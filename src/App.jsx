@@ -468,7 +468,14 @@ function inscricaoAberta() {
 
 // Times mais bem colocados da última edição (7ª, VII Copa) — usados pra
 // montar o Pote 1 do sorteio, conforme Art. 13 do regulamento.
-const MELHORES_COLOCADOS_ULTIMA_EDICAO = ["2010", "2014", "2022.1", "2009"];
+// Classificação final da última edição (1º ao 15º), do jeito que a
+// organização confirmou — usada pra montar os 5 potes do sorteio (Art. 13).
+const RANKING_ULTIMA_EDICAO = [
+  "2010", "2014", "2022.1", "2009", // pote 1 — 1º a 4º
+  "2015", "2021", "2007/06", "2022.2", // pote 2 — 5º a 8º
+  "2019", "2003/04", "2020", "2001/02", // pote 3 — 9º a 12º
+  "2012", "2018", "2013", // pote 4 — 13º a 15º
+];
 
 // Regras de inscrição vindas do regulamento oficial (Capítulo III), usadas
 // pelo diagnosticador de irregularidades.
@@ -2817,37 +2824,13 @@ function Cadastro({ onVoltar }) {
 // grupos. Só admin sorteia; todo mundo vê o resultado.
 // ---------------------------------------------------------------------------
 function montarPotes(teams) {
-  const restantes = [...teams];
-  const tirar = (pred) => {
-    const achados = restantes.filter(pred);
-    achados.forEach((t) => {
-      const idx = restantes.indexOf(t);
-      if (idx > -1) restantes.splice(idx, 1);
-    });
-    return achados;
-  };
-
-  const pote1 = MELHORES_COLOCADOS_ULTIMA_EDICAO
-    .map((turma) => restantes.find((t) => t.nome === turma))
-    .filter(Boolean);
-  pote1.forEach((t) => {
-    const idx = restantes.indexOf(t);
-    if (idx > -1) restantes.splice(idx, 1);
+  const potes = [[], [], [], [], []]; // pote 5 = times novos (fora do ranking)
+  teams.forEach((t) => {
+    const posicao = RANKING_ULTIMA_EDICAO.indexOf(t.nome);
+    const indicePote = posicao === -1 ? 4 : Math.min(3, Math.floor(posicao / 4));
+    potes[indicePote].push(t);
   });
-
-  const novos = tirar((t) => !TURMAS_HISTORICAS.some((h) => h.turma === t.nome));
-
-  // Os demais times históricos (sem posição exata conhecida da última
-  // edição) ficam distribuídos entre os potes 2, 3 e 4.
-  const historicosRestantes = [...restantes];
-  const pote2 = [];
-  const pote3 = [];
-  const pote4 = [];
-  historicosRestantes.forEach((t, i) => {
-    [pote2, pote3, pote4][i % 3].push(t);
-  });
-
-  return [pote1, pote2, pote3, pote4, novos];
+  return potes;
 }
 
 function sortearGrupos(potes) {
@@ -2891,9 +2874,9 @@ function Sorteio({ teams, sorteio, saveSorteio, sessao }) {
     <div>
       <SectionLabel eyebrow="Art. 13 do regulamento" title="Sorteio dos grupos" />
       <p className="text-sm mb-6 max-w-xl" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-        Pote 1 traz os 4 melhores colocados da edição passada (2010, 2014, 2022.1 e 2009). Os
-        demais times já conhecidos ficam distribuídos nos potes 2 a 4, e o pote 5 é só para
-        times novos, nunca inscritos antes — igual manda o regulamento.
+        Os potes seguem a classificação final da última edição (1º ao 15º), do 1º-4º no pote 1
+        até o 13º-15º no pote 4. O pote 5 é só para times novos, que nunca disputaram antes —
+        igual manda o regulamento. O campeão sai sempre como cabeça de chave do Grupo A.
       </p>
 
       <div className="grid sm:grid-cols-5 gap-3 mb-8">
