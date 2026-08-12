@@ -97,3 +97,21 @@ export async function promoverParaAdmin(userId, email) {
   const { error } = await supabase.from("admins").insert({ user_id: userId, email, super_admin: false });
   if (error) throw error;
 }
+
+// ---------------------------------------------------------------------
+// Armazenamento de fotos e vídeos (Supabase Storage) — em vez de guardar
+// a imagem inteira como texto dentro do banco, sobe o arquivo de verdade
+// pro bucket "fotos" e guarda só o link curto. Mais leve e sem limite
+// artificial de tamanho pra vídeo.
+// ---------------------------------------------------------------------
+
+export async function subirArquivo(blob, nomeArquivo, contentType) {
+  const caminho = `${Date.now()}_${nomeArquivo.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+  const { error } = await supabase.storage.from("fotos").upload(caminho, blob, {
+    contentType: contentType || blob.type,
+    upsert: false,
+  });
+  if (error) throw error;
+  const { data } = supabase.storage.from("fotos").getPublicUrl(caminho);
+  return data.publicUrl;
+}

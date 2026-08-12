@@ -38,6 +38,7 @@ import {
   souAdmin,
   listarAdmins,
   promoverParaAdmin,
+  subirArquivo,
 } from "./lib/supabase.js";
 
 // ---------------------------------------------------------------------------
@@ -533,6 +534,38 @@ function compressImageFile(file, maxSize = 1080, quality = 0.72) {
         const ctx = canvas.getContext("2d");
         ctx.drawImage(img, 0, 0, width, height);
         resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// Mesma compressão, mas devolve um Blob de verdade em vez de base64 — pra
+// subir pro Supabase Storage (fotos/vídeos da Comunidade), em vez de
+// guardar a imagem inteira como texto dentro do banco.
+function compressImageToBlob(file, maxSize = 1280, quality = 0.75) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Falha ao ler arquivo"));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("Falha ao carregar imagem"));
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > height && width > maxSize) {
+          height = Math.round((height * maxSize) / width);
+          width = maxSize;
+        } else if (height > maxSize) {
+          width = Math.round((width * maxSize) / height);
+          height = maxSize;
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("Falha ao gerar imagem"))), "image/jpeg", quality);
       };
       img.src = reader.result;
     };
@@ -1811,8 +1844,9 @@ function Comunidade({ posts, savePosts }) {
   const fotoInputRef = React.useRef(null);
   const videoInputRef = React.useRef(null);
   const [capturing, setCapturing] = useState(false);
+  const [subindoVideo, setSubindoVideo] = useState(false);
 
-  const MAX_VIDEO_BYTES = 4 * 1024 * 1024; // limite do armazenamento (texto/base64)
+  const MAX_VIDEO_BYTES = 60 * 1024 * 1024; // limite generoso do plano gratuito do Storage
 
   const publicar = async (extra) => {
     setSaving(true);
@@ -1820,7 +1854,7 @@ function Comunidade({ posts, savePosts }) {
       id: `post_${Date.now()}`,
       ano,
       fotoUrl: "",
-      videoData: "",
+      videoUrl: "",
       legenda: legenda.trim(),
       criadoEm: new Date().toISOString(),
       ...extra,
@@ -1839,8 +1873,9 @@ function Comunidade({ posts, savePosts }) {
     if (!file) return;
     setCapturing(true);
     try {
-      const dataUrl = await compressImageFile(file);
-      await publicar({ fotoUrl: dataUrl });
+      const blob = await compressImageToBlob(file);
+      const url = await subirArquivo(blob, file.name || "foto.jpg", "image/jpeg");
+      await publicar({ fotoUrl: url });
     } catch (err) {
       console.error(err);
     } finally {
@@ -1853,17 +1888,24 @@ function Comunidade({ posts, savePosts }) {
     e.target.value = "";
     if (!file) return;
     setVideoErro("");
+    if (file.size > MAX_VIDEO_BYTES) {
+      setVideoErro(`Vídeo muito grande (máximo ${(MAX_VIDEO_BYTES / 1024 / 1024).toFixed(0)}MB). Grava um trecho mais curto.`);
+      return;
+    }
+    setSubindoVideo(true);
     try {
-      const dataUrl = await readFileAsDataURL(file, MAX_VIDEO_BYTES);
-      setVideoStaged(dataUrl);
+      const url = await subirArquivo(file, file.name || "video.mp4", file.type);
+      setVideoStaged(url);
     } catch (err) {
-      setVideoErro(err.message);
+      setVideoErro("Falha ao subir o vídeo: " + err.message);
+    } finally {
+      setSubindoVideo(false);
     }
   };
 
   const publicarVideo = async () => {
     if (!videoStaged) return;
-    await publicar({ videoData: videoStaged });
+    await publicar({ videoUrl: videoStaged });
   };
 
   const anos = ["Todos", ...Array.from(new Set(posts.map((p) => p.ano).filter(Boolean)))];
@@ -1909,11 +1951,12 @@ function Comunidade({ posts, savePosts }) {
         <button
           type="button"
           onClick={() => videoInputRef.current && videoInputRef.current.click()}
-          className="w-14 h-14 rounded-full flex items-center justify-center shrink-0"
+          disabled={subindoVideo}
+          className="w-14 h-14 rounded-full flex items-center justify-center shrink-0 disabled:opacity-60"
           style={{ backgroundColor: COLORS.navy }}
           aria-label="Adicionar vídeo"
         >
-          <Video size={20} color={COLORS.gold} />
+          {subindoVideo ? <Loader2 size={20} color={COLORS.gold} className="animate-spin" /> : <Video size={20} color={COLORS.gold} />}
         </button>
         <div className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
           Foto (câmera ou galeria) publica na hora. Vídeo (câmera ou galeria) — edição:{" "}
@@ -2017,8 +2060,8 @@ function Comunidade({ posts, savePosts }) {
                 className="rounded-2xl overflow-hidden"
                 style={{ border: `1px solid ${COLORS.border}`, backgroundColor: COLORS.card }}
               >
-                {p.videoData ? (
-                  <video src={p.videoData} controls className="w-full max-h-64 bg-black" />
+                {p.videoUrl ? (
+                  <video src={p.videoUrl} controls className="w-full max-h-64 bg-black" />
                 ) : (
                   p.fotoUrl && <img src={p.fotoUrl} alt={p.legenda} className="w-full h-48 object-cover" />
                 )}
@@ -3732,12 +3775,13 @@ export default function App() {
     if (!file) return;
     setFabBusy(true);
     try {
-      const dataUrl = await compressImageFile(file);
+      const blob = await compressImageToBlob(file);
+      const url = await subirArquivo(blob, file.name || "foto.jpg", "image/jpeg");
       const novo = {
         id: `post_${Date.now()}`,
         ano: EDICOES_DISPONIVEIS[0],
-        fotoUrl: dataUrl,
-        videoData: "",
+        fotoUrl: url,
+        videoUrl: "",
         legenda: "",
         criadoEm: new Date().toISOString(),
       };
