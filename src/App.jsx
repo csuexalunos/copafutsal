@@ -217,33 +217,33 @@ const ESCUDOS_TIMES = {
 
 const ELENCOS_2025 = {
   "2022.1": [
-    { numero: 1, apelido: "Pedro Miguel", nome: "Pedro Miguel Silva Couto", periodo: "2015-2022", anoConclusao: "2022.0" },
-    { numero: 2, apelido: "Caik", nome: "Caik agra toledo", periodo: "2012-2022", anoConclusao: "2022.0" },
-    { numero: 4, apelido: "Elias", nome: "Gabriel Elias calheiros", periodo: "2012-2022", anoConclusao: "2022.0" },
-    { numero: 5, apelido: "Huguinho", nome: "Hugo Santos ferro Cavalcante", periodo: "2012-2022", anoConclusao: "2022.0" },
-    { numero: 7, apelido: "Assis", nome: "Pedro Assis leite nobre", periodo: "2016-2022", anoConclusao: "2022.0" },
-    { numero: 7, apelido: "Bel", nome: "BELTRANO ALVES GUSMÃO BARBOSA", periodo: "1995-2005", anoConclusao: "2005.0" },
-    { numero: 8, apelido: "Marlon", nome: "Marlon vergetti Araújo", periodo: "2012-2022", anoConclusao: "2022.0" },
-    { numero: 10, apelido: "Lucca", nome: "Luciano lucca farias", periodo: "2019-2022", anoConclusao: "2022.0" },
-    { numero: 11, apelido: "Borela", nome: "Lucca borela toledo correia", periodo: "2012-2022", anoConclusao: "2022.0" },
-    { numero: 14, apelido: "Teixeira", nome: "Pedro Teixeira dos Santos soares", periodo: "2016-2022", anoConclusao: "2022.0" },
-    { numero: 25, apelido: "Eugênio", nome: "Luiz Eugênio Duarte Santos", periodo: "2018-2022", anoConclusao: "2022.0" },
-    { numero: 77, apelido: "Bruno", nome: "Bruno Fernandes calheiros", periodo: "2018-2022", anoConclusao: "2022.0" },
+    { numero: 1, apelido: "Pedro Miguel", nome: "Pedro Miguel Silva Couto", periodo: "2015-2022", anoConclusao: "2022" },
+    { numero: 2, apelido: "Caik", nome: "Caik agra toledo", periodo: "2012-2022", anoConclusao: "2022" },
+    { numero: 4, apelido: "Elias", nome: "Gabriel Elias calheiros", periodo: "2012-2022", anoConclusao: "2022" },
+    { numero: 5, apelido: "Huguinho", nome: "Hugo Santos ferro Cavalcante", periodo: "2012-2022", anoConclusao: "2022" },
+    { numero: 7, apelido: "Assis", nome: "Pedro Assis leite nobre", periodo: "2016-2022", anoConclusao: "2022" },
+    { numero: 7, apelido: "Bel", nome: "BELTRANO ALVES GUSMÃO BARBOSA", periodo: "1995-2005", anoConclusao: "2005" },
+    { numero: 8, apelido: "Marlon", nome: "Marlon vergetti Araújo", periodo: "2012-2022", anoConclusao: "2022" },
+    { numero: 10, apelido: "Lucca", nome: "Luciano lucca farias", periodo: "2019-2022", anoConclusao: "2022" },
+    { numero: 11, apelido: "Borela", nome: "Lucca borela toledo correia", periodo: "2012-2022", anoConclusao: "2022" },
+    { numero: 14, apelido: "Teixeira", nome: "Pedro Teixeira dos Santos soares", periodo: "2016-2022", anoConclusao: "2022" },
+    { numero: 25, apelido: "Eugênio", nome: "Luiz Eugênio Duarte Santos", periodo: "2018-2022", anoConclusao: "2022" },
+    { numero: 77, apelido: "Bruno", nome: "Bruno Fernandes calheiros", periodo: "2018-2022", anoConclusao: "2022" },
   ],
   "2007/06": [
-    { numero: 1, apelido: "Ze", nome: "JOSE LUCAS PACHECO RODRIGUES LIMA", periodo: "2006-2007", anoConclusao: "2007.0" },
-    { numero: 2, apelido: "Baratinha", nome: "SIDNEY DUARTE ARRUDA PIMENTEL", periodo: "1995-2005", anoConclusao: "2007.0" },
-    { numero: 3, apelido: "Caio", nome: "CAIO MAGALHÃES BATISTA", periodo: "1994-2004", anoConclusao: "2007.0" },
-    { numero: 4, apelido: "Del", nome: "HILDEBRANDO T. DE A. NETO", periodo: "1997-2007", anoConclusao: "2007.0" },
-    { numero: 6, apelido: "Rodolfo", nome: "RODOLFO SANTOS BEZERRA", periodo: "1994-2004", anoConclusao: "2006.0" },
-    { numero: 7, apelido: "Engels", nome: "ENGELS BARROS DE CASTRO", periodo: "1997-1998", anoConclusao: "2006.0" },
-    { numero: 8, apelido: "Gabriel (cachorrão)", nome: "GABRIEL DE FRANÇA RIBEIRO", periodo: "1996-2006", anoConclusao: "2006.0" },
-    { numero: 9, apelido: "Luan", nome: "LUAN FARACO GUIMARÃES", periodo: "2005.0", anoConclusao: "2007.0" },
-    { numero: 10, apelido: "Leite", nome: "BRUNO LEITE SETTON", periodo: "1997-2007", anoConclusao: "2007.0" },
-    { numero: 11, apelido: "Breno", nome: "BRENO DA SILVEIRA PACHECO", periodo: "1997-2004", anoConclusao: "2007.0" },
-    { numero: 14, apelido: "Pedro", nome: "PEDRO GUILHERME FERREIRA TENÓRIO", periodo: "2000-2001", anoConclusao: "2007.0" },
-    { numero: 21, apelido: "Abilio", nome: "ABILIO JORGE TENORIO ANTUNES DE MELLO", periodo: "1997-2004", anoConclusao: "2007.0" },
-    { numero: 69, apelido: "Dudu", nome: "EDUARDO SANTOS C DE ALBUQUERQUE", periodo: "2001-2004", anoConclusao: "2006.0" },
+    { numero: 1, apelido: "Ze", nome: "JOSE LUCAS PACHECO RODRIGUES LIMA", periodo: "2006-2007", anoConclusao: "2007" },
+    { numero: 2, apelido: "Baratinha", nome: "SIDNEY DUARTE ARRUDA PIMENTEL", periodo: "1995-2005", anoConclusao: "2007" },
+    { numero: 3, apelido: "Caio", nome: "CAIO MAGALHÃES BATISTA", periodo: "1994-2004", anoConclusao: "2007" },
+    { numero: 4, apelido: "Del", nome: "HILDEBRANDO T. DE A. NETO", periodo: "1997-2007", anoConclusao: "2007" },
+    { numero: 6, apelido: "Rodolfo", nome: "RODOLFO SANTOS BEZERRA", periodo: "1994-2004", anoConclusao: "2006" },
+    { numero: 7, apelido: "Engels", nome: "ENGELS BARROS DE CASTRO", periodo: "1997-1998", anoConclusao: "2006" },
+    { numero: 8, apelido: "Gabriel (cachorrão)", nome: "GABRIEL DE FRANÇA RIBEIRO", periodo: "1996-2006", anoConclusao: "2006" },
+    { numero: 9, apelido: "Luan", nome: "LUAN FARACO GUIMARÃES", periodo: "2005.0", anoConclusao: "2007" },
+    { numero: 10, apelido: "Leite", nome: "BRUNO LEITE SETTON", periodo: "1997-2007", anoConclusao: "2007" },
+    { numero: 11, apelido: "Breno", nome: "BRENO DA SILVEIRA PACHECO", periodo: "1997-2004", anoConclusao: "2007" },
+    { numero: 14, apelido: "Pedro", nome: "PEDRO GUILHERME FERREIRA TENÓRIO", periodo: "2000-2001", anoConclusao: "2007" },
+    { numero: 21, apelido: "Abilio", nome: "ABILIO JORGE TENORIO ANTUNES DE MELLO", periodo: "1997-2004", anoConclusao: "2007" },
+    { numero: 69, apelido: "Dudu", nome: "EDUARDO SANTOS C DE ALBUQUERQUE", periodo: "2001-2004", anoConclusao: "2006" },
   ],
   "2009": [
     { numero: 1, apelido: "Vovô", nome: "Diego José Uchôa Quintela", periodo: "2000-2006", anoConclusao: "2009" },
@@ -258,15 +258,15 @@ const ELENCOS_2025 = {
     { numero: 69, apelido: "Yaggo", nome: "Yaggo de Melo Freitas", periodo: "2003-2009", anoConclusao: "2009" },
   ],
   "2020": [
-    { numero: 4, apelido: "Bernardo", nome: "Bernardo Torres de Souza", periodo: "2010-2020", anoConclusao: "2020.0" },
-    { numero: 5, apelido: "Teixeira", nome: "Matheus Monteiro Pires Teixeira", periodo: "2019-2020", anoConclusao: "2020.0" },
-    { numero: 8, apelido: "Rodrigo", nome: "RODRIGO COELHO BRINGEL B. DE BRITO", periodo: "2011-2020", anoConclusao: "2020.0" },
-    { numero: 9, apelido: "Luan", nome: "LUAN HENRIQUE OLIVEIRA DO NASCIMENTO LOPES NETTER", periodo: "2016-2020", anoConclusao: "2020.0" },
-    { numero: 10, apelido: "Aragão", nome: "GABRIEL VERÇOSA ARAGÃO", periodo: "2014-2018", anoConclusao: "2020.0" },
-    { numero: 11, apelido: "Dudu", nome: "EDUARDO LARANJEIRA LEAHY", periodo: "2014-2020", anoConclusao: "2020.0" },
-    { numero: 17, apelido: "Arthur", nome: "ARTHUR COELHO BRINGEL BEZERRA DE BRITO", periodo: "2011-2024", anoConclusao: "2024.0" },
-    { numero: 21, apelido: "Kevin", nome: "KEVIN MEDEIROS DE SOUZA", periodo: "2014-2017", anoConclusao: "2020.0" },
-    { numero: 38, apelido: "José", nome: "José Victor Gadelha Xavier Martins", periodo: "2006-2020", anoConclusao: "2020.0" },
+    { numero: 4, apelido: "Bernardo", nome: "Bernardo Torres de Souza", periodo: "2010-2020", anoConclusao: "2020" },
+    { numero: 5, apelido: "Teixeira", nome: "Matheus Monteiro Pires Teixeira", periodo: "2019-2020", anoConclusao: "2020" },
+    { numero: 8, apelido: "Rodrigo", nome: "RODRIGO COELHO BRINGEL B. DE BRITO", periodo: "2011-2020", anoConclusao: "2020" },
+    { numero: 9, apelido: "Luan", nome: "LUAN HENRIQUE OLIVEIRA DO NASCIMENTO LOPES NETTER", periodo: "2016-2020", anoConclusao: "2020" },
+    { numero: 10, apelido: "Aragão", nome: "GABRIEL VERÇOSA ARAGÃO", periodo: "2014-2018", anoConclusao: "2020" },
+    { numero: 11, apelido: "Dudu", nome: "EDUARDO LARANJEIRA LEAHY", periodo: "2014-2020", anoConclusao: "2020" },
+    { numero: 17, apelido: "Arthur", nome: "ARTHUR COELHO BRINGEL BEZERRA DE BRITO", periodo: "2011-2024", anoConclusao: "2024" },
+    { numero: 21, apelido: "Kevin", nome: "KEVIN MEDEIROS DE SOUZA", periodo: "2014-2017", anoConclusao: "2020" },
+    { numero: 38, apelido: "José", nome: "José Victor Gadelha Xavier Martins", periodo: "2006-2020", anoConclusao: "2020" },
   ],
   "2010": [
     { numero: 7, apelido: "Bel", nome: "BELTRANO ALVES GUSMÃO BARBOSA", periodo: "1995-2005", anoConclusao: "2005" },
@@ -326,40 +326,40 @@ const ELENCOS_2025 = {
     { numero: 50, apelido: "Castanha", nome: "Ycaro Farias Valença", periodo: "94 A 2002", anoConclusao: "2002" },
   ],
   "2022.2": [
-    { numero: 4, apelido: "Besouro", nome: "Sérgio Rodrigues da Rocha neto", periodo: "2016-2022", anoConclusao: "2022.0" },
-    { numero: 6, apelido: "Uchôa", nome: "Rodrigo Nolasco Candido Uchoa", periodo: "2018 - 2022", anoConclusao: "2022.0" },
-    { numero: 7, apelido: "Bel", nome: "BELTRANO ALVES GUSMÃO BARBOSA", periodo: "1995-2005", anoConclusao: "2005.0" },
-    { numero: 8, apelido: "Nougaro", nome: "Gabriel Bittencourt Nougaro", periodo: "2016-2021", anoConclusao: "2022.0" },
-    { numero: 9, apelido: "Danielzinho", nome: "Daniel Lucena Dos Anjos", periodo: "2020-2022", anoConclusao: "2022.0" },
-    { numero: 10, apelido: "Griz", nome: "Vinicius Almeida Griz", periodo: "2016-2022", anoConclusao: "2022.0" },
-    { numero: 11, apelido: "Heitor", nome: "Heitor Cesar Neves Sampaio", periodo: "2014-2018", anoConclusao: "2022.0" },
-    { numero: 14, apelido: "Ildo", nome: "Ildo Raphael Caldeira Vasconcelos", periodo: "2012-2022", anoConclusao: "2022.0" },
-    { numero: 19, apelido: "Juninho", nome: "Paulo Daniel Juazeiro arruda de Carvalho Júnior", periodo: "2016-18/ 2020", anoConclusao: "2022.0" },
-    { numero: 24, apelido: "Da Mota", nome: "Mateus da Mota Lins Queiroga", periodo: "2019-2022", anoConclusao: "2022.0" },
+    { numero: 4, apelido: "Besouro", nome: "Sérgio Rodrigues da Rocha neto", periodo: "2016-2022", anoConclusao: "2022" },
+    { numero: 6, apelido: "Uchôa", nome: "Rodrigo Nolasco Candido Uchoa", periodo: "2018 - 2022", anoConclusao: "2022" },
+    { numero: 7, apelido: "Bel", nome: "BELTRANO ALVES GUSMÃO BARBOSA", periodo: "1995-2005", anoConclusao: "2005" },
+    { numero: 8, apelido: "Nougaro", nome: "Gabriel Bittencourt Nougaro", periodo: "2016-2021", anoConclusao: "2022" },
+    { numero: 9, apelido: "Danielzinho", nome: "Daniel Lucena Dos Anjos", periodo: "2020-2022", anoConclusao: "2022" },
+    { numero: 10, apelido: "Griz", nome: "Vinicius Almeida Griz", periodo: "2016-2022", anoConclusao: "2022" },
+    { numero: 11, apelido: "Heitor", nome: "Heitor Cesar Neves Sampaio", periodo: "2014-2018", anoConclusao: "2022" },
+    { numero: 14, apelido: "Ildo", nome: "Ildo Raphael Caldeira Vasconcelos", periodo: "2012-2022", anoConclusao: "2022" },
+    { numero: 19, apelido: "Juninho", nome: "Paulo Daniel Juazeiro arruda de Carvalho Júnior", periodo: "2016-18/ 2020", anoConclusao: "2022" },
+    { numero: 24, apelido: "Da Mota", nome: "Mateus da Mota Lins Queiroga", periodo: "2019-2022", anoConclusao: "2022" },
   ],
   "2015": [
-    { numero: 1, apelido: "Daniel", nome: "Daniel Monteiro de Carvalho Filho", periodo: "2009-2015", anoConclusao: "2015.0" },
-    { numero: 3, apelido: "Boi", nome: "Bruno Lins Soares Palmeira", periodo: "2009 - 2015", anoConclusao: "2015.0" },
-    { numero: 4, apelido: "Renan", nome: "Renan Kayan Couto Silva", periodo: "2005 - 2013", anoConclusao: "2015.0" },
-    { numero: 7, apelido: "Rogerinho", nome: "Lucas Rogério Sampaio Lima", periodo: "2009-2015", anoConclusao: "2015.0" },
-    { numero: 7, apelido: "Bel", nome: "BELTRANO ALVES GUSMÃO BARBOSA", periodo: "1995-2005", anoConclusao: "2005.0" },
-    { numero: 9, apelido: "Sego", nome: "Diogo Pitombeira Braga", periodo: "2011-2015", anoConclusao: "2015.0" },
-    { numero: 10, apelido: "Schausse", nome: "Gustavo Schausse Salgado", periodo: "2005 a 2015", anoConclusao: "2015.0" },
-    { numero: 11, apelido: "Marquinhos", nome: "Marcos Antônio Hermes Leandro Junior", periodo: "2005 a 2012", anoConclusao: "2015.0" },
-    { numero: 13, apelido: "Mineiro", nome: "Lucas Mendes Rosa Peres", periodo: "2012 a 2015", anoConclusao: "2015.0" },
+    { numero: 1, apelido: "Daniel", nome: "Daniel Monteiro de Carvalho Filho", periodo: "2009-2015", anoConclusao: "2015" },
+    { numero: 3, apelido: "Boi", nome: "Bruno Lins Soares Palmeira", periodo: "2009 - 2015", anoConclusao: "2015" },
+    { numero: 4, apelido: "Renan", nome: "Renan Kayan Couto Silva", periodo: "2005 - 2013", anoConclusao: "2015" },
+    { numero: 7, apelido: "Rogerinho", nome: "Lucas Rogério Sampaio Lima", periodo: "2009-2015", anoConclusao: "2015" },
+    { numero: 7, apelido: "Bel", nome: "BELTRANO ALVES GUSMÃO BARBOSA", periodo: "1995-2005", anoConclusao: "2005" },
+    { numero: 9, apelido: "Sego", nome: "Diogo Pitombeira Braga", periodo: "2011-2015", anoConclusao: "2015" },
+    { numero: 10, apelido: "Schausse", nome: "Gustavo Schausse Salgado", periodo: "2005 a 2015", anoConclusao: "2015" },
+    { numero: 11, apelido: "Marquinhos", nome: "Marcos Antônio Hermes Leandro Junior", periodo: "2005 a 2012", anoConclusao: "2015" },
+    { numero: 13, apelido: "Mineiro", nome: "Lucas Mendes Rosa Peres", periodo: "2012 a 2015", anoConclusao: "2015" },
   ],
   "2003/04": [
-    { numero: 5, apelido: "Cadu", nome: "Carlos Eduardo Neto Muniz Farias", periodo: "2000 – 2003", anoConclusao: "2003.0" },
-    { numero: 7, apelido: "Dennis", nome: "Danny Charles Oliveira de Almeida Ventura", periodo: "1997 – 2001", anoConclusao: "2003.0" },
-    { numero: 10, apelido: "Thales", nome: "Thales Anderson Bastos Soares", periodo: "2001 – 2003", anoConclusao: "2003.0" },
-    { numero: 12, apelido: "Gabriel", nome: "Gabriel Toledo Torres", periodo: "1988 - 2003", anoConclusao: "2003.0" },
-    { numero: 18, apelido: "D2", nome: "Diego Marcel Cavalcante de Vasconcelos", periodo: "1995 – 2000", anoConclusao: "2003.0" },
-    { numero: 51, apelido: "Brulu", nome: "Bruno Lucio de Oliveira", periodo: "2003 – 2004", anoConclusao: "2004.0" },
-    { numero: 69, apelido: "Sukebe", nome: "Fernando Nebson Falcão Tavares Junior", periodo: "2004.0", anoConclusao: "2004.0" },
-    { numero: 420, apelido: "Tulio", nome: "Tulio José Bastos Soares", periodo: "2001 – 2003", anoConclusao: "2003.0" },
-    { numero: null, apelido: null, nome: "Henrique Emanoel Rocha Santos", periodo: "2002 - 2004", anoConclusao: "2004.0" },
-    { numero: null, apelido: null, nome: "Leopoldo Marcílio Gonçalves Souza", periodo: "1992 - 2001", anoConclusao: "2003.0" },
-    { numero: null, apelido: null, nome: "Henrique Barreto Monteiro", periodo: "1992-2001", anoConclusao: "2003.0" },
+    { numero: 5, apelido: "Cadu", nome: "Carlos Eduardo Neto Muniz Farias", periodo: "2000 – 2003", anoConclusao: "2003" },
+    { numero: 7, apelido: "Dennis", nome: "Danny Charles Oliveira de Almeida Ventura", periodo: "1997 – 2001", anoConclusao: "2003" },
+    { numero: 10, apelido: "Thales", nome: "Thales Anderson Bastos Soares", periodo: "2001 – 2003", anoConclusao: "2003" },
+    { numero: 12, apelido: "Gabriel", nome: "Gabriel Toledo Torres", periodo: "1988 - 2003", anoConclusao: "2003" },
+    { numero: 18, apelido: "D2", nome: "Diego Marcel Cavalcante de Vasconcelos", periodo: "1995 – 2000", anoConclusao: "2003" },
+    { numero: 51, apelido: "Brulu", nome: "Bruno Lucio de Oliveira", periodo: "2003 – 2004", anoConclusao: "2004" },
+    { numero: 69, apelido: "Sukebe", nome: "Fernando Nebson Falcão Tavares Junior", periodo: "2004.0", anoConclusao: "2004" },
+    { numero: 420, apelido: "Tulio", nome: "Tulio José Bastos Soares", periodo: "2001 – 2003", anoConclusao: "2003" },
+    { numero: null, apelido: null, nome: "Henrique Emanoel Rocha Santos", periodo: "2002 - 2004", anoConclusao: "2004" },
+    { numero: null, apelido: null, nome: "Leopoldo Marcílio Gonçalves Souza", periodo: "1992 - 2001", anoConclusao: "2003" },
+    { numero: null, apelido: null, nome: "Henrique Barreto Monteiro", periodo: "1992-2001", anoConclusao: "2003" },
   ],
   "2019": [
     { numero: 2, apelido: "Raimundinho", nome: "RAIMUNDO LUKAS NOGUEIRA MELLO ALEXANDRE", periodo: "2013-2019", anoConclusao: "2019" },
@@ -373,14 +373,14 @@ const ELENCOS_2025 = {
     { numero: 87, apelido: "Chumbo-", nome: "DIEGO ESTEVÃO DA COSTA", periodo: "2011-2019", anoConclusao: "2019" },
   ],
   "2021": [
-    { numero: 1, apelido: "Pipi", nome: "felipe oliveira soares de lima", periodo: "2015 a 2017", anoConclusao: "2021.0" },
-    { numero: 5, apelido: "Leão", nome: "Pedro Vitor Rolemberg leão", periodo: "2015 a 2018", anoConclusao: "2021.0" },
-    { numero: 7, apelido: "Bel", nome: "BELTRANO ALVES GUSMÃO BARBOSA", periodo: "1995-2005", anoConclusao: "2005.0" },
-    { numero: 8, apelido: "Bassoa", nome: "juan henrique almeida bassoa", periodo: "2015 a 2018", anoConclusao: "2021.0" },
-    { numero: 9, apelido: "Coxinha", nome: "caio tenorio bentes", periodo: "2014 a 2017", anoConclusao: "2020.0" },
-    { numero: 19, apelido: "Gerônimo", nome: "marcos geronimo barbosa", periodo: "2010 a 2015", anoConclusao: "2020.0" },
-    { numero: 22, apelido: "Marcellus", nome: "pedro marcellus portella", periodo: "Maternal, 2015-2017", anoConclusao: "2022.0" },
-    { numero: 99, apelido: "Serginho", nome: "Sergio ricardo maciel filho", periodo: "2011 a 2014", anoConclusao: "2021.0" },
+    { numero: 1, apelido: "Pipi", nome: "felipe oliveira soares de lima", periodo: "2015 a 2017", anoConclusao: "2021" },
+    { numero: 5, apelido: "Leão", nome: "Pedro Vitor Rolemberg leão", periodo: "2015 a 2018", anoConclusao: "2021" },
+    { numero: 7, apelido: "Bel", nome: "BELTRANO ALVES GUSMÃO BARBOSA", periodo: "1995-2005", anoConclusao: "2005" },
+    { numero: 8, apelido: "Bassoa", nome: "juan henrique almeida bassoa", periodo: "2015 a 2018", anoConclusao: "2021" },
+    { numero: 9, apelido: "Coxinha", nome: "caio tenorio bentes", periodo: "2014 a 2017", anoConclusao: "2020" },
+    { numero: 19, apelido: "Gerônimo", nome: "marcos geronimo barbosa", periodo: "2010 a 2015", anoConclusao: "2020" },
+    { numero: 22, apelido: "Marcellus", nome: "pedro marcellus portella", periodo: "Maternal, 2015-2017", anoConclusao: "2022" },
+    { numero: 99, apelido: "Serginho", nome: "Sergio ricardo maciel filho", periodo: "2011 a 2014", anoConclusao: "2021" },
   ],
   "2018": [
     { numero: 1, apelido: "Pão", nome: "João Victor Vieira Melo", periodo: "2004-2016", anoConclusao: "2016" },
@@ -393,19 +393,19 @@ const ELENCOS_2025 = {
     { numero: 17, apelido: "Victor", nome: "João Victor Porciuncula", periodo: "2006-2018", anoConclusao: "2018" },
   ],
   "2012": [
-    { numero: 1, apelido: "Thiago", nome: "Thiago Lins Ramires", periodo: "2006-2012", anoConclusao: "2012.0" },
-    { numero: 5, apelido: "Netinho", nome: "Jose Agnaldo de Souza Araujo Neto", periodo: "2005-2012", anoConclusao: "2012.0" },
-    { numero: 6, apelido: "Henrique", nome: "Henrique Vaz Ferreira Acioli", periodo: "2005-2011", anoConclusao: "2011.0" },
-    { numero: 7, apelido: "Fumaça", nome: "Vinicius Nunes Felino", periodo: "2011-2012", anoConclusao: "2012.0" },
-    { numero: 8, apelido: "Murilo", nome: "Murilo Correia Tenorio de Albuquerque", periodo: "2004-2007", anoConclusao: "2012.0" },
-    { numero: 9, apelido: "Iago", nome: "Iago Gomes Vacchiano", periodo: "2006-2009", anoConclusao: "2012.0" },
-    { numero: 10, apelido: "Ib", nome: "Ib da Aldeia Breda", periodo: "2006-2010", anoConclusao: "2012.0" },
-    { numero: 11, apelido: "Chico", nome: "Francisco Hélio Cavalcante Jatobá Neto", periodo: "2006-2010", anoConclusao: "2011.0" },
-    { numero: 58, apelido: "Neto", nome: "José Jairo Melo neto", periodo: "1996-2006", anoConclusao: "2012.0" },
-    { numero: 69, apelido: "Lelaeta", nome: "Rodrigo Vilela Cortes", periodo: "2005-2008", anoConclusao: "2012.0" },
-    { numero: 94, apelido: "Fabinho", nome: "Fabio Manoel Fragoso Bittencourt Araujo", periodo: "2005-2010", anoConclusao: "2011.0" },
-    { numero: 99, apelido: "Emano", nome: "Emmanoel Victor Esteves da Rocha", periodo: "2006-2010", anoConclusao: "2012.0" },
-    { numero: 157, apelido: "Sipa", nome: "João Carlos Nunes", periodo: "2000-2007", anoConclusao: "2012.0" },
+    { numero: 1, apelido: "Thiago", nome: "Thiago Lins Ramires", periodo: "2006-2012", anoConclusao: "2012" },
+    { numero: 5, apelido: "Netinho", nome: "Jose Agnaldo de Souza Araujo Neto", periodo: "2005-2012", anoConclusao: "2012" },
+    { numero: 6, apelido: "Henrique", nome: "Henrique Vaz Ferreira Acioli", periodo: "2005-2011", anoConclusao: "2011" },
+    { numero: 7, apelido: "Fumaça", nome: "Vinicius Nunes Felino", periodo: "2011-2012", anoConclusao: "2012" },
+    { numero: 8, apelido: "Murilo", nome: "Murilo Correia Tenorio de Albuquerque", periodo: "2004-2007", anoConclusao: "2012" },
+    { numero: 9, apelido: "Iago", nome: "Iago Gomes Vacchiano", periodo: "2006-2009", anoConclusao: "2012" },
+    { numero: 10, apelido: "Ib", nome: "Ib da Aldeia Breda", periodo: "2006-2010", anoConclusao: "2012" },
+    { numero: 11, apelido: "Chico", nome: "Francisco Hélio Cavalcante Jatobá Neto", periodo: "2006-2010", anoConclusao: "2011" },
+    { numero: 58, apelido: "Neto", nome: "José Jairo Melo neto", periodo: "1996-2006", anoConclusao: "2012" },
+    { numero: 69, apelido: "Lelaeta", nome: "Rodrigo Vilela Cortes", periodo: "2005-2008", anoConclusao: "2012" },
+    { numero: 94, apelido: "Fabinho", nome: "Fabio Manoel Fragoso Bittencourt Araujo", periodo: "2005-2010", anoConclusao: "2011" },
+    { numero: 99, apelido: "Emano", nome: "Emmanoel Victor Esteves da Rocha", periodo: "2006-2010", anoConclusao: "2012" },
+    { numero: 157, apelido: "Sipa", nome: "João Carlos Nunes", periodo: "2000-2007", anoConclusao: "2012" },
   ],
 };
 
@@ -457,6 +457,14 @@ const HALL_DA_FAMA = {
 // Data e prazo desta edição — atualizar quando a organização confirmar.
 const DATA_EVENTO = "6, 7 e 8 de novembro";
 const PRAZO_INSCRICAO = "1 a 29 de setembro";
+// Datas de verdade (ajuste o ano se precisar) — usadas pra travar a aba de
+// Inscrição fora do período.
+const INSCRICAO_INICIO = new Date(2026, 8, 1, 0, 0, 0); // 1 de setembro
+const INSCRICAO_FIM = new Date(2026, 8, 29, 23, 59, 59); // 29 de setembro
+function inscricaoAberta() {
+  const agora = new Date();
+  return agora >= INSCRICAO_INICIO && agora <= INSCRICAO_FIM;
+}
 
 // Times mais bem colocados da última edição (7ª, VII Copa) — usados pra
 // montar o Pote 1 do sorteio, conforme Art. 13 do regulamento.
@@ -905,6 +913,22 @@ function PlayerRow({ player, onChange, onRemove, turmaTime }) {
             className="px-2.5 py-1.5 rounded-lg text-sm col-span-2"
             style={{ border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
           />
+          <input
+            type="text"
+            placeholder="CPF"
+            value={player.cpf || ""}
+            onChange={(e) => onChange({ ...player, cpf: e.target.value })}
+            className="px-2.5 py-1.5 rounded-lg text-sm col-span-1"
+            style={{ border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+          />
+          <input
+            type="date"
+            placeholder="Data de nascimento"
+            value={player.nascimento || ""}
+            onChange={(e) => onChange({ ...player, nascimento: e.target.value })}
+            className="px-2.5 py-1.5 rounded-lg text-sm col-span-1"
+            style={{ border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+          />
         </div>
       )}
     </div>
@@ -985,14 +1009,9 @@ function EscudoPicker({ value, onChange }) {
 // ---------------------------------------------------------------------------
 function RosterEditor({ team, onSave }) {
   const [jogadores, setJogadores] = useState(team.jogadores || []);
-  const [novoJogador, setNovoJogador] = useState("");
   const [saved, setSaved] = useState(false);
 
-  const addJogador = () => {
-    if (!novoJogador.trim()) return;
-    setJogadores([...jogadores, { id: `j_${Date.now()}`, numero: "", apelido: novoJogador.trim(), nome: "", posicao: "", periodo: "", anoConclusao: "" }]);
-    setNovoJogador("");
-  };
+  const addJogador = (novo) => setJogadores([...jogadores, novo]);
   const updateJogador = (updated) => setJogadores(jogadores.map((j) => (j.id === updated.id ? updated : j)));
   const removeJogador = (id) => setJogadores(jogadores.filter((j) => j.id !== id));
 
@@ -1004,30 +1023,13 @@ function RosterEditor({ team, onSave }) {
 
   return (
     <div>
-      <div className="flex gap-2 mb-3">
-        <input
-          type="text"
-          value={novoJogador}
-          onChange={(e) => setNovoJogador(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              addJogador();
-            }
-          }}
-          placeholder="Nome do jogador"
-          className="flex-1 px-3 py-2 rounded-xl outline-none text-sm"
-          style={{ backgroundColor: COLORS.card, border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
-        />
-        <button
-          type="button"
-          onClick={addJogador}
-          className="px-4 py-2 rounded-xl text-sm font-semibold shrink-0"
-          style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
-        >
-          Adicionar
-        </button>
+      <div
+        className="text-xs font-semibold uppercase tracking-wide mb-2"
+        style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+      >
+        Adicionar jogador — todos os campos são obrigatórios
       </div>
+      <AddPlayerForm onAdd={addJogador} />
 
       <div className="space-y-1.5 max-h-96 overflow-y-auto mb-3">
         {jogadores.map((j) => (
@@ -1162,24 +1164,93 @@ function EditarMeuTime({ teams, saveTeams }) {
   );
 }
 
+// Formulário completo pra adicionar um jogador novo — nada de "só o nome":
+// exige apelido, número, nome completo, período, ano de conclusão, CPF e
+// data de nascimento, igual pede o regulamento.
+function AddPlayerForm({ onAdd }) {
+  const vazio = { apelido: "", numero: "", nome: "", periodo: "", anoConclusao: "", cpf: "", nascimento: "" };
+  const [novo, setNovo] = useState(vazio);
+  const [erro, setErro] = useState("");
+
+  const campo = (key, value) => setNovo({ ...novo, [key]: value });
+
+  const adicionar = () => {
+    const faltando = Object.entries(novo).some(([, v]) => !String(v).trim());
+    if (faltando) {
+      setErro("Preenche todos os campos pra poder adicionar o jogador — nenhum é opcional.");
+      return;
+    }
+    setErro("");
+    onAdd({ id: `j_${Date.now()}`, posicao: "", ...novo });
+    setNovo(vazio);
+  };
+
+  const campos = [
+    { key: "apelido", label: "Apelido *", placeholder: "Ex: Bruninho" },
+    { key: "numero", label: "Número da camisa *", placeholder: "Ex: 10" },
+    { key: "nome", label: "Nome completo *", placeholder: "Nome e sobrenome", span: true },
+    { key: "periodo", label: "Período de estudo *", placeholder: "Ex: 2003-2009" },
+    { key: "anoConclusao", label: "Ano de conclusão *", placeholder: "Ex: 2009" },
+    { key: "cpf", label: "CPF *", placeholder: "000.000.000-00" },
+    { key: "nascimento", label: "Data de nascimento *", placeholder: "", type: "date" },
+  ];
+
+  return (
+    <div className="rounded-xl p-3 mb-3" style={{ backgroundColor: COLORS.card, border: `1.5px solid ${COLORS.border}` }}>
+      <div className="grid grid-cols-2 gap-2">
+        {campos.map((f) => (
+          <input
+            key={f.key}
+            type={f.type || "text"}
+            placeholder={f.placeholder}
+            value={novo[f.key]}
+            onChange={(e) => campo(f.key, e.target.value)}
+            className={`px-2.5 py-1.5 rounded-lg text-sm ${f.span ? "col-span-2" : ""}`}
+            style={{ border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+          />
+        ))}
+      </div>
+      {erro && (
+        <div className="text-xs font-medium mt-2" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
+          {erro}
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={adicionar}
+        className="mt-2 px-4 py-2 rounded-lg text-sm font-semibold"
+        style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+      >
+        Adicionar jogador
+      </button>
+    </div>
+  );
+}
+
 function Inscricao({ teams, saveTeams }) {
-  const [form, setForm] = useState({ nome: "", capitao: "", contato: "", jogadores: [], escudoUrl: "" });
-  const [novoJogador, setNovoJogador] = useState("");
+  const [form, setForm] = useState({ turmaSelecionada: "", nomeCustom: "", capitao: "", contato: "", jogadores: [], escudoUrl: "" });
   const [sent, setSent] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [codigoGerado, setCodigoGerado] = useState("");
 
-  const addJogador = () => {
-    if (!novoJogador.trim()) return;
+  const nomeTime = form.turmaSelecionada === "outro" ? form.nomeCustom.trim() : form.turmaSelecionada;
+
+  const escolherTurma = (valor) => {
+    if (valor === "outro") {
+      setForm({ ...form, turmaSelecionada: valor, jogadores: [], escudoUrl: "" });
+      return;
+    }
     setForm({
       ...form,
-      jogadores: [
-        ...form.jogadores,
-        { id: `j_${Date.now()}`, numero: "", apelido: novoJogador.trim(), nome: "", posicao: "", periodo: "", anoConclusao: "" },
-      ],
+      turmaSelecionada: valor,
+      jogadores: jogadoresDaTurma(valor),
+      escudoUrl: ESCUDOS_TIMES[valor] || "",
     });
-    setNovoJogador("");
+  };
+
+  const addJogador = (novo) => {
+    setForm({ ...form, jogadores: [...form.jogadores, novo] });
   };
 
   const updateJogador = (updated) => {
@@ -1193,8 +1264,8 @@ function Inscricao({ teams, saveTeams }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-    if (!form.nome.trim() || !form.capitao.trim() || !form.contato.trim()) {
-      setError("Preencha nome do time, capitão e contato.");
+    if (!nomeTime || !form.capitao.trim() || !form.contato.trim()) {
+      setError("Preencha seus dados, escolha a turma e o contato.");
       return;
     }
     if (form.jogadores.length === 0) {
@@ -1205,7 +1276,7 @@ function Inscricao({ teams, saveTeams }) {
     const codigo = gerarCodigoTime();
     const novoTime = {
       id: `time_${Date.now()}`,
-      nome: form.nome.trim(),
+      nome: nomeTime,
       capitao: form.capitao.trim(),
       contato: form.contato.trim(),
       jogadores: form.jogadores,
@@ -1217,158 +1288,156 @@ function Inscricao({ teams, saveTeams }) {
     setSaving(false);
     setSent(true);
     setCodigoGerado(codigo);
-    setForm({ nome: "", capitao: "", contato: "", jogadores: [], escudoUrl: "" });
+    setForm({ turmaSelecionada: "", nomeCustom: "", capitao: "", contato: "", jogadores: [], escudoUrl: "" });
   };
+
+  if (!inscricaoAberta()) {
+    return (
+      <div>
+        <SectionLabel eyebrow="Participe" title="Inscrição de time" />
+        <EmptyState>
+          O período de inscrição ({PRAZO_INSCRICAO}) está encerrado por enquanto. Se você já
+          inscreveu seu time, fale com a organização pra qualquer ajuste — o cadastro de novos
+          times volta a abrir na próxima edição.
+        </EmptyState>
+      </div>
+    );
+  }
 
   return (
     <div>
       <SectionLabel eyebrow="Participe" title="Inscrição de time" />
 
-      <div
-        className="rounded-2xl p-4 mb-6"
-        style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
-      >
-        <div
-          className="text-xs font-semibold uppercase tracking-wide mb-2.5"
-          style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
-        >
-          Turmas que já disputaram edições anteriores — toque para preencher o time e
-          puxar automaticamente o elenco de 2025
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {TURMAS_HISTORICAS.map((t) => (
-            <button
-              key={t.turma}
-              type="button"
-              onClick={() =>
-                setForm({
-                  ...form,
-                  nome: t.turma,
-                  jogadores: jogadoresDaTurma(t.turma),
-                  escudoUrl: ESCUDOS_TIMES[t.turma] || form.escudoUrl,
-                })
-              }
-              className="flex items-center gap-1.5 pl-1.5 pr-3 py-1.5 rounded-full text-xs font-medium transition-colors"
-              style={{
-                backgroundColor: form.nome === t.turma ? COLORS.accent : COLORS.surfaceAlt,
-                color: form.nome === t.turma ? "#FFFFFF" : COLORS.ink,
-                border: `1px solid ${form.nome === t.turma ? COLORS.accent : COLORS.border}`,
-                fontFamily: "'Inter', sans-serif",
-              }}
-              title={t.apelido}
-            >
-              {ESCUDOS_TIMES[t.turma] && (
-                <img src={ESCUDOS_TIMES[t.turma]} alt="" className="w-5 h-5 object-contain shrink-0" />
-              )}
-              {t.turma}
-            </button>
-          ))}
-        </div>
-      </div>
-
       <div className="grid sm:grid-cols-5 gap-8">
         <form onSubmit={handleSubmit} className="sm:col-span-3 space-y-4">
-          {[
-            { key: "nome", label: "Nome do time", placeholder: "Ex: Turma de 2010" },
-            { key: "capitao", label: "Capitão", placeholder: "Nome completo" },
-            { key: "contato", label: "Contato (WhatsApp)", placeholder: "(00) 00000-0000" },
-          ].map((f) => (
-            <div key={f.key}>
+          <div>
+            <label
+              className="block text-xs font-semibold uppercase tracking-wide mb-1.5"
+              style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+            >
+              Capitão
+            </label>
+            <input
+              type="text"
+              value={form.capitao}
+              onChange={(e) => setForm({ ...form, capitao: e.target.value })}
+              placeholder="Seu nome completo"
+              className="w-full px-4 py-2.5 rounded-xl outline-none text-sm"
+              style={{ backgroundColor: COLORS.card, border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+            />
+          </div>
+
+          <div>
+            <label
+              className="block text-xs font-semibold uppercase tracking-wide mb-1.5"
+              style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+            >
+              Contato (WhatsApp)
+            </label>
+            <input
+              type="text"
+              value={form.contato}
+              onChange={(e) => setForm({ ...form, contato: e.target.value })}
+              placeholder="(00) 00000-0000"
+              className="w-full px-4 py-2.5 rounded-xl outline-none text-sm"
+              style={{ backgroundColor: COLORS.card, border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+            />
+          </div>
+
+          <div>
+            <label
+              className="block text-xs font-semibold uppercase tracking-wide mb-1.5"
+              style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+            >
+              Sua turma / ano
+            </label>
+            <select
+              value={form.turmaSelecionada}
+              onChange={(e) => escolherTurma(e.target.value)}
+              className="w-full px-4 py-2.5 rounded-xl outline-none text-sm"
+              style={{ backgroundColor: COLORS.card, border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+            >
+              <option value="">Selecione depois de preencher seus dados acima</option>
+              {TURMAS_HISTORICAS.map((t) => (
+                <option key={t.turma} value={t.turma}>
+                  {t.turma}
+                </option>
+              ))}
+              <option value="outro">Outra turma / time novo</option>
+            </select>
+          </div>
+
+          {form.turmaSelecionada === "outro" && (
+            <div>
               <label
                 className="block text-xs font-semibold uppercase tracking-wide mb-1.5"
                 style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
               >
-                {f.label}
+                Nome do time
               </label>
               <input
                 type="text"
-                value={form[f.key]}
-                onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
-                placeholder={f.placeholder}
+                value={form.nomeCustom}
+                onChange={(e) => setForm({ ...form, nomeCustom: e.target.value })}
+                placeholder="Ex: Turma de 2011"
                 className="w-full px-4 py-2.5 rounded-xl outline-none text-sm"
-                style={{
-                  backgroundColor: COLORS.card,
-                  border: `1.5px solid ${COLORS.border}`,
-                  color: COLORS.ink,
-                  fontFamily: "'Inter', sans-serif",
-                }}
+                style={{ backgroundColor: COLORS.card, border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
               />
             </div>
-          ))}
+          )}
 
-          <div>
-            <label
-              className="block text-xs font-semibold uppercase tracking-wide mb-1.5"
-              style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
-            >
-              Escudo
-            </label>
-            <EscudoPicker value={form.escudoUrl} onChange={(v) => setForm({ ...form, escudoUrl: v })} />
-          </div>
-
-          <div>
-            <label
-              className="block text-xs font-semibold uppercase tracking-wide mb-1.5"
-              style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
-            >
-              Jogadores — obrigatório pelo menos 1; toque num jogador pra editar número,
-              posição e nome
-            </label>
-
-            <div className="flex gap-2 mb-3">
-              <input
-                type="text"
-                value={novoJogador}
-                onChange={(e) => setNovoJogador(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    addJogador();
-                  }
-                }}
-                placeholder="Nome do jogador"
-                className="flex-1 px-4 py-2.5 rounded-xl outline-none text-sm"
-                style={{
-                  backgroundColor: COLORS.card,
-                  border: `1.5px solid ${COLORS.border}`,
-                  color: COLORS.ink,
-                  fontFamily: "'Inter', sans-serif",
-                }}
-              />
-              <button
-                type="button"
-                onClick={addJogador}
-                className="px-4 py-2.5 rounded-xl text-sm font-semibold shrink-0"
-                style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
-              >
-                Adicionar
-              </button>
-            </div>
-
-            {form.jogadores.length > 0 && (
-              <div
-                className="text-xs mb-2 font-medium"
-                style={{
-                  color: form.jogadores.length < MIN_JOGADORES_TIME || form.jogadores.length > MAX_JOGADORES_TIME ? COLORS.accent : COLORS.slate,
-                  fontFamily: "'Inter', sans-serif",
-                }}
-              >
-                Total: {form.jogadores.length} (entre {MIN_JOGADORES_TIME} e {MAX_JOGADORES_TIME} exigido pelo regulamento)
+          {form.turmaSelecionada && (
+            <>
+              <div className="flex items-center gap-3 rounded-xl p-3" style={{ backgroundColor: COLORS.accentSoft }}>
+                {form.escudoUrl && <img src={form.escudoUrl} alt="" className="w-10 h-10 object-contain shrink-0" />}
+                <div className="text-sm font-semibold" style={{ color: COLORS.accent, fontFamily: "'Sora', sans-serif" }}>
+                  {nomeTime || "Time novo"}
+                </div>
               </div>
-            )}
 
-            <div className="space-y-1.5 max-h-96 overflow-y-auto">
-              {form.jogadores.map((j) => (
-                <PlayerRow
-                  key={j.id}
-                  player={j}
-                  onChange={updateJogador}
-                  onRemove={() => removeJogador(j.id)}
-                  turmaTime={form.nome}
-                />
-              ))}
-            </div>
-          </div>
+              <div>
+                <label
+                  className="block text-xs font-semibold uppercase tracking-wide mb-1.5"
+                  style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+                >
+                  Escudo
+                </label>
+                <EscudoPicker value={form.escudoUrl} onChange={(v) => setForm({ ...form, escudoUrl: v })} />
+              </div>
+
+              <div>
+                <label
+                  className="block text-xs font-semibold uppercase tracking-wide mb-1.5"
+                  style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+                >
+                  Jogadores — {form.jogadores.length} cadastrado(s), entre {MIN_JOGADORES_TIME} e{" "}
+                  {MAX_JOGADORES_TIME} exigido pelo regulamento
+                </label>
+
+                {form.jogadores.length > 0 && (
+                  <div className="space-y-1.5 max-h-96 overflow-y-auto mb-3">
+                    {form.jogadores.map((j) => (
+                      <PlayerRow
+                        key={j.id}
+                        player={j}
+                        onChange={updateJogador}
+                        onRemove={() => removeJogador(j.id)}
+                        turmaTime={nomeTime}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                <div
+                  className="text-xs font-semibold uppercase tracking-wide mb-2"
+                  style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+                >
+                  Adicionar jogador — todos os campos são obrigatórios
+                </div>
+                <AddPlayerForm onAdd={addJogador} />
+              </div>
+            </>
+          )}
 
           {error && (
             <div className="text-sm font-medium" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
@@ -2784,10 +2853,26 @@ function montarPotes(teams) {
 function sortearGrupos(potes) {
   const grupos = { A: [], B: [], C: [], D: [] };
   const nomesGrupo = ["A", "B", "C", "D"];
-  potes.forEach((pote) => {
-    const embaralhado = [...pote].sort(() => Math.random() - 0.5);
+  const nomeCampeao = HALL_DA_FAMA.campeoes[HALL_DA_FAMA.campeoes.length - 1]?.turma;
+
+  potes.forEach((pote, potIdx) => {
+    let restante = [...pote];
+
+    // Regra do sorteio: o campeão da última edição é sempre o cabeça de
+    // chave do Grupo A (só vale pro pote 1, onde ele está).
+    if (potIdx === 0) {
+      const campeao = restante.find((t) => t.nome === nomeCampeao);
+      if (campeao) {
+        grupos.A.push(campeao);
+        restante = restante.filter((t) => t.id !== campeao.id);
+      }
+    }
+
+    const embaralhado = restante.sort(() => Math.random() - 0.5);
+    const gruposComVaga = nomesGrupo.filter((g) => grupos[g].length <= potIdx);
     embaralhado.forEach((time, i) => {
-      grupos[nomesGrupo[i % 4]].push(time);
+      const alvo = gruposComVaga[i % gruposComVaga.length] || nomesGrupo[i % 4];
+      grupos[alvo].push(time);
     });
   });
   return grupos;
