@@ -26,3 +26,74 @@ export async function writeKey(key, value) {
   const { error } = await supabase.from("app_data").upsert({ key, value, updated_at: new Date().toISOString() });
   if (error) throw error;
 }
+
+// ---------------------------------------------------------------------
+// Autenticação de verdade (Supabase Auth) — substitui o login caseiro.
+// ---------------------------------------------------------------------
+
+export async function cadastrarConta(email, senha) {
+  const { data, error } = await supabase.auth.signUp({ email, password: senha });
+  if (error) throw error;
+  return data.user;
+}
+
+export async function entrarConta(email, senha) {
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password: senha });
+  if (error) throw error;
+  return data.user;
+}
+
+export async function sairConta() {
+  await supabase.auth.signOut();
+}
+
+export async function sessaoAtual() {
+  const { data } = await supabase.auth.getSession();
+  return data.session ? data.session.user : null;
+}
+
+export function aoMudarSessao(callback) {
+  const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+    callback(session ? session.user : null);
+  });
+  return () => data.subscription.unsubscribe();
+}
+
+export async function criarPerfil(userId, perfil) {
+  const { error } = await supabase.from("profiles").insert({ id: userId, ...perfil });
+  if (error) throw error;
+}
+
+export async function buscarPerfil(userId) {
+  const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export async function listarPerfis() {
+  const { data, error } = await supabase.from("profiles").select("*");
+  if (error) throw error;
+  return data || [];
+}
+
+export async function atualizarPerfil(userId, campos) {
+  const { error } = await supabase.from("profiles").update(campos).eq("id", userId);
+  if (error) throw error;
+}
+
+export async function souAdmin(userId) {
+  const { data, error } = await supabase.from("admins").select("super_admin").eq("user_id", userId).maybeSingle();
+  if (error) throw error;
+  return data ? { admin: true, superAdmin: !!data.super_admin } : { admin: false, superAdmin: false };
+}
+
+export async function listarAdmins() {
+  const { data, error } = await supabase.from("admins").select("*");
+  if (error) throw error;
+  return data || [];
+}
+
+export async function promoverParaAdmin(userId, email) {
+  const { error } = await supabase.from("admins").insert({ user_id: userId, email, super_admin: false });
+  if (error) throw error;
+}

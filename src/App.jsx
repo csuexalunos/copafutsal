@@ -23,15 +23,28 @@ import {
   Loader2,
   ArrowRight,
 } from "lucide-react";
-import { readKey, writeKey } from "./lib/supabase.js";
+import {
+  readKey,
+  writeKey,
+  cadastrarConta,
+  entrarConta,
+  sairConta,
+  sessaoAtual,
+  aoMudarSessao,
+  criarPerfil,
+  buscarPerfil,
+  listarPerfis,
+  atualizarPerfil,
+  souAdmin,
+  listarAdmins,
+  promoverParaAdmin,
+} from "./lib/supabase.js";
 
 // ---------------------------------------------------------------------------
 // Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula — 8ª Edição
 // Redesign limpo e moderno: navy como base, laranja como único acento vivo,
 // muito branco, cartões com sombra suave em vez de blocos de cor pesados.
 // ---------------------------------------------------------------------------
-
-const ADMIN_PASSCODE = "SERVIAM8"; // trocar aqui se quiser outra senha
 
 const COLORS = {
   bg: "#0B0F1C", // fundo escuro — usado em toda a interface
@@ -771,7 +784,8 @@ function jogadoresDaTurma(turma) {
     return detalhado.map((j, i) => ({
       id: `j_${Date.now()}_${i}`,
       numero: j.numero != null ? String(j.numero) : "",
-      nome: j.nome || j.apelido || "",
+      apelido: j.apelido || "",
+      nome: j.nome || "",
       posicao: "",
       periodo: j.periodo || "",
       anoConclusao: j.anoConclusao || "",
@@ -793,7 +807,7 @@ function jogadoresDaTurma(turma) {
 
 function PlayerRow({ player, onChange, onRemove, turmaTime }) {
   const [expanded, setExpanded] = useState(false);
-  const titulo = player.nome || "Jogador sem nome";
+  const titulo = player.apelido || player.nome || "Jogador sem nome";
   const regular = anoConclusaoRegular(player.anoConclusao, turmaTime);
   const irregular = regular === false;
 
@@ -823,9 +837,9 @@ function PlayerRow({ player, onChange, onRemove, turmaTime }) {
               Ano de conclusão ({player.anoConclusao}) não bate com a turma {turmaTime} — Art. 6º/7º
             </div>
           ) : (
-            player.periodo && (
+            (player.periodo || (player.apelido && player.nome)) && (
               <div className="text-xs truncate" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-                {player.periodo}
+                {[player.apelido && player.nome ? player.nome : null, player.periodo].filter(Boolean).join(" · ")}
               </div>
             )
           )}
@@ -861,6 +875,14 @@ function PlayerRow({ player, onChange, onRemove, turmaTime }) {
           />
           <input
             type="text"
+            placeholder="Apelido"
+            value={player.apelido || ""}
+            onChange={(e) => onChange({ ...player, apelido: e.target.value })}
+            className="px-2.5 py-1.5 rounded-lg text-sm col-span-2"
+            style={{ border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+          />
+          <input
+            type="text"
             placeholder="Nome completo"
             value={player.nome}
             onChange={(e) => onChange({ ...player, nome: e.target.value })}
@@ -890,37 +912,11 @@ function PlayerRow({ player, onChange, onRemove, turmaTime }) {
 }
 
 // ---------------------------------------------------------------------------
-// Segurança de senha — nunca guardamos senha em texto puro. Cada senha
-// ganha um "salt" aleatório e é transformada com SHA-256 antes de ir pro
-// banco; login recalcula o hash com o mesmo salt e compara.
+// Nota: o login/senha de pessoas agora é 100% Supabase Auth (ver
+// src/lib/supabase.js) — não guardamos mais hash de senha aqui no app.
+// O código de time (abaixo) é só um código curto de conveniência, não uma
+// senha de conta.
 // ---------------------------------------------------------------------------
-function gerarSalt() {
-  const bytes = crypto.getRandomValues(new Uint8Array(16));
-  return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-async function hashSenha(senha, salt) {
-  const enc = new TextEncoder().encode(`${salt}:${senha}`);
-  const buf = await crypto.subtle.digest("SHA-256", enc);
-  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-async function protegerSenha(senhaPura) {
-  const salt = gerarSalt();
-  const senhaHash = await hashSenha(senhaPura, salt);
-  return { salt, senhaHash };
-}
-
-async function senhaConfere(senhaDigitada, registro) {
-  if (!registro || !registro.salt || !registro.senhaHash) return false;
-  const hash = await hashSenha(senhaDigitada, registro.salt);
-  return hash === registro.senhaHash;
-}
-
-// Senha temporária inicial do super admin (equivale a "trocar123") — já
-// guardada como hash, nunca em texto puro. Troque assim que possível.
-const SALT_ADMIN_INICIAL = "32734104bcb7f6d9fc81aa394db8289f";
-const HASH_ADMIN_INICIAL = "dd3c8f4b63849fd3c1df4f9bb447ab8862b7761a238a910d1979bda76618c3f1";
 
 function gerarCodigoTime() {
   return String(Math.floor(1000 + Math.random() * 9000));
@@ -994,7 +990,7 @@ function RosterEditor({ team, onSave }) {
 
   const addJogador = () => {
     if (!novoJogador.trim()) return;
-    setJogadores([...jogadores, { id: `j_${Date.now()}`, numero: "", nome: novoJogador.trim(), posicao: "", periodo: "", anoConclusao: "" }]);
+    setJogadores([...jogadores, { id: `j_${Date.now()}`, numero: "", apelido: novoJogador.trim(), nome: "", posicao: "", periodo: "", anoConclusao: "" }]);
     setNovoJogador("");
   };
   const updateJogador = (updated) => setJogadores(jogadores.map((j) => (j.id === updated.id ? updated : j)));
@@ -1180,7 +1176,7 @@ function Inscricao({ teams, saveTeams }) {
       ...form,
       jogadores: [
         ...form.jogadores,
-        { id: `j_${Date.now()}`, numero: "", nome: novoJogador.trim(), posicao: "", periodo: "", anoConclusao: "" },
+        { id: `j_${Date.now()}`, numero: "", apelido: novoJogador.trim(), nome: "", posicao: "", periodo: "", anoConclusao: "" },
       ],
     });
     setNovoJogador("");
@@ -2217,9 +2213,10 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove }) {
               if (!elenco) return null;
               return (
                 <datalist id={`elenco_${eventForm.timeId}`}>
-                  {elenco.map((j, i) => (
-                    <option key={j.id || j.numero || i} value={j.numero ? `${j.nome} (${j.numero})` : j.nome} />
-                  ))}
+                  {elenco.map((j, i) => {
+                    const rotulo = j.apelido || j.nome;
+                    return <option key={j.id || j.numero || i} value={j.numero ? `${rotulo} (${j.numero})` : rotulo} />;
+                  })}
                 </datalist>
               );
             })()}
@@ -2540,7 +2537,7 @@ function GerenciarElencos({ teams, saveTeams }) {
 // TAB: Cadastro — primeira página, cadastro de pessoa (jogador ou torcedor),
 // fica pendente até um organizador aprovar.
 // ---------------------------------------------------------------------------
-function Cadastro({ users, saveUsers, onVoltar }) {
+function Cadastro({ onVoltar }) {
   const [form, setForm] = useState({
     nome: "",
     tipo: "jogador",
@@ -2568,25 +2565,31 @@ function Cadastro({ users, saveUsers, onVoltar }) {
       setError("Preencha todos os campos" + (form.tipo === "jogador" ? " (inclusive a turma)." : "."));
       return;
     }
+    if (form.senha.trim().length < 6) {
+      setError("A senha precisa ter pelo menos 6 caracteres.");
+      return;
+    }
     setSaving(true);
-    const { salt, senhaHash } = await protegerSenha(form.senha);
-    const novo = {
-      id: `user_${Date.now()}`,
-      nome: form.nome.trim(),
-      tipo: form.tipo,
-      turma: form.tipo === "jogador" ? form.turma : "",
-      whatsapp: form.whatsapp.trim(),
-      email: form.email.trim(),
-      nascimento: form.nascimento,
-      salt,
-      senhaHash,
-      status: "pendente",
-      criadoEm: new Date().toISOString(),
-    };
-    await saveUsers([...users, novo]);
-    setSaving(false);
-    setSent(true);
-    setForm({ nome: "", tipo: "jogador", turma: "", whatsapp: "", email: "", nascimento: "", senha: "" });
+    try {
+      const user = await cadastrarConta(form.email.trim(), form.senha.trim());
+      if (user) {
+        await criarPerfil(user.id, {
+          email: form.email.trim(),
+          nome: form.nome.trim(),
+          tipo: form.tipo,
+          turma: form.tipo === "jogador" ? form.turma : "",
+          whatsapp: form.whatsapp.trim(),
+          nascimento: form.nascimento,
+          status: "pendente",
+        });
+      }
+      setSaving(false);
+      setSent(true);
+      setForm({ nome: "", tipo: "jogador", turma: "", whatsapp: "", email: "", nascimento: "", senha: "" });
+    } catch (err) {
+      setSaving(false);
+      setError(err.message === "User already registered" ? "Esse e-mail já tem cadastro — tenta entrar." : "Erro ao cadastrar: " + err.message);
+    }
   };
 
   return (
@@ -2723,7 +2726,9 @@ function Cadastro({ users, saveUsers, onVoltar }) {
             style={{ backgroundColor: COLORS.accentSoft, color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}
           >
             <div className="flex items-center gap-2 mb-2">
-              <Check size={16} /> Cadastro enviado. Aguarde aprovação de um organizador.
+              <Check size={16} /> Conta criada. Se o Supabase pedir confirmação por e-mail, confirma
+              antes de entrar. Depois disso, seu cadastro ainda fica pendente até um organizador
+              aprovar.
             </div>
             {onVoltar && (
               <button type="button" onClick={onVoltar} className="text-sm font-semibold underline">
@@ -2875,57 +2880,61 @@ const SUPER_ADMIN_EMAIL = "csuexalunos@gmail.com";
 // não tem conta cai no Cadastro (que fica pendente até um organizador
 // aprovar); admins também entram por aqui com o e-mail/senha deles.
 // ---------------------------------------------------------------------------
-function LoginGate({ users, saveUsers, admins, onLogin }) {
+function LoginGate({ onLogin }) {
   const [modo, setModo] = useState("login");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState("");
+  const [entrando, setEntrando] = useState(false);
 
   const entrar = async (e) => {
     e.preventDefault();
+    setErro("");
+    setEntrando(true);
     try {
-      const alvo = email.trim().toLowerCase();
-      const senhaDigitada = senha.trim();
-
-      // Atalho de segurança: a senha mestra sempre entra como admin, mesmo
-      // que a lista de admins não tenha carregado certinho por algum motivo.
-      if (senhaDigitada.toUpperCase() === ADMIN_PASSCODE.toUpperCase()) {
-        onLogin({ email: alvo || SUPER_ADMIN_EMAIL, nome: alvo || SUPER_ADMIN_EMAIL, tipo: "admin" });
+      const user = await entrarConta(email.trim(), senha.trim());
+      if (!user) {
+        setErro("E-mail ou senha incorretos.");
+        setEntrando(false);
         return;
       }
 
-      const listaAdmins = Array.isArray(admins) ? admins : [];
-      for (const a of listaAdmins) {
-        if (a && String(a.email || "").trim().toLowerCase() === alvo && (await senhaConfere(senhaDigitada, a))) {
-          onLogin({ email: a.email, nome: a.email, tipo: "admin" });
-          return;
-        }
-      }
-
-      const listaUsers = Array.isArray(users) ? users : [];
-      let usuario = null;
-      for (const u of listaUsers) {
-        if (u && String(u.email || "").trim().toLowerCase() === alvo && (await senhaConfere(senhaDigitada, u))) {
-          usuario = u;
-          break;
-        }
-      }
-      if (usuario && usuario.status === "aprovado") {
-        onLogin({ email: usuario.email, nome: usuario.nome, tipo: "usuario" });
+      const statusAdmin = await souAdmin(user.id);
+      if (statusAdmin.admin) {
+        onLogin({ id: user.id, email: user.email, nome: user.email, tipo: "admin", superAdmin: statusAdmin.superAdmin });
         return;
       }
-      if (usuario && usuario.status === "pendente") {
+
+      const perfil = await buscarPerfil(user.id);
+      if (perfil && perfil.status === "aprovado") {
+        onLogin({ id: user.id, email: user.email, nome: perfil.nome || user.email, tipo: "usuario" });
+        return;
+      }
+      if (perfil && perfil.status === "pendente") {
         setErro("Seu cadastro ainda não foi aprovado por um organizador.");
+        await sairConta();
+        setEntrando(false);
         return;
       }
-      if (usuario && usuario.status === "recusado") {
+      if (perfil && perfil.status === "recusado") {
         setErro("Seu cadastro foi recusado. Fale com a organização.");
+        await sairConta();
+        setEntrando(false);
         return;
       }
-      setErro("E-mail ou senha incorretos.");
+      setErro("Não encontrei seu perfil. Tenta se cadastrar de novo.");
+      await sairConta();
+      setEntrando(false);
     } catch (err) {
       console.error("Erro ao entrar:", err);
-      setErro("Deu um erro inesperado ao tentar entrar. Tenta de novo ou usa a senha mestra.");
+      setErro(
+        err.message === "Invalid login credentials"
+          ? "E-mail ou senha incorretos."
+          : err.message === "Email not confirmed"
+          ? "Confirma seu e-mail antes de entrar (verifica a caixa de entrada)."
+          : "Erro ao entrar: " + err.message
+      );
+      setEntrando(false);
     }
   };
 
@@ -2949,7 +2958,7 @@ function LoginGate({ users, saveUsers, admins, onLogin }) {
         </div>
 
         {modo === "cadastro" ? (
-          <Cadastro users={users} saveUsers={saveUsers} onVoltar={() => setModo("login")} />
+          <Cadastro onVoltar={() => setModo("login")} />
         ) : (
           <>
             <form
@@ -2989,10 +2998,11 @@ function LoginGate({ users, saveUsers, admins, onLogin }) {
               <button
                 type="button"
                 onClick={entrar}
-                className="w-full px-4 py-3 rounded-xl font-semibold text-sm"
+                disabled={entrando}
+                className="w-full px-4 py-3 rounded-xl font-semibold text-sm disabled:opacity-60"
                 style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
               >
-                Entrar
+                {entrando ? "Entrando..." : "Entrar"}
               </button>
             </form>
 
@@ -3014,11 +3024,37 @@ function LoginGate({ users, saveUsers, admins, onLogin }) {
   );
 }
 
-function Organizacao({ teams, matches, saveMatches, saveTeams, admins, saveAdmins, adminRequests, saveAdminRequests, users, saveUsers, sessaoAdminEmail, config, saveConfig }) {
-  const [unlocked, setUnlocked] = useState(!!sessaoAdminEmail);
-  const [loginEmail, setLoginEmail] = useState(sessaoAdminEmail || "");
-  const [loginSenha, setLoginSenha] = useState("");
-  const [passError, setPassError] = useState(false);
+function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, saveAdminRequests, sessao, config, saveConfig }) {
+  const souAdminLogado = sessao && sessao.tipo === "admin";
+  const souSuperAdmin = souAdminLogado && sessao.superAdmin;
+
+  const [perfis, setPerfis] = useState([]);
+  const [listaAdmins, setListaAdmins] = useState([]);
+  const [carregandoPainel, setCarregandoPainel] = useState(true);
+
+  useEffect(() => {
+    if (!souAdminLogado) return;
+    let cancelado = false;
+    const carregar = async () => {
+      try {
+        const [p, a] = await Promise.all([listarPerfis(), listarAdmins()]);
+        if (!cancelado) {
+          setPerfis(p);
+          setListaAdmins(a);
+          setCarregandoPainel(false);
+        }
+      } catch (e) {
+        console.error("Falha ao carregar painel de organização", e);
+        if (!cancelado) setCarregandoPainel(false);
+      }
+    };
+    carregar();
+    const id = setInterval(carregar, 8000);
+    return () => {
+      cancelado = true;
+      clearInterval(id);
+    };
+  }, [souAdminLogado]);
 
   const [reqNome, setReqNome] = useState("");
   const [reqEmail, setReqEmail] = useState("");
@@ -3033,26 +3069,6 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, admins, saveAdmin
     e.preventDefault();
     await saveConfig({ ...config, linkTransmissao: linkTransmissao.trim() });
   };
-
-  const tryUnlock = async (e) => {
-    e.preventDefault();
-    const email = loginEmail.trim().toLowerCase();
-    if (loginSenha.toUpperCase() === ADMIN_PASSCODE.toUpperCase()) {
-      setUnlocked(true);
-      setPassError(false);
-      return;
-    }
-    for (const a of admins) {
-      if (a && a.email.toLowerCase() === email && (await senhaConfere(loginSenha, a))) {
-        setUnlocked(true);
-        setPassError(false);
-        return;
-      }
-    }
-    setPassError(true);
-  };
-
-  const souSuperAdmin = loginEmail.trim().toLowerCase() === SUPER_ADMIN_EMAIL;
 
   const enviarSolicitacao = async (e) => {
     e.preventDefault();
@@ -3073,23 +3089,29 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, admins, saveAdmin
   };
 
   const aprovarSolicitacao = async (req) => {
-    const senhaTemp = gerarCodigoTime();
-    const { salt, senhaHash } = await protegerSenha(senhaTemp);
-    await saveAdmins([...admins, { email: req.email, salt, senhaHash }]);
+    const alvo = perfis.find((p) => (p.email || "").trim().toLowerCase() === req.email.trim().toLowerCase());
+    if (!alvo) {
+      alert("Essa pessoa ainda não criou conta pelo Cadastro do site — peça pra ela se cadastrar primeiro.");
+      return;
+    }
+    await promoverParaAdmin(alvo.id, alvo.email);
     await saveAdminRequests(adminRequests.map((r) => (r.id === req.id ? { ...r, status: "aprovado" } : r)));
-    setUltimaSenhaGerada({ email: req.email, senha: senhaTemp });
+    setListaAdmins(await listarAdmins());
+    setUltimaSenhaGerada(null);
   };
 
   const recusarSolicitacao = async (req) => {
     await saveAdminRequests(adminRequests.map((r) => (r.id === req.id ? { ...r, status: "recusado" } : r)));
   };
 
-  const aprovarUsuario = async (u) => {
-    await saveUsers(users.map((x) => (x.id === u.id ? { ...x, status: "aprovado" } : x)));
+  const aprovarUsuario = async (p) => {
+    await atualizarPerfil(p.id, { status: "aprovado" });
+    setPerfis(perfis.map((x) => (x.id === p.id ? { ...x, status: "aprovado" } : x)));
   };
 
-  const recusarUsuario = async (u) => {
-    await saveUsers(users.map((x) => (x.id === u.id ? { ...x, status: "recusado" } : x)));
+  const recusarUsuario = async (p) => {
+    await atualizarPerfil(p.id, { status: "recusado" });
+    setPerfis(perfis.map((x) => (x.id === p.id ? { ...x, status: "recusado" } : x)));
   };
 
   const addMatch = async (e) => {
@@ -3141,50 +3163,25 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, admins, saveAdmin
     await saveMatches([...matches, ...novosJogos]);
   };
 
-  if (!unlocked) {
+  if (!souAdminLogado) {
     return (
       <div>
         <SectionLabel eyebrow="Restrito" title="Área da organização" />
-        <form
-          onSubmit={tryUnlock}
+        <div
           className="max-w-sm rounded-2xl p-6 mb-6"
           style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
         >
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 mb-2">
             <Lock size={18} color={COLORS.ink} />
             <span style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }} className="text-sm font-medium">
-              Entrar como organizador
+              Só organizadores têm acesso
             </span>
           </div>
-          <input
-            type="email"
-            value={loginEmail}
-            onChange={(e) => setLoginEmail(e.target.value)}
-            placeholder="E-mail"
-            className="w-full px-4 py-2.5 rounded-xl outline-none text-sm mb-2"
-            style={{ backgroundColor: COLORS.surface, border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
-          />
-          <div className="mb-3">
-            <PasswordInput
-              value={loginSenha}
-              onChange={(e) => setLoginSenha(e.target.value)}
-              placeholder="Senha"
-              style={{ backgroundColor: COLORS.surface, border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
-            />
-          </div>
-          {passError && (
-            <div className="text-sm mb-3" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
-              E-mail ou senha incorretos.
-            </div>
-          )}
-          <button
-            type="submit"
-            className="w-full px-4 py-2.5 rounded-xl font-semibold text-sm"
-            style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
-          >
-            Entrar
-          </button>
-        </form>
+          <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Sua conta está logada, mas não como organizador. Se você deveria ter acesso, peça pra
+            um admin já existente te aprovar abaixo.
+          </p>
+        </div>
 
         <div className="max-w-sm">
           {reqEnviado ? (
@@ -3215,7 +3212,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, admins, saveAdmin
                   type="email"
                   value={reqEmail}
                   onChange={(e) => setReqEmail(e.target.value)}
-                  placeholder="Seu e-mail"
+                  placeholder="Seu e-mail (o mesmo do cadastro)"
                   className="w-full px-3 py-2 rounded-xl text-sm"
                   style={{ border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
                 />
@@ -3247,50 +3244,56 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, admins, saveAdmin
       <div className="flex items-center justify-between mb-6">
         <SectionLabel eyebrow="Painel" title="Organização" />
         <div className="flex items-center gap-1.5 text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-          <Unlock size={14} /> liberado
+          <Unlock size={14} /> {sessao.superAdmin ? "super admin" : "admin"}
         </div>
       </div>
 
-      {users.filter((u) => u.status === "pendente").length > 0 && (
-        <div
-          className="rounded-2xl p-5 mb-8"
-          style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
-        >
-          <h3 className="font-semibold mb-3" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
-            Cadastros pendentes ({users.filter((u) => u.status === "pendente").length})
-          </h3>
-          <ul className="space-y-2">
-            {users
-              .filter((u) => u.status === "pendente")
-              .map((u) => (
-                <li
-                  key={u.id}
-                  className="flex items-center gap-3 text-sm px-3 py-2 rounded-lg"
-                  style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
-                >
-                  <span className="flex-1 min-w-0 truncate">
-                    {u.nome} — {u.tipo === "jogador" ? `jogador (${u.turma})` : "torcedor"} — {u.email}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => aprovarUsuario(u)}
-                    className="px-3 py-1 rounded-lg text-xs font-semibold shrink-0"
-                    style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
-                  >
-                    Aprovar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => recusarUsuario(u)}
-                    className="px-3 py-1 rounded-lg text-xs font-semibold shrink-0"
-                    style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
-                  >
-                    Recusar
-                  </button>
-                </li>
-              ))}
-          </ul>
+      {carregandoPainel ? (
+        <div className="flex items-center gap-2 text-sm mb-8" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+          <Loader2 size={14} className="animate-spin" /> Carregando cadastros...
         </div>
+      ) : (
+        perfis.filter((p) => p.status === "pendente").length > 0 && (
+          <div
+            className="rounded-2xl p-5 mb-8"
+            style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
+          >
+            <h3 className="font-semibold mb-3" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+              Cadastros pendentes ({perfis.filter((p) => p.status === "pendente").length})
+            </h3>
+            <ul className="space-y-2">
+              {perfis
+                .filter((p) => p.status === "pendente")
+                .map((p) => (
+                  <li
+                    key={p.id}
+                    className="flex items-center gap-3 text-sm px-3 py-2 rounded-lg"
+                    style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+                  >
+                    <span className="flex-1 min-w-0 truncate">
+                      {p.nome} — {p.tipo === "jogador" ? `jogador (${p.turma})` : "torcedor"} — {p.email}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => aprovarUsuario(p)}
+                      className="px-3 py-1 rounded-lg text-xs font-semibold shrink-0"
+                      style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+                    >
+                      Aprovar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => recusarUsuario(p)}
+                      className="px-3 py-1 rounded-lg text-xs font-semibold shrink-0"
+                      style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+                    >
+                      Recusar
+                    </button>
+                  </li>
+                ))}
+            </ul>
+          </div>
+        )
       )}
 
       {souSuperAdmin && adminRequests.filter((r) => r.status === "pendente").length > 0 && (
@@ -3557,15 +3560,10 @@ const TABS = [
 export default function App() {
   const [tab, setTab] = useState("inicio");
   const [sessao, setSessao] = useState(null);
+  const [checandoSessao, setCheckandoSessao] = useState(true);
   const [teams, saveTeams, loadingTeams] = useSharedStorage("copasu:teams", [], 7000);
   const [matches, saveMatches, loadingMatches] = useSharedStorage("copasu:matches", [], 5000);
   const [posts, savePosts, loadingPosts] = useSharedStorage("copasu:community", [], 6000);
-  const [users, saveUsers, loadingUsers] = useSharedStorage("copasu:users", [], 8000);
-  const [admins, saveAdmins, loadingAdmins] = useSharedStorage(
-    "copasu:admins",
-    [{ email: SUPER_ADMIN_EMAIL, salt: SALT_ADMIN_INICIAL, senhaHash: HASH_ADMIN_INICIAL }],
-    8000
-  );
   const [adminRequests, saveAdminRequests, loadingAdminRequests] = useSharedStorage("copasu:admin_requests", [], 8000);
   const [sorteio, saveSorteio, loadingSorteio] = useSharedStorage("copasu:sorteio", {}, 6000);
   const [config, saveConfig, loadingConfig] = useSharedStorage("copasu:config", {}, 10000);
@@ -3574,46 +3572,51 @@ export default function App() {
   const fabInputRef = React.useRef(null);
 
   const loading =
-    loadingTeams || loadingMatches || loadingPosts || loadingUsers || loadingAdmins || loadingAdminRequests || loadingSorteio || loadingConfig;
+    loadingTeams || loadingMatches || loadingPosts || loadingAdminRequests || loadingSorteio || loadingConfig || checandoSessao;
 
-  // Garante que o admin inicial exista no armazenamento compartilhado
-  // (só grava uma vez, quando a lista ainda está vazia de verdade), e
-  // migra qualquer senha antiga que ainda esteja em texto puro pro hash.
-  // Garante que o admin inicial exista, e migra qualquer registro antigo
-  // que ainda não tenha salt+hash (nunca guardamos senha em texto puro).
-  useEffect(() => {
-    if (loadingAdmins) return;
-    if (admins.length === 0) {
-      saveAdmins([{ email: SUPER_ADMIN_EMAIL, salt: SALT_ADMIN_INICIAL, senhaHash: HASH_ADMIN_INICIAL }]);
+  // Monta a sessão a partir do usuário autenticado (Supabase Auth) — cobre
+  // tanto o login recém-feito quanto a sessão que já estava guardada no
+  // navegador (por isso agora o login sobrevive a recarregar a página).
+  const montarSessao = useCallback(async (user) => {
+    if (!user) {
+      setSessao(null);
       return;
     }
-    const precisaMigrar = admins.some((a) => !a.senhaHash || !a.salt);
-    if (precisaMigrar) {
-      Promise.all(
-        admins.map(async (a) => {
-          if (a.senhaHash && a.salt) return a;
-          const { salt, senhaHash } = await protegerSenha(a.senha || "");
-          const { senha, ...resto } = a;
-          return { ...resto, salt, senhaHash };
-        })
-      ).then((migrados) => saveAdmins(migrados));
+    try {
+      const statusAdmin = await souAdmin(user.id);
+      if (statusAdmin.admin) {
+        setSessao({ id: user.id, email: user.email, nome: user.email, tipo: "admin", superAdmin: statusAdmin.superAdmin });
+        return;
+      }
+      const perfil = await buscarPerfil(user.id);
+      if (perfil && perfil.status === "aprovado") {
+        setSessao({ id: user.id, email: user.email, nome: perfil.nome || user.email, tipo: "usuario" });
+      } else {
+        setSessao(null);
+      }
+    } catch (e) {
+      console.error("Falha ao montar sessão", e);
+      setSessao(null);
     }
-  }, [loadingAdmins, admins]);
+  }, []);
 
   useEffect(() => {
-    if (loadingUsers) return;
-    const precisaMigrar = users.some((u) => !u.senhaHash || !u.salt);
-    if (precisaMigrar) {
-      Promise.all(
-        users.map(async (u) => {
-          if (u.senhaHash && u.salt) return u;
-          const { salt, senhaHash } = await protegerSenha(u.senha || "");
-          const { senha, ...resto } = u;
-          return { ...resto, salt, senhaHash };
-        })
-      ).then((migrados) => saveUsers(migrados));
-    }
-  }, [loadingUsers, users]);
+    let cancelado = false;
+    (async () => {
+      const user = await sessaoAtual();
+      if (!cancelado) {
+        await montarSessao(user);
+        setCheckandoSessao(false);
+      }
+    })();
+    const cancelarInscricao = aoMudarSessao((user) => {
+      montarSessao(user);
+    });
+    return () => {
+      cancelado = true;
+      cancelarInscricao();
+    };
+  }, [montarSessao]);
 
   const handleFabCapture = async (e) => {
     const file = e.target.files && e.target.files[0];
@@ -3649,7 +3652,7 @@ export default function App() {
   }
 
   if (!sessao) {
-    return <LoginGate users={users} saveUsers={saveUsers} admins={admins} onLogin={setSessao} />;
+    return <LoginGate onLogin={setSessao} />;
   }
 
   return (
@@ -3697,7 +3700,10 @@ export default function App() {
             );
           })}
           <button
-            onClick={() => setSessao(null)}
+            onClick={async () => {
+              await sairConta();
+              setSessao(null);
+            }}
             title="Sair"
             className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium ml-1 shrink-0"
             style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
@@ -3727,13 +3733,9 @@ export default function App() {
                 matches={matches}
                 saveMatches={saveMatches}
                 saveTeams={saveTeams}
-                admins={admins}
-                saveAdmins={saveAdmins}
                 adminRequests={adminRequests}
                 saveAdminRequests={saveAdminRequests}
-                users={users}
-                saveUsers={saveUsers}
-                sessaoAdminEmail={sessao && sessao.tipo === "admin" ? sessao.email : null}
+                sessao={sessao}
                 config={config}
                 saveConfig={saveConfig}
               />
