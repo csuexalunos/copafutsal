@@ -10,6 +10,9 @@ import {
   UserPlus,
   Eye,
   EyeOff,
+  AlertTriangle,
+  Radio,
+  Dices,
   ShieldCheck,
   Plus,
   Lock,
@@ -449,6 +452,35 @@ const HALL_DA_FAMA = {
 const DATA_EVENTO = "6, 7 e 8 de novembro";
 const PRAZO_INSCRICAO = "1 a 29 de setembro";
 
+// Times mais bem colocados da última edição (7ª, VII Copa) — usados pra
+// montar o Pote 1 do sorteio, conforme Art. 13 do regulamento.
+const MELHORES_COLOCADOS_ULTIMA_EDICAO = ["2010", "2014", "2022.1", "2009"];
+
+// Regras de inscrição vindas do regulamento oficial (Capítulo III), usadas
+// pelo diagnosticador de irregularidades.
+const MIN_JOGADORES_TIME = 7;
+const MAX_JOGADORES_TIME = 15;
+
+// Extrai o(s) ano(s) numéricos de uma turma/nome de time — ex: "2007/06"
+// -> [2007, 2006], "2022.1" -> [2022], "2010" -> [2010].
+function anosDaTurma(turma) {
+  if (!turma) return [];
+  const nums = String(turma).match(/\d{4}|\d{2}(?!\d)/g) || [];
+  return nums.map((n) => (n.length === 2 ? Number("20" + n) : Number(n))).filter((n) => n > 1990 && n < 2030);
+}
+
+// Confere se o ano de conclusão do jogador é compatível com a turma do
+// time — Art. 6º/7º do regulamento (não pode misturar anos de conclusão
+// diferentes na mesma equipe, salvo exceção aprovada pela organização).
+function anoConclusaoRegular(anoConclusao, turmaTime) {
+  if (!anoConclusao || !turmaTime) return null; // sem dado suficiente pra checar
+  const anoJogador = parseInt(String(anoConclusao).match(/\d{4}/)?.[0] || "", 10);
+  if (!anoJogador) return null;
+  const anosTime = anosDaTurma(turmaTime);
+  if (anosTime.length === 0) return null;
+  return anosTime.includes(anoJogador);
+}
+
 // Edições disponíveis para marcar uma foto/vídeo — a atual mais as
 // edições anteriores já registradas no Hall da Fama.
 const EDICOES_DISPONIVEIS = [
@@ -595,9 +627,10 @@ function EmptyState({ children }) {
 // ---------------------------------------------------------------------------
 // TAB: Início
 // ---------------------------------------------------------------------------
-function Home({ teams, matches, setTab }) {
+function Home({ teams, matches, setTab, config }) {
   const menuItems = [
     { id: "inscricao", label: "Inscrição", desc: "Inscreva seu time para a 8ª edição", icon: Users },
+    { id: "sorteio", label: "Sorteio", desc: "Potes e grupos da edição", icon: Dices },
     { id: "chaveamento", label: "Chaveamento", desc: "Acompanhe o mata-mata em tempo real", icon: Swords },
     { id: "classificacao", label: "Classificação", desc: "Tabela, resultados e saldo de gols", icon: ListOrdered },
     { id: "comunidade", label: "Fotos e Vídeos", desc: "Compartilhado por quem se inscreveu", icon: Camera },
@@ -651,6 +684,32 @@ function Home({ teams, matches, setTab }) {
           <strong>Competição:</strong> {DATA_EVENTO}
         </div>
       </div>
+
+      {config && config.linkTransmissao && (
+        <a
+          href={config.linkTransmissao}
+          target="_blank"
+          rel="noreferrer"
+          className="flex items-center gap-3 mb-6 rounded-xl px-4 py-3.5"
+          style={{ backgroundColor: COLORS.navy }}
+        >
+          <span
+            className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+            style={{ backgroundColor: "rgba(255,255,255,0.1)" }}
+          >
+            <Radio size={18} color={COLORS.gold} />
+          </span>
+          <span className="flex-1 min-w-0">
+            <div className="text-sm font-semibold" style={{ color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}>
+              Assista aos jogos ao vivo
+            </div>
+            <div className="text-xs truncate" style={{ color: COLORS.ice, fontFamily: "'Inter', sans-serif" }}>
+              {config.linkTransmissao}
+            </div>
+          </span>
+          <ArrowRight size={16} color={COLORS.gold} className="shrink-0" />
+        </a>
+      )}
 
       <div className="flex flex-wrap gap-x-6 gap-y-1 mb-8">
         {stats.map((s) => (
@@ -741,12 +800,17 @@ function jogadoresDaTurma(turma) {
   return [];
 }
 
-function PlayerRow({ player, onChange, onRemove }) {
+function PlayerRow({ player, onChange, onRemove, turmaTime }) {
   const [expanded, setExpanded] = useState(false);
   const titulo = player.apelido || player.nome || "Jogador sem nome";
+  const regular = anoConclusaoRegular(player.anoConclusao, turmaTime);
+  const irregular = regular === false;
 
   return (
-    <div className="rounded-xl overflow-hidden" style={{ backgroundColor: COLORS.zebra }}>
+    <div
+      className="rounded-xl overflow-hidden"
+      style={{ backgroundColor: COLORS.zebra, border: irregular ? `1.5px solid ${COLORS.accent}` : "1.5px solid transparent" }}
+    >
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
@@ -759,13 +823,20 @@ function PlayerRow({ player, onChange, onRemove }) {
           {player.numero || "–"}
         </span>
         <span className="flex-1 min-w-0">
-          <div className="text-sm font-medium truncate" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+          <div className="text-sm font-medium truncate flex items-center gap-1.5" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
             {titulo}
+            {irregular && <AlertTriangle size={13} color={COLORS.accent} />}
           </div>
-          {(player.periodo || (player.apelido && player.nome)) && (
-            <div className="text-xs truncate" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-              {[player.apelido && player.nome ? player.nome : null, player.periodo].filter(Boolean).join(" · ")}
+          {irregular ? (
+            <div className="text-xs truncate font-medium" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
+              Ano de conclusão ({player.anoConclusao}) não bate com a turma {turmaTime} — Art. 6º/7º
             </div>
+          ) : (
+            (player.periodo || (player.apelido && player.nome)) && (
+              <div className="text-xs truncate" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                {[player.apelido && player.nome ? player.nome : null, player.periodo].filter(Boolean).join(" · ")}
+              </div>
+            )
           )}
         </span>
         <span
@@ -948,9 +1019,19 @@ function RosterEditor({ team, onSave }) {
 
       <div className="space-y-1.5 max-h-96 overflow-y-auto mb-3">
         {jogadores.map((j) => (
-          <PlayerRow key={j.id} player={j} onChange={updateJogador} onRemove={() => removeJogador(j.id)} />
+          <PlayerRow key={j.id} player={j} onChange={updateJogador} onRemove={() => removeJogador(j.id)} turmaTime={team.nome} />
         ))}
       </div>
+
+      {jogadores.length > 0 && (jogadores.length < MIN_JOGADORES_TIME || jogadores.length > MAX_JOGADORES_TIME) && (
+        <div
+          className="flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-lg mb-3"
+          style={{ backgroundColor: COLORS.accentSoft, color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}
+        >
+          <AlertTriangle size={14} />
+          Time precisa ter entre {MIN_JOGADORES_TIME} e {MAX_JOGADORES_TIME} jogadores (Art. 6º) — está com {jogadores.length}.
+        </div>
+      )}
 
       <button
         type="button"
@@ -1255,8 +1336,14 @@ function Inscricao({ teams, saveTeams }) {
             </div>
 
             {form.jogadores.length > 0 && (
-              <div className="text-xs mb-2" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-                Total: {form.jogadores.length}
+              <div
+                className="text-xs mb-2 font-medium"
+                style={{
+                  color: form.jogadores.length < MIN_JOGADORES_TIME || form.jogadores.length > MAX_JOGADORES_TIME ? COLORS.accent : COLORS.slate,
+                  fontFamily: "'Inter', sans-serif",
+                }}
+              >
+                Total: {form.jogadores.length} (entre {MIN_JOGADORES_TIME} e {MAX_JOGADORES_TIME} exigido pelo regulamento)
               </div>
             )}
 
@@ -1267,6 +1354,7 @@ function Inscricao({ teams, saveTeams }) {
                   player={j}
                   onChange={updateJogador}
                   onRemove={() => removeJogador(j.id)}
+                  turmaTime={form.nome}
                 />
               ))}
             </div>
@@ -2157,6 +2245,62 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove }) {
 
 // Organização gerencia (adiciona/remove) jogadores de qualquer time já
 // inscrito — protegido pela senha de admin, não pelo código do time.
+// Diagnóstico de irregularidades por time, conforme regulamento oficial
+// (Capítulo III — mínimo/máximo de atletas e ano de conclusão da turma).
+function diagnosticarTime(team) {
+  const problemas = [];
+  const jogadores = Array.isArray(team.jogadores) ? team.jogadores : [];
+  if (jogadores.length > 0 && jogadores.length < MIN_JOGADORES_TIME) {
+    problemas.push(`Só ${jogadores.length} jogador(es) — mínimo é ${MIN_JOGADORES_TIME} (Art. 6º).`);
+  }
+  if (jogadores.length > MAX_JOGADORES_TIME) {
+    problemas.push(`${jogadores.length} jogadores — máximo é ${MAX_JOGADORES_TIME} (Art. 6º).`);
+  }
+  jogadores.forEach((j) => {
+    if (anoConclusaoRegular(j.anoConclusao, team.nome) === false) {
+      problemas.push(`${j.apelido || j.nome || "Jogador"}: ano de conclusão (${j.anoConclusao}) não bate com a turma ${team.nome} (Art. 6º/7º).`);
+    }
+  });
+  return problemas;
+}
+
+function DiagnosticoIrregularidades({ teams }) {
+  const times = teams.map((t) => ({ time: t, problemas: diagnosticarTime(t) })).filter((x) => x.problemas.length > 0);
+
+  if (times.length === 0) return null;
+
+  return (
+    <div
+      className="rounded-2xl p-5 mt-8"
+      style={{ backgroundColor: COLORS.card, border: `1.5px solid ${COLORS.accent}` }}
+    >
+      <h3 className="font-semibold mb-1 flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+        <AlertTriangle size={18} color={COLORS.accent} /> Diagnóstico de irregularidades ({times.length})
+      </h3>
+      <p className="text-xs mb-4" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+        Checagem automática com base no Regulamento Oficial dos Jogos Ex-Alunos. Confirma com o
+        time antes de qualquer punição — Art. 9º dá direito de esclarecimento.
+      </p>
+      <div className="space-y-3">
+        {times.map(({ time, problemas }) => (
+          <div key={time.id} className="rounded-lg p-3" style={{ backgroundColor: COLORS.zebra }}>
+            <div className="text-sm font-semibold mb-1" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+              {time.nome}
+            </div>
+            <ul className="space-y-0.5">
+              {problemas.map((p, i) => (
+                <li key={i} className="text-xs" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
+                  • {p}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function GerenciarElencos({ teams, saveTeams }) {
   const [timeId, setTimeId] = useState("");
   const time = teams.find((t) => t.id === timeId);
@@ -2390,6 +2534,137 @@ function Cadastro({ users, saveUsers, onVoltar }) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// TAB: Sorteio — monta os potes conforme Art. 13 do regulamento (pote 1 =
+// melhores colocados da última edição, pote 5 = times novos) e sorteia os
+// grupos. Só admin sorteia; todo mundo vê o resultado.
+// ---------------------------------------------------------------------------
+function montarPotes(teams) {
+  const restantes = [...teams];
+  const tirar = (pred) => {
+    const achados = restantes.filter(pred);
+    achados.forEach((t) => {
+      const idx = restantes.indexOf(t);
+      if (idx > -1) restantes.splice(idx, 1);
+    });
+    return achados;
+  };
+
+  const pote1 = MELHORES_COLOCADOS_ULTIMA_EDICAO
+    .map((turma) => restantes.find((t) => t.nome === turma))
+    .filter(Boolean);
+  pote1.forEach((t) => {
+    const idx = restantes.indexOf(t);
+    if (idx > -1) restantes.splice(idx, 1);
+  });
+
+  const novos = tirar((t) => !TURMAS_HISTORICAS.some((h) => h.turma === t.nome));
+
+  // Os demais times históricos (sem posição exata conhecida da última
+  // edição) ficam distribuídos entre os potes 2, 3 e 4.
+  const historicosRestantes = [...restantes];
+  const pote2 = [];
+  const pote3 = [];
+  const pote4 = [];
+  historicosRestantes.forEach((t, i) => {
+    [pote2, pote3, pote4][i % 3].push(t);
+  });
+
+  return [pote1, pote2, pote3, pote4, novos];
+}
+
+function sortearGrupos(potes) {
+  const grupos = { A: [], B: [], C: [], D: [] };
+  const nomesGrupo = ["A", "B", "C", "D"];
+  potes.forEach((pote) => {
+    const embaralhado = [...pote].sort(() => Math.random() - 0.5);
+    embaralhado.forEach((time, i) => {
+      grupos[nomesGrupo[i % 4]].push(time);
+    });
+  });
+  return grupos;
+}
+
+function Sorteio({ teams, sorteio, saveSorteio, sessao }) {
+  const potes = useMemo(() => montarPotes(teams), [teams]);
+  const souAdmin = sessao && sessao.tipo === "admin";
+
+  const realizarSorteio = async () => {
+    const grupos = sortearGrupos(potes);
+    await saveSorteio({ grupos, sorteadoEm: new Date().toISOString() });
+  };
+
+  return (
+    <div>
+      <SectionLabel eyebrow="Art. 13 do regulamento" title="Sorteio dos grupos" />
+      <p className="text-sm mb-6 max-w-xl" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+        Pote 1 traz os 4 melhores colocados da edição passada (2010, 2014, 2022.1 e 2009). Os
+        demais times já conhecidos ficam distribuídos nos potes 2 a 4, e o pote 5 é só para
+        times novos, nunca inscritos antes — igual manda o regulamento.
+      </p>
+
+      <div className="grid sm:grid-cols-5 gap-3 mb-8">
+        {potes.map((pote, i) => (
+          <div key={i} className="rounded-xl p-3" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+            <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
+              Pote {i + 1}
+            </div>
+            {pote.length === 0 ? (
+              <div className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                Vazio
+              </div>
+            ) : (
+              <ul className="space-y-1">
+                {pote.map((t) => (
+                  <li key={t.id} className="flex items-center gap-1.5 text-xs" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+                    {ESCUDOS_TIMES[t.nome] && <img src={ESCUDOS_TIMES[t.nome]} alt="" className="w-4 h-4 object-contain shrink-0" />}
+                    <span className="truncate">{t.nome}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {souAdmin && (
+        <button
+          type="button"
+          onClick={realizarSorteio}
+          disabled={teams.length === 0}
+          className="px-5 py-3 rounded-xl font-semibold text-sm inline-flex items-center gap-2 mb-8 disabled:opacity-50"
+          style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+        >
+          <Dices size={16} /> {sorteio && sorteio.grupos ? "Sortear de novo" : "Sortear grupos"}
+        </button>
+      )}
+
+      {sorteio && sorteio.grupos && (
+        <div>
+          <SectionLabel eyebrow="Resultado" title="Grupos sorteados" />
+          <div className="grid sm:grid-cols-2 gap-4">
+            {Object.entries(sorteio.grupos).map(([nome, times]) => (
+              <div key={nome} className="rounded-xl p-4" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+                <div className="text-sm font-bold mb-2" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>
+                  Grupo {nome}
+                </div>
+                <ul className="space-y-1.5">
+                  {times.map((t) => (
+                    <li key={t.id} className="flex items-center gap-2 text-sm" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+                      {ESCUDOS_TIMES[t.nome] && <img src={ESCUDOS_TIMES[t.nome]} alt="" className="w-5 h-5 object-contain shrink-0" />}
+                      {t.nome}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const SUPER_ADMIN_EMAIL = "csuexalunos@gmail.com";
 
 // ---------------------------------------------------------------------------
@@ -2533,7 +2808,7 @@ function LoginGate({ users, saveUsers, admins, onLogin }) {
   );
 }
 
-function Organizacao({ teams, matches, saveMatches, saveTeams, admins, saveAdmins, adminRequests, saveAdminRequests, users, saveUsers, sessaoAdminEmail }) {
+function Organizacao({ teams, matches, saveMatches, saveTeams, admins, saveAdmins, adminRequests, saveAdminRequests, users, saveUsers, sessaoAdminEmail, config, saveConfig }) {
   const [unlocked, setUnlocked] = useState(!!sessaoAdminEmail);
   const [loginEmail, setLoginEmail] = useState(sessaoAdminEmail || "");
   const [loginSenha, setLoginSenha] = useState("");
@@ -2545,6 +2820,12 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, admins, saveAdmin
   const [reqEnviado, setReqEnviado] = useState(false);
 
   const [matchForm, setMatchForm] = useState({ fase: "Grupos", timeA: "", timeB: "", golsA: "", golsB: "" });
+  const [linkTransmissao, setLinkTransmissao] = useState((config && config.linkTransmissao) || "");
+
+  const salvarLinkTransmissao = async (e) => {
+    e.preventDefault();
+    await saveConfig({ ...config, linkTransmissao: linkTransmissao.trim() });
+  };
 
   const tryUnlock = (e) => {
     e.preventDefault();
@@ -2873,6 +3154,32 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, admins, saveAdmin
         )}
 
       <div className="max-w-xl">
+        <div className="rounded-2xl p-5 mb-8" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+          <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+            <Radio size={16} color={COLORS.accent} /> Link de transmissão ao vivo
+          </h3>
+          <form onSubmit={salvarLinkTransmissao} className="flex gap-2">
+            <input
+              type="text"
+              value={linkTransmissao}
+              onChange={(e) => setLinkTransmissao(e.target.value)}
+              placeholder="https://youtube.com/... ou instagram.com/..."
+              className="flex-1 px-3 py-2 rounded-xl text-sm"
+              style={{ border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+            />
+            <button
+              type="submit"
+              className="px-4 py-2 rounded-xl text-sm font-semibold shrink-0"
+              style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}
+            >
+              Salvar
+            </button>
+          </form>
+          <p className="text-xs mt-2" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Aparece em destaque na página inicial pra todo mundo assistir fácil.
+          </p>
+        </div>
+
         {/* Lançar jogo */}
         <div className="rounded-2xl p-5" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
           <h3 className="font-semibold mb-4" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
@@ -2981,6 +3288,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, admins, saveAdmin
       })()}
 
       <GerenciarElencos teams={teams} saveTeams={saveTeams} />
+      <DiagnosticoIrregularidades teams={teams} />
 
       <div
         className="rounded-2xl p-5 mt-8"
@@ -3026,6 +3334,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, admins, saveAdmin
 const TABS = [
   { id: "inicio", label: "Início", icon: Trophy },
   { id: "inscricao", label: "Inscrição", icon: Users },
+  { id: "sorteio", label: "Sorteio", icon: Dices },
   { id: "chaveamento", label: "Chaveamento", icon: Swords },
   { id: "classificacao", label: "Classificação", icon: ListOrdered },
   { id: "comunidade", label: "Fotos e Vídeos", icon: Camera },
@@ -3046,11 +3355,14 @@ export default function App() {
     8000
   );
   const [adminRequests, saveAdminRequests, loadingAdminRequests] = useSharedStorage("copasu:admin_requests", [], 8000);
+  const [sorteio, saveSorteio, loadingSorteio] = useSharedStorage("copasu:sorteio", {}, 6000);
+  const [config, saveConfig, loadingConfig] = useSharedStorage("copasu:config", {}, 10000);
   const [fabBusy, setFabBusy] = useState(false);
   const [fabDone, setFabDone] = useState(false);
   const fabInputRef = React.useRef(null);
 
-  const loading = loadingTeams || loadingMatches || loadingPosts || loadingUsers || loadingAdmins || loadingAdminRequests;
+  const loading =
+    loadingTeams || loadingMatches || loadingPosts || loadingUsers || loadingAdmins || loadingAdminRequests || loadingSorteio || loadingConfig;
 
   // Garante que o admin inicial exista no armazenamento compartilhado
   // (só grava uma vez, quando a lista ainda está vazia de verdade).
@@ -3159,8 +3471,9 @@ export default function App() {
           </div>
         ) : (
           <>
-            {tab === "inicio" && <Home teams={teams} matches={matches} setTab={setTab} />}
+            {tab === "inicio" && <Home teams={teams} matches={matches} setTab={setTab} config={config} />}
             {tab === "inscricao" && <Inscricao teams={teams} saveTeams={saveTeams} />}
+            {tab === "sorteio" && <Sorteio teams={teams} sorteio={sorteio} saveSorteio={saveSorteio} sessao={sessao} />}
             {tab === "chaveamento" && <Chaveamento matches={matches} teams={teams} />}
             {tab === "classificacao" && <Classificacao matches={matches} teams={teams} />}
             {tab === "comunidade" && <Comunidade posts={posts} savePosts={savePosts} />}
@@ -3178,6 +3491,8 @@ export default function App() {
                 users={users}
                 saveUsers={saveUsers}
                 sessaoAdminEmail={sessao && sessao.tipo === "admin" ? sessao.email : null}
+                config={config}
+                saveConfig={saveConfig}
               />
             )}
           </>
