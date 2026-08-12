@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   Radio,
   Dices,
+  Download,
   ShieldCheck,
   Plus,
   Lock,
@@ -215,7 +216,6 @@ const ELENCOS_2025 = {
     { numero: 14, apelido: "Teixeira", nome: "Pedro Teixeira dos Santos soares", periodo: "2016-2022", anoConclusao: "2022.0" },
     { numero: 25, apelido: "Eugênio", nome: "Luiz Eugênio Duarte Santos", periodo: "2018-2022", anoConclusao: "2022.0" },
     { numero: 77, apelido: "Bruno", nome: "Bruno Fernandes calheiros", periodo: "2018-2022", anoConclusao: "2022.0" },
-    { numero: null, apelido: "Apelido", nome: "NOME COMPLETO", periodo: "PERÍODO DE ESTUDO", anoConclusao: "ANO DE CONCLUSÃO" },
   ],
   "2007/06": [
     { numero: 1, apelido: "Ze", nome: "JOSE LUCAS PACHECO RODRIGUES LIMA", periodo: "2006-2007", anoConclusao: "2007.0" },
@@ -231,7 +231,6 @@ const ELENCOS_2025 = {
     { numero: 14, apelido: "Pedro", nome: "PEDRO GUILHERME FERREIRA TENÓRIO", periodo: "2000-2001", anoConclusao: "2007.0" },
     { numero: 21, apelido: "Abilio", nome: "ABILIO JORGE TENORIO ANTUNES DE MELLO", periodo: "1997-2004", anoConclusao: "2007.0" },
     { numero: 69, apelido: "Dudu", nome: "EDUARDO SANTOS C DE ALBUQUERQUE", periodo: "2001-2004", anoConclusao: "2006.0" },
-    { numero: null, apelido: "Apelido", nome: "NOME COMPLETO", periodo: "PERÍODO DE ESTUDO", anoConclusao: "ANO DE CONCLUSÃO" },
   ],
   "2009": [
     { numero: 1, apelido: "Vovô", nome: "Diego José Uchôa Quintela", periodo: "2000-2006", anoConclusao: "2009" },
@@ -269,7 +268,6 @@ const ELENCOS_2025 = {
     { numero: null, apelido: "Waldir", nome: "Waldir Normande Guido", periodo: "2001 a 2010", anoConclusao: "2010" },
     { numero: null, apelido: "Paulinho", nome: "Paulo Ernesto Firmiano e Silva", periodo: "2003 e 2005 a 2006", anoConclusao: "2010" },
     { numero: null, apelido: "Fraga", nome: "Paulo Fernando Fraga de Castro Filho", periodo: "1999-2009", anoConclusao: "2010" },
-    { numero: null, apelido: "Apelido", nome: "NOME COMPLETO", periodo: "PERÍODO DE ESTUDO", anoConclusao: "ANO DE CONCLUSÃO" },
   ],
   "2014": [
     { numero: 1, apelido: "Bicuddo", nome: "LUCAS ALVES VIEIRA DE SOUZA", periodo: "2004 - 2014", anoConclusao: "2014" },
@@ -283,7 +281,6 @@ const ELENCOS_2025 = {
     { numero: 11, apelido: "Lebrão", nome: "RAPHAEL PEREIRA LEBRE", periodo: "2013 - 2014", anoConclusao: "2014" },
     { numero: 12, apelido: "Lira", nome: "ARTHUR DE SOUSA LIRA", periodo: "2013 - 2014", anoConclusao: "2014" },
     { numero: 97, apelido: "Léo", nome: "LEONARDO RAMOS PIMENTEL SANTANA", periodo: "2008 - 2012", anoConclusao: "2014" },
-    { numero: null, apelido: "Apelido", nome: "NOME COMPLETO", periodo: "PERÍODO DE ESTUDO", anoConclusao: "ANO DE CONCLUSÃO" },
   ],
   "2013": [
     { numero: 1, apelido: "Douglas", nome: "Douglas de Carvalho Matos Barros", periodo: "2006 - 2009", anoConclusao: "2013" },
@@ -326,7 +323,6 @@ const ELENCOS_2025 = {
     { numero: 14, apelido: "Ildo", nome: "Ildo Raphael Caldeira Vasconcelos", periodo: "2012-2022", anoConclusao: "2022.0" },
     { numero: 19, apelido: "Juninho", nome: "Paulo Daniel Juazeiro arruda de Carvalho Júnior", periodo: "2016-18/ 2020", anoConclusao: "2022.0" },
     { numero: 24, apelido: "Da Mota", nome: "Mateus da Mota Lins Queiroga", periodo: "2019-2022", anoConclusao: "2022.0" },
-    { numero: null, apelido: "Apelido", nome: "NOME COMPLETO", periodo: "PERÍODO DE ESTUDO", anoConclusao: "ANO DE CONCLUSÃO" },
   ],
   "2015": [
     { numero: 1, apelido: "Daniel", nome: "Daniel Monteiro de Carvalho Filho", periodo: "2009-2015", anoConclusao: "2015.0" },
@@ -338,7 +334,6 @@ const ELENCOS_2025 = {
     { numero: 10, apelido: "Schausse", nome: "Gustavo Schausse Salgado", periodo: "2005 a 2015", anoConclusao: "2015.0" },
     { numero: 11, apelido: "Marquinhos", nome: "Marcos Antônio Hermes Leandro Junior", periodo: "2005 a 2012", anoConclusao: "2015.0" },
     { numero: 13, apelido: "Mineiro", nome: "Lucas Mendes Rosa Peres", periodo: "2012 a 2015", anoConclusao: "2015.0" },
-    { numero: null, apelido: "Apelido", nome: "NOME COMPLETO", periodo: "PERÍODO DE ESTUDO", anoConclusao: "ANO DE CONCLUSÃO" },
   ],
   "2003/04": [
     { numero: 5, apelido: "Cadu", nome: "Carlos Eduardo Neto Muniz Farias", periodo: "2000 – 2003", anoConclusao: "2003.0" },
@@ -363,7 +358,6 @@ const ELENCOS_2025 = {
     { numero: 11, apelido: "Lucganso", nome: "LUCCA BEZERRA MOURA TORRES", periodo: "2013-2019", anoConclusao: "2019" },
     { numero: 77, apelido: "Fumacinha", nome: "ARTUR LUCAS SOUSA GUEDES", periodo: "2013-2019", anoConclusao: "2019" },
     { numero: 87, apelido: "Chumbo-", nome: "DIEGO ESTEVÃO DA COSTA", periodo: "2011-2019", anoConclusao: "2019" },
-    { numero: null, apelido: "Apelido", nome: "NOME COMPLETO", periodo: "PERÍODO DE ESTUDO", anoConclusao: "ANO DE CONCLUSÃO" },
   ],
   "2021": [
     { numero: 1, apelido: "Pipi", nome: "felipe oliveira soares de lima", periodo: "2015 a 2017", anoConclusao: "2021.0" },
@@ -374,7 +368,6 @@ const ELENCOS_2025 = {
     { numero: 19, apelido: "Gerônimo", nome: "marcos geronimo barbosa", periodo: "2010 a 2015", anoConclusao: "2020.0" },
     { numero: 22, apelido: "Marcellus", nome: "pedro marcellus portella", periodo: "Maternal, 2015-2017", anoConclusao: "2022.0" },
     { numero: 99, apelido: "Serginho", nome: "Sergio ricardo maciel filho", periodo: "2011 a 2014", anoConclusao: "2021.0" },
-    { numero: null, apelido: "Apelido", nome: "NOME COMPLETO", periodo: "PERÍODO DE ESTUDO", anoConclusao: "ANO DE CONCLUSÃO" },
   ],
   "2018": [
     { numero: 1, apelido: "Pão", nome: "João Victor Vieira Melo", periodo: "2004-2016", anoConclusao: "2016" },
@@ -778,8 +771,7 @@ function jogadoresDaTurma(turma) {
     return detalhado.map((j, i) => ({
       id: `j_${Date.now()}_${i}`,
       numero: j.numero != null ? String(j.numero) : "",
-      apelido: j.apelido || "",
-      nome: j.nome || "",
+      nome: j.nome || j.apelido || "",
       posicao: "",
       periodo: j.periodo || "",
       anoConclusao: j.anoConclusao || "",
@@ -790,7 +782,6 @@ function jogadoresDaTurma(turma) {
     return simples.map((nome, i) => ({
       id: `j_${Date.now()}_${i}`,
       numero: "",
-      apelido: "",
       nome,
       posicao: "",
       periodo: "",
@@ -802,7 +793,7 @@ function jogadoresDaTurma(turma) {
 
 function PlayerRow({ player, onChange, onRemove, turmaTime }) {
   const [expanded, setExpanded] = useState(false);
-  const titulo = player.apelido || player.nome || "Jogador sem nome";
+  const titulo = player.nome || "Jogador sem nome";
   const regular = anoConclusaoRegular(player.anoConclusao, turmaTime);
   const irregular = regular === false;
 
@@ -832,9 +823,9 @@ function PlayerRow({ player, onChange, onRemove, turmaTime }) {
               Ano de conclusão ({player.anoConclusao}) não bate com a turma {turmaTime} — Art. 6º/7º
             </div>
           ) : (
-            (player.periodo || (player.apelido && player.nome)) && (
+            player.periodo && (
               <div className="text-xs truncate" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-                {[player.apelido && player.nome ? player.nome : null, player.periodo].filter(Boolean).join(" · ")}
+                {player.periodo}
               </div>
             )
           )}
@@ -870,14 +861,6 @@ function PlayerRow({ player, onChange, onRemove, turmaTime }) {
           />
           <input
             type="text"
-            placeholder="Apelido"
-            value={player.apelido}
-            onChange={(e) => onChange({ ...player, apelido: e.target.value })}
-            className="px-2.5 py-1.5 rounded-lg text-sm col-span-2"
-            style={{ border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
-          />
-          <input
-            type="text"
             placeholder="Nome completo"
             value={player.nome}
             onChange={(e) => onChange({ ...player, nome: e.target.value })}
@@ -905,6 +888,39 @@ function PlayerRow({ player, onChange, onRemove, turmaTime }) {
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Segurança de senha — nunca guardamos senha em texto puro. Cada senha
+// ganha um "salt" aleatório e é transformada com SHA-256 antes de ir pro
+// banco; login recalcula o hash com o mesmo salt e compara.
+// ---------------------------------------------------------------------------
+function gerarSalt() {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function hashSenha(senha, salt) {
+  const enc = new TextEncoder().encode(`${salt}:${senha}`);
+  const buf = await crypto.subtle.digest("SHA-256", enc);
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function protegerSenha(senhaPura) {
+  const salt = gerarSalt();
+  const senhaHash = await hashSenha(senhaPura, salt);
+  return { salt, senhaHash };
+}
+
+async function senhaConfere(senhaDigitada, registro) {
+  if (!registro || !registro.salt || !registro.senhaHash) return false;
+  const hash = await hashSenha(senhaDigitada, registro.salt);
+  return hash === registro.senhaHash;
+}
+
+// Senha temporária inicial do super admin (equivale a "trocar123") — já
+// guardada como hash, nunca em texto puro. Troque assim que possível.
+const SALT_ADMIN_INICIAL = "32734104bcb7f6d9fc81aa394db8289f";
+const HASH_ADMIN_INICIAL = "dd3c8f4b63849fd3c1df4f9bb447ab8862b7761a238a910d1979bda76618c3f1";
 
 function gerarCodigoTime() {
   return String(Math.floor(1000 + Math.random() * 9000));
@@ -978,7 +994,7 @@ function RosterEditor({ team, onSave }) {
 
   const addJogador = () => {
     if (!novoJogador.trim()) return;
-    setJogadores([...jogadores, { id: `j_${Date.now()}`, numero: "", apelido: novoJogador.trim(), nome: "", posicao: "" }]);
+    setJogadores([...jogadores, { id: `j_${Date.now()}`, numero: "", nome: novoJogador.trim(), posicao: "", periodo: "", anoConclusao: "" }]);
     setNovoJogador("");
   };
   const updateJogador = (updated) => setJogadores(jogadores.map((j) => (j.id === updated.id ? updated : j)));
@@ -1151,7 +1167,7 @@ function EditarMeuTime({ teams, saveTeams }) {
 }
 
 function Inscricao({ teams, saveTeams }) {
-  const [form, setForm] = useState({ nome: "", periodo: "", capitao: "", contato: "", jogadores: [], escudoUrl: "" });
+  const [form, setForm] = useState({ nome: "", capitao: "", contato: "", jogadores: [], escudoUrl: "" });
   const [novoJogador, setNovoJogador] = useState("");
   const [sent, setSent] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1164,7 +1180,7 @@ function Inscricao({ teams, saveTeams }) {
       ...form,
       jogadores: [
         ...form.jogadores,
-        { id: `j_${Date.now()}`, numero: "", apelido: novoJogador.trim(), nome: "", posicao: "" },
+        { id: `j_${Date.now()}`, numero: "", nome: novoJogador.trim(), posicao: "", periodo: "", anoConclusao: "" },
       ],
     });
     setNovoJogador("");
@@ -1181,8 +1197,8 @@ function Inscricao({ teams, saveTeams }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-    if (!form.nome.trim() || !form.periodo.trim() || !form.capitao.trim() || !form.contato.trim()) {
-      setError("Preencha nome do time, período, capitão e contato.");
+    if (!form.nome.trim() || !form.capitao.trim() || !form.contato.trim()) {
+      setError("Preencha nome do time, capitão e contato.");
       return;
     }
     if (form.jogadores.length === 0) {
@@ -1194,7 +1210,6 @@ function Inscricao({ teams, saveTeams }) {
     const novoTime = {
       id: `time_${Date.now()}`,
       nome: form.nome.trim(),
-      periodo: form.periodo.trim(),
       capitao: form.capitao.trim(),
       contato: form.contato.trim(),
       jogadores: form.jogadores,
@@ -1206,7 +1221,7 @@ function Inscricao({ teams, saveTeams }) {
     setSaving(false);
     setSent(true);
     setCodigoGerado(codigo);
-    setForm({ nome: "", periodo: "", capitao: "", contato: "", jogadores: [], escudoUrl: "" });
+    setForm({ nome: "", capitao: "", contato: "", jogadores: [], escudoUrl: "" });
   };
 
   return (
@@ -1259,7 +1274,6 @@ function Inscricao({ teams, saveTeams }) {
         <form onSubmit={handleSubmit} className="sm:col-span-3 space-y-4">
           {[
             { key: "nome", label: "Nome do time", placeholder: "Ex: Turma de 2010" },
-            { key: "periodo", label: "Período (anos da turma no colégio)", placeholder: "Ex: 2001–2008" },
             { key: "capitao", label: "Capitão", placeholder: "Nome completo" },
             { key: "contato", label: "Contato (WhatsApp)", placeholder: "(00) 00000-0000" },
           ].map((f) => (
@@ -2204,7 +2218,7 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove }) {
               return (
                 <datalist id={`elenco_${eventForm.timeId}`}>
                   {elenco.map((j, i) => (
-                    <option key={j.id || j.numero || i} value={j.numero ? `${j.apelido || j.nome} (${j.numero})` : j.apelido || j.nome} />
+                    <option key={j.id || j.numero || i} value={j.numero ? `${j.nome} (${j.numero})` : j.nome} />
                   ))}
                 </datalist>
               );
@@ -2247,6 +2261,193 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove }) {
 // inscrito — protegido pela senha de admin, não pelo código do time.
 // Diagnóstico de irregularidades por time, conforme regulamento oficial
 // (Capítulo III — mínimo/máximo de atletas e ano de conclusão da turma).
+// ---------------------------------------------------------------------------
+// Documentos pra imprimir/baixar em PDF — ficha de time e súmula de jogo.
+// Usa a caixa de impressão do navegador (sem depender de nenhuma
+// biblioteca externa): abre um documento pronto e já chama "Imprimir",
+// onde a pessoa escolhe "Salvar como PDF".
+// ---------------------------------------------------------------------------
+function escapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function abrirImpressao(titulo, corpoHtml) {
+  const win = window.open("", "_blank");
+  if (!win) {
+    alert("Seu navegador bloqueou a janela. Permite pop-ups pra baixar o PDF.");
+    return;
+  }
+  win.document.write(`<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<title>${escapeHtml(titulo)}</title>
+<style>
+  body { font-family: Arial, Helvetica, sans-serif; color: #12203D; padding: 28px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 15px; margin: 20px 0 6px; border-bottom: 2px solid #12203D; padding-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+  th, td { border: 1px solid #ccc; padding: 5px 8px; font-size: 12px; text-align: left; }
+  th { background: #f0f0f0; }
+  .secao { page-break-after: always; }
+  .secao:last-child { page-break-after: auto; }
+  .meta { font-size: 12px; color: #555; margin-bottom: 10px; }
+  .imprimir-btn { margin-bottom: 18px; padding: 8px 16px; font-size: 14px; cursor: pointer; }
+  @media print { .no-print { display: none; } }
+</style>
+</head>
+<body>
+  <button class="imprimir-btn no-print" onclick="window.print()">Imprimir / Salvar como PDF</button>
+  ${corpoHtml}
+</body>
+</html>`);
+  win.document.close();
+  setTimeout(() => {
+    try {
+      win.print();
+    } catch (e) {
+      // usuário usa o botão manualmente se o navegador bloquear o print automático
+    }
+  }, 400);
+}
+
+function fichaTimeHtml(team) {
+  const jogadores = Array.isArray(team.jogadores) ? team.jogadores : [];
+  return `
+    <div class="secao">
+      <h1>${escapeHtml(team.nome)}</h1>
+      <div class="meta">Capitão: ${escapeHtml(team.capitao || "—")} · Contato: ${escapeHtml(team.contato || "—")} · ${jogadores.length} jogador(es)</div>
+      <table>
+        <thead><tr><th>Nº</th><th>Nome completo</th><th>Período de estudo</th><th>Ano de conclusão</th></tr></thead>
+        <tbody>
+          ${jogadores
+            .map(
+              (j) =>
+                `<tr><td>${escapeHtml(j.numero || "—")}</td><td>${escapeHtml(j.nome || "—")}</td><td>${escapeHtml(j.periodo || "—")}</td><td>${escapeHtml(j.anoConclusao || "—")}</td></tr>`
+            )
+            .join("")}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function baixarFichaTime(team) {
+  abrirImpressao(`Ficha — ${team.nome}`, fichaTimeHtml(team));
+}
+
+function baixarFichaTodosTimes(teams) {
+  const corpo = teams.map(fichaTimeHtml).join("");
+  abrirImpressao("Fichas de todos os times", corpo);
+}
+
+function sumulaHtml(match, teams) {
+  const timeA = teams.find((t) => t.id === match.timeA);
+  const timeB = teams.find((t) => t.id === match.timeB);
+  const linhasTime = (time) =>
+    (time && Array.isArray(time.jogadores) ? time.jogadores : [])
+      .map(
+        (j) =>
+          `<tr><td>${escapeHtml(j.numero || "—")}</td><td>${escapeHtml(j.nome || "—")}</td><td></td><td></td><td></td></tr>`
+      )
+      .join("");
+  return `
+    <div class="secao">
+      <h1>Súmula de Partida</h1>
+      <div class="meta">Fase: ${escapeHtml(match.fase || "—")} · Data: ____/____/______ · Horário: ____:____ · Local: Ginásio CSU</div>
+      <h2>${escapeHtml(timeA ? timeA.nome : "Time A")}</h2>
+      <table>
+        <thead><tr><th>Nº</th><th>Nome</th><th>Gol</th><th>Cartão amarelo</th><th>Cartão vermelho</th></tr></thead>
+        <tbody>${linhasTime(timeA)}</tbody>
+      </table>
+      <h2>${escapeHtml(timeB ? timeB.nome : "Time B")}</h2>
+      <table>
+        <thead><tr><th>Nº</th><th>Nome</th><th>Gol</th><th>Cartão amarelo</th><th>Cartão vermelho</th></tr></thead>
+        <tbody>${linhasTime(timeB)}</tbody>
+      </table>
+      <div class="meta" style="margin-top:24px; font-size:13px;">
+        Placar final: _______ &nbsp;x&nbsp; _______<br/><br/>
+        Árbitro: _____________________________________ &nbsp;&nbsp; Mesário: _____________________________________
+      </div>
+    </div>`;
+}
+
+function baixarSumula(match, teams) {
+  const timeA = teams.find((t) => t.id === match.timeA);
+  const timeB = teams.find((t) => t.id === match.timeB);
+  const nomeArquivo = `${timeA ? timeA.nome : "TimeA"} x ${timeB ? timeB.nome : "TimeB"}`;
+  abrirImpressao(`Súmula — ${nomeArquivo}`, sumulaHtml(match, teams));
+}
+
+function DocumentosOrganizacao({ teams, matches }) {
+  return (
+    <div className="rounded-2xl p-5 mt-8" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+      <h3 className="font-semibold mb-1 flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+        <Download size={18} color={COLORS.ink} /> Documentos pra imprimir
+      </h3>
+      <p className="text-xs mb-4" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+        Abre uma janela pronta pra imprimir — escolhe "Salvar como PDF" na caixa de impressão do
+        navegador.
+      </p>
+
+      <button
+        type="button"
+        onClick={() => baixarFichaTodosTimes(teams)}
+        disabled={teams.length === 0}
+        className="px-4 py-2 rounded-xl text-sm font-semibold inline-flex items-center gap-1.5 mb-5 disabled:opacity-50"
+        style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}
+      >
+        <Download size={14} /> Ficha de todos os times
+      </button>
+
+      {teams.length > 0 && (
+        <div className="mb-5">
+          <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Ficha individual por time
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {teams.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => baixarFichaTime(t)}
+                className="px-3 py-1.5 rounded-full text-xs font-medium inline-flex items-center gap-1"
+                style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+              >
+                <Download size={12} /> {t.nome}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {matches.length > 0 && (
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Súmula por confronto
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {matches.map((m) => {
+              const timeA = teams.find((t) => t.id === m.timeA);
+              const timeB = teams.find((t) => t.id === m.timeB);
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => baixarSumula(m, teams)}
+                  className="px-3 py-1.5 rounded-full text-xs font-medium inline-flex items-center gap-1"
+                  style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+                >
+                  <Download size={12} /> {timeA ? timeA.nome : "?"} x {timeB ? timeB.nome : "?"}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function diagnosticarTime(team) {
   const problemas = [];
   const jogadores = Array.isArray(team.jogadores) ? team.jogadores : [];
@@ -2258,7 +2459,7 @@ function diagnosticarTime(team) {
   }
   jogadores.forEach((j) => {
     if (anoConclusaoRegular(j.anoConclusao, team.nome) === false) {
-      problemas.push(`${j.apelido || j.nome || "Jogador"}: ano de conclusão (${j.anoConclusao}) não bate com a turma ${team.nome} (Art. 6º/7º).`);
+      problemas.push(`${j.nome || "Jogador"}: ano de conclusão (${j.anoConclusao}) não bate com a turma ${team.nome} (Art. 6º/7º).`);
     }
   });
   return problemas;
@@ -2368,6 +2569,7 @@ function Cadastro({ users, saveUsers, onVoltar }) {
       return;
     }
     setSaving(true);
+    const { salt, senhaHash } = await protegerSenha(form.senha);
     const novo = {
       id: `user_${Date.now()}`,
       nome: form.nome.trim(),
@@ -2376,7 +2578,8 @@ function Cadastro({ users, saveUsers, onVoltar }) {
       whatsapp: form.whatsapp.trim(),
       email: form.email.trim(),
       nascimento: form.nascimento,
-      senha: form.senha,
+      salt,
+      senhaHash,
       status: "pendente",
       criadoEm: new Date().toISOString(),
     };
@@ -2678,7 +2881,7 @@ function LoginGate({ users, saveUsers, admins, onLogin }) {
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState("");
 
-  const entrar = (e) => {
+  const entrar = async (e) => {
     e.preventDefault();
     try {
       const alvo = email.trim().toLowerCase();
@@ -2692,18 +2895,21 @@ function LoginGate({ users, saveUsers, admins, onLogin }) {
       }
 
       const listaAdmins = Array.isArray(admins) ? admins : [];
-      const admin = listaAdmins.find(
-        (a) => a && String(a.email || "").trim().toLowerCase() === alvo && String(a.senha || "").trim() === senhaDigitada
-      );
-      if (admin) {
-        onLogin({ email: admin.email, nome: admin.email, tipo: "admin" });
-        return;
+      for (const a of listaAdmins) {
+        if (a && String(a.email || "").trim().toLowerCase() === alvo && (await senhaConfere(senhaDigitada, a))) {
+          onLogin({ email: a.email, nome: a.email, tipo: "admin" });
+          return;
+        }
       }
 
       const listaUsers = Array.isArray(users) ? users : [];
-      const usuario = listaUsers.find(
-        (u) => u && String(u.email || "").trim().toLowerCase() === alvo && String(u.senha || "").trim() === senhaDigitada
-      );
+      let usuario = null;
+      for (const u of listaUsers) {
+        if (u && String(u.email || "").trim().toLowerCase() === alvo && (await senhaConfere(senhaDigitada, u))) {
+          usuario = u;
+          break;
+        }
+      }
       if (usuario && usuario.status === "aprovado") {
         onLogin({ email: usuario.email, nome: usuario.nome, tipo: "usuario" });
         return;
@@ -2818,6 +3024,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, admins, saveAdmin
   const [reqEmail, setReqEmail] = useState("");
   const [reqMotivo, setReqMotivo] = useState("");
   const [reqEnviado, setReqEnviado] = useState(false);
+  const [ultimaSenhaGerada, setUltimaSenhaGerada] = useState(null);
 
   const [matchForm, setMatchForm] = useState({ fase: "Grupos", timeA: "", timeB: "", golsA: "", golsB: "" });
   const [linkTransmissao, setLinkTransmissao] = useState((config && config.linkTransmissao) || "");
@@ -2827,16 +3034,22 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, admins, saveAdmin
     await saveConfig({ ...config, linkTransmissao: linkTransmissao.trim() });
   };
 
-  const tryUnlock = (e) => {
+  const tryUnlock = async (e) => {
     e.preventDefault();
     const email = loginEmail.trim().toLowerCase();
-    const encontrado = admins.find((a) => a.email.toLowerCase() === email && a.senha === loginSenha);
-    if (encontrado || loginSenha === ADMIN_PASSCODE) {
+    if (loginSenha.toUpperCase() === ADMIN_PASSCODE.toUpperCase()) {
       setUnlocked(true);
       setPassError(false);
-    } else {
-      setPassError(true);
+      return;
     }
+    for (const a of admins) {
+      if (a && a.email.toLowerCase() === email && (await senhaConfere(loginSenha, a))) {
+        setUnlocked(true);
+        setPassError(false);
+        return;
+      }
+    }
+    setPassError(true);
   };
 
   const souSuperAdmin = loginEmail.trim().toLowerCase() === SUPER_ADMIN_EMAIL;
@@ -2861,10 +3074,10 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, admins, saveAdmin
 
   const aprovarSolicitacao = async (req) => {
     const senhaTemp = gerarCodigoTime();
-    await saveAdmins([...admins, { email: req.email, senha: senhaTemp }]);
-    await saveAdminRequests(
-      adminRequests.map((r) => (r.id === req.id ? { ...r, status: "aprovado", senhaTemp } : r))
-    );
+    const { salt, senhaHash } = await protegerSenha(senhaTemp);
+    await saveAdmins([...admins, { email: req.email, salt, senhaHash }]);
+    await saveAdminRequests(adminRequests.map((r) => (r.id === req.id ? { ...r, status: "aprovado" } : r)));
+    setUltimaSenhaGerada({ email: req.email, senha: senhaTemp });
   };
 
   const recusarSolicitacao = async (req) => {
@@ -3125,33 +3338,31 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, admins, saveAdmin
         </div>
       )}
 
-      {souSuperAdmin &&
-        adminRequests.filter((r) => r.status === "aprovado" && r.senhaTemp).length > 0 && (
+      {ultimaSenhaGerada && (
+        <div
+          className="rounded-2xl p-5 mb-8"
+          style={{ backgroundColor: COLORS.card, border: `1.5px solid ${COLORS.accent}` }}
+        >
+          <h3 className="font-semibold mb-2 flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+            <ShieldCheck size={16} color={COLORS.accent} /> Senha temporária gerada
+          </h3>
+          <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Repassa pra pessoa por fora do app agora — ela não fica guardada em texto puro em
+            lugar nenhum, então só aparece aqui uma vez.
+          </p>
           <div
-            className="rounded-2xl p-5 mb-8"
-            style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
+            className="text-sm px-3 py-2 rounded-lg flex items-center justify-between gap-3"
+            style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'JetBrains Mono', monospace" }}
           >
-            <h3 className="font-semibold mb-3" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
-              Senhas temporárias geradas
-            </h3>
-            <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-              Repasse pra pessoa por fora do app — some daqui quando você recarregar.
-            </p>
-            <ul className="space-y-1.5">
-              {adminRequests
-                .filter((r) => r.status === "aprovado" && r.senhaTemp)
-                .map((r) => (
-                  <li
-                    key={r.id}
-                    className="text-sm px-3 py-2 rounded-lg"
-                    style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'JetBrains Mono', monospace" }}
-                  >
-                    {r.email}: {r.senhaTemp}
-                  </li>
-                ))}
-            </ul>
+            <span>
+              {ultimaSenhaGerada.email}: <strong>{ultimaSenhaGerada.senha}</strong>
+            </span>
+            <button type="button" onClick={() => setUltimaSenhaGerada(null)} aria-label="Fechar">
+              <X size={14} color={COLORS.slate} />
+            </button>
           </div>
-        )}
+        </div>
+      )}
 
       <div className="max-w-xl">
         <div className="rounded-2xl p-5 mb-8" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
@@ -3289,6 +3500,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, admins, saveAdmin
 
       <GerenciarElencos teams={teams} saveTeams={saveTeams} />
       <DiagnosticoIrregularidades teams={teams} />
+      <DocumentosOrganizacao teams={teams} matches={matches} />
 
       <div
         className="rounded-2xl p-5 mt-8"
@@ -3351,7 +3563,7 @@ export default function App() {
   const [users, saveUsers, loadingUsers] = useSharedStorage("copasu:users", [], 8000);
   const [admins, saveAdmins, loadingAdmins] = useSharedStorage(
     "copasu:admins",
-    [{ email: SUPER_ADMIN_EMAIL, senha: "trocar123" }],
+    [{ email: SUPER_ADMIN_EMAIL, salt: SALT_ADMIN_INICIAL, senhaHash: HASH_ADMIN_INICIAL }],
     8000
   );
   const [adminRequests, saveAdminRequests, loadingAdminRequests] = useSharedStorage("copasu:admin_requests", [], 8000);
@@ -3365,12 +3577,43 @@ export default function App() {
     loadingTeams || loadingMatches || loadingPosts || loadingUsers || loadingAdmins || loadingAdminRequests || loadingSorteio || loadingConfig;
 
   // Garante que o admin inicial exista no armazenamento compartilhado
-  // (só grava uma vez, quando a lista ainda está vazia de verdade).
+  // (só grava uma vez, quando a lista ainda está vazia de verdade), e
+  // migra qualquer senha antiga que ainda esteja em texto puro pro hash.
+  // Garante que o admin inicial exista, e migra qualquer registro antigo
+  // que ainda não tenha salt+hash (nunca guardamos senha em texto puro).
   useEffect(() => {
-    if (!loadingAdmins && admins.length === 0) {
-      saveAdmins([{ email: SUPER_ADMIN_EMAIL, senha: "trocar123" }]);
+    if (loadingAdmins) return;
+    if (admins.length === 0) {
+      saveAdmins([{ email: SUPER_ADMIN_EMAIL, salt: SALT_ADMIN_INICIAL, senhaHash: HASH_ADMIN_INICIAL }]);
+      return;
     }
-  }, [loadingAdmins]);
+    const precisaMigrar = admins.some((a) => !a.senhaHash || !a.salt);
+    if (precisaMigrar) {
+      Promise.all(
+        admins.map(async (a) => {
+          if (a.senhaHash && a.salt) return a;
+          const { salt, senhaHash } = await protegerSenha(a.senha || "");
+          const { senha, ...resto } = a;
+          return { ...resto, salt, senhaHash };
+        })
+      ).then((migrados) => saveAdmins(migrados));
+    }
+  }, [loadingAdmins, admins]);
+
+  useEffect(() => {
+    if (loadingUsers) return;
+    const precisaMigrar = users.some((u) => !u.senhaHash || !u.salt);
+    if (precisaMigrar) {
+      Promise.all(
+        users.map(async (u) => {
+          if (u.senhaHash && u.salt) return u;
+          const { salt, senhaHash } = await protegerSenha(u.senha || "");
+          const { senha, ...resto } = u;
+          return { ...resto, salt, senhaHash };
+        })
+      ).then((migrados) => saveUsers(migrados));
+    }
+  }, [loadingUsers, users]);
 
   const handleFabCapture = async (e) => {
     const file = e.target.files && e.target.files[0];
