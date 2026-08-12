@@ -39,6 +39,7 @@ import {
   listarAdmins,
   promoverParaAdmin,
   subirArquivo,
+  urlAssinada,
 } from "./lib/supabase.js";
 
 // ---------------------------------------------------------------------------
@@ -1833,6 +1834,44 @@ function Galeria() {
 // ---------------------------------------------------------------------------
 // TAB: Comunidade — fotos e vídeos de quem já se inscreveu
 // ---------------------------------------------------------------------------
+// Mostra uma foto ou vídeo guardado no bucket privado — como não existe
+// mais link fixo, pede um link temporário (assinado) na hora de exibir,
+// só funciona pra quem está logado.
+function MidiaProtegida({ caminho, tipo, className, legenda }) {
+  const [url, setUrl] = useState(null);
+  const [erro, setErro] = useState(false);
+
+  useEffect(() => {
+    let cancelado = false;
+    setUrl(null);
+    setErro(false);
+    urlAssinada(caminho)
+      .then((u) => {
+        if (!cancelado) setUrl(u);
+      })
+      .catch(() => {
+        if (!cancelado) setErro(true);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [caminho]);
+
+  if (erro) return null;
+  if (!url) {
+    return (
+      <div className={className} style={{ display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: COLORS.zebra }}>
+        <Loader2 size={18} className="animate-spin" color={COLORS.slate} />
+      </div>
+    );
+  }
+  return tipo === "video" ? (
+    <video src={url} controls className={className} />
+  ) : (
+    <img src={url} alt={legenda || ""} className={className} />
+  );
+}
+
 function Comunidade({ posts, savePosts }) {
   const [ano, setAno] = useState(EDICOES_DISPONIVEIS[0]);
   const [legenda, setLegenda] = useState("");
@@ -1874,8 +1913,8 @@ function Comunidade({ posts, savePosts }) {
     setCapturing(true);
     try {
       const blob = await compressImageToBlob(file);
-      const url = await subirArquivo(blob, file.name || "foto.jpg", "image/jpeg");
-      await publicar({ fotoUrl: url });
+      const caminho = await subirArquivo(blob, file.name || "foto.jpg", "image/jpeg");
+      await publicar({ fotoUrl: caminho });
     } catch (err) {
       console.error(err);
     } finally {
@@ -1894,8 +1933,9 @@ function Comunidade({ posts, savePosts }) {
     }
     setSubindoVideo(true);
     try {
-      const url = await subirArquivo(file, file.name || "video.mp4", file.type);
-      setVideoStaged(url);
+      const caminho = await subirArquivo(file, file.name || "video.mp4", file.type);
+      const url = await urlAssinada(caminho);
+      setVideoStaged({ caminho, url });
     } catch (err) {
       setVideoErro("Falha ao subir o vídeo: " + err.message);
     } finally {
@@ -1905,7 +1945,7 @@ function Comunidade({ posts, savePosts }) {
 
   const publicarVideo = async () => {
     if (!videoStaged) return;
-    await publicar({ videoUrl: videoStaged });
+    await publicar({ videoUrl: videoStaged.caminho });
   };
 
   const anos = ["Todos", ...Array.from(new Set(posts.map((p) => p.ano).filter(Boolean)))];
@@ -1986,7 +2026,7 @@ function Comunidade({ posts, savePosts }) {
           className="rounded-2xl p-4 mb-8 space-y-3"
           style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
         >
-          <video src={videoStaged} controls className="w-full rounded-xl max-h-64" />
+          <video src={videoStaged.url} controls className="w-full rounded-xl max-h-64" />
           <input
             type="text"
             placeholder="Legenda (opcional)"
@@ -2061,9 +2101,11 @@ function Comunidade({ posts, savePosts }) {
                 style={{ border: `1px solid ${COLORS.border}`, backgroundColor: COLORS.card }}
               >
                 {p.videoUrl ? (
-                  <video src={p.videoUrl} controls className="w-full max-h-64 bg-black" />
+                  <MidiaProtegida caminho={p.videoUrl} tipo="video" className="w-full max-h-64 bg-black" />
                 ) : (
-                  p.fotoUrl && <img src={p.fotoUrl} alt={p.legenda} className="w-full h-48 object-cover" />
+                  p.fotoUrl && (
+                    <MidiaProtegida caminho={p.fotoUrl} tipo="foto" className="w-full h-48 object-cover" legenda={p.legenda} />
+                  )
                 )}
                 <div className="p-3">
                   <div className="flex items-center justify-between gap-2">

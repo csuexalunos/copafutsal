@@ -99,10 +99,10 @@ export async function promoverParaAdmin(userId, email) {
 }
 
 // ---------------------------------------------------------------------
-// Armazenamento de fotos e vídeos (Supabase Storage) — em vez de guardar
-// a imagem inteira como texto dentro do banco, sobe o arquivo de verdade
-// pro bucket "fotos" e guarda só o link curto. Mais leve e sem limite
-// artificial de tamanho pra vídeo.
+// Armazenamento de fotos e vídeos (Supabase Storage) — bucket PRIVADO:
+// só quem tem login consegue subir ou ver. Como não é mais público, não
+// existe link fixo — cada exibição pede um link temporário (assinado),
+// válido só por um tempo.
 // ---------------------------------------------------------------------
 
 export async function subirArquivo(blob, nomeArquivo, contentType) {
@@ -112,6 +112,12 @@ export async function subirArquivo(blob, nomeArquivo, contentType) {
     upsert: false,
   });
   if (error) throw error;
-  const { data } = supabase.storage.from("fotos").getPublicUrl(caminho);
-  return data.publicUrl;
+  return caminho; // guarda só o caminho — o link é gerado na hora de exibir
+}
+
+export async function urlAssinada(caminho, expiraEmSegundos = 3600) {
+  if (!caminho) return null;
+  const { data, error } = await supabase.storage.from("fotos").createSignedUrl(caminho, expiraEmSegundos);
+  if (error) throw error;
+  return data.signedUrl;
 }
