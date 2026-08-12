@@ -2823,19 +2823,38 @@ function Cadastro({ onVoltar }) {
 // melhores colocados da última edição, pote 5 = times novos) e sorteia os
 // grupos. Só admin sorteia; todo mundo vê o resultado.
 // ---------------------------------------------------------------------------
-function montarPotes(teams) {
-  const potes = [[], [], [], [], []]; // pote 5 = times novos (fora do ranking)
-  teams.forEach((t) => {
-    const posicao = RANKING_ULTIMA_EDICAO.indexOf(t.nome);
-    const indicePote = posicao === -1 ? 4 : Math.min(3, Math.floor(posicao / 4));
-    potes[indicePote].push(t);
-  });
+function montarPotes(teams, numGrupos) {
+  const potes = [];
+  const usados = new Set();
+
+  // Cada pote tem o tamanho do número de grupos (um time de cada pote pra
+  // cada grupo) — os blocos seguem a classificação final da última edição.
+  for (let i = 0; i < RANKING_ULTIMA_EDICAO.length; i += numGrupos) {
+    const bloco = RANKING_ULTIMA_EDICAO.slice(i, i + numGrupos)
+      .map((nome) => teams.find((t) => t.nome === nome))
+      .filter(Boolean);
+    if (bloco.length > 0) {
+      potes.push(bloco);
+      bloco.forEach((t) => usados.add(t.id));
+    }
+  }
+
+  // Pote extra só para times que nunca disputaram antes (fora do ranking).
+  const novos = teams.filter((t) => !usados.has(t.id));
+  if (novos.length > 0) potes.push(novos);
+
   return potes;
 }
 
-function sortearGrupos(potes) {
-  const grupos = { A: [], B: [], C: [], D: [] };
-  const nomesGrupo = ["A", "B", "C", "D"];
+function sugerirNumGrupos(totalTimes) {
+  if (totalTimes <= 4) return 1;
+  return Math.max(1, Math.round(totalTimes / 4));
+}
+
+function sortearGrupos(potes, numGrupos) {
+  const nomesGrupo = Array.from({ length: numGrupos }, (_, i) => String.fromCharCode(65 + i)); // A, B, C...
+  const grupos = {};
+  nomesGrupo.forEach((g) => (grupos[g] = []));
   const nomeCampeao = HALL_DA_FAMA.campeoes[HALL_DA_FAMA.campeoes.length - 1]?.turma;
 
   potes.forEach((pote, potIdx) => {
@@ -2843,7 +2862,7 @@ function sortearGrupos(potes) {
 
     // Regra do sorteio: o campeão da última edição é sempre o cabeça de
     // chave do Grupo A (só vale pro pote 1, onde ele está).
-    if (potIdx === 0) {
+    if (potIdx === 0 && nomesGrupo.includes("A")) {
       const campeao = restante.find((t) => t.nome === nomeCampeao);
       if (campeao) {
         grupos.A.push(campeao);
@@ -2854,7 +2873,7 @@ function sortearGrupos(potes) {
     const embaralhado = restante.sort(() => Math.random() - 0.5);
     const gruposComVaga = nomesGrupo.filter((g) => grupos[g].length <= potIdx);
     embaralhado.forEach((time, i) => {
-      const alvo = gruposComVaga[i % gruposComVaga.length] || nomesGrupo[i % 4];
+      const alvo = gruposComVaga[i % gruposComVaga.length] || nomesGrupo[i % nomesGrupo.length];
       grupos[alvo].push(time);
     });
   });
@@ -2862,22 +2881,43 @@ function sortearGrupos(potes) {
 }
 
 function Sorteio({ teams, sorteio, saveSorteio, sessao }) {
-  const potes = useMemo(() => montarPotes(teams), [teams]);
   const souAdmin = sessao && sessao.tipo === "admin";
+  const [numGrupos, setNumGrupos] = useState(() => sugerirNumGrupos(teams.length));
+  const potes = useMemo(() => montarPotes(teams, numGrupos), [teams, numGrupos]);
 
   const realizarSorteio = async () => {
-    const grupos = sortearGrupos(potes);
-    await saveSorteio({ grupos, sorteadoEm: new Date().toISOString() });
+    const grupos = sortearGrupos(potes, numGrupos);
+    await saveSorteio({ grupos, numGrupos, sorteadoEm: new Date().toISOString() });
   };
 
   return (
     <div>
       <SectionLabel eyebrow="Art. 13 do regulamento" title="Sorteio dos grupos" />
-      <p className="text-sm mb-6 max-w-xl" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-        Os potes seguem a classificação final da última edição (1º ao 15º), do 1º-4º no pote 1
-        até o 13º-15º no pote 4. O pote 5 é só para times novos, que nunca disputaram antes —
-        igual manda o regulamento. O campeão sai sempre como cabeça de chave do Grupo A.
+      <p className="text-sm mb-4 max-w-xl" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+        Os potes seguem a classificação final da última edição (do 1º ao 15º) — cada pote traz um
+        time pra cada grupo. Times que nunca disputaram antes ficam no último pote. O campeão sai
+        sempre como cabeça de chave do Grupo A.
       </p>
+
+      {souAdmin && (
+        <div className="flex items-center gap-3 mb-6">
+          <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Número de grupos (times de 4)
+          </label>
+          <input
+            type="number"
+            min={1}
+            max={10}
+            value={numGrupos}
+            onChange={(e) => setNumGrupos(Math.max(1, Number(e.target.value) || 1))}
+            className="w-16 px-2 py-1.5 rounded-lg text-sm text-center"
+            style={{ border: `1.5px solid ${COLORS.border}`, fontFamily: "'JetBrains Mono', monospace" }}
+          />
+          <span className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            {teams.length} times inscritos — sugestão automática: {sugerirNumGrupos(teams.length)} grupos
+          </span>
+        </div>
+      )}
 
       <div className="grid sm:grid-cols-5 gap-3 mb-8">
         {potes.map((pote, i) => (
