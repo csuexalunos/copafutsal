@@ -1269,40 +1269,80 @@ function AddPlayerForm({ onAdd }) {
 }
 
 function Inscricao({ teams, saveTeams, sessao }) {
-  const [form, setForm] = useState({ turmaSelecionada: "", nomeCustom: "", capitao: "", contato: "", jogadores: [], escudoUrl: "" });
+  const isAdmin = sessao && sessao.tipo === "admin";
+  const podeAcessar = sessao && (isAdmin || sessao.representanteAprovado);
+  const turmaFixa = !isAdmin && sessao ? sessao.turma || "" : "";
+
+  const montarEstadoInicial = () => {
+    const turmaAlvo = isAdmin ? "" : turmaFixa;
+    const timeAlvo = turmaAlvo ? teams.find((t) => t.nome === turmaAlvo) : null;
+    if (timeAlvo) {
+      return {
+        turmaSelecionada: timeAlvo.nome,
+        nomeCustom: "",
+        capitao: timeAlvo.capitao || "",
+        contato: timeAlvo.contato || "",
+        jogadores: timeAlvo.jogadores || [],
+        escudoUrl: timeAlvo.escudoUrl || "",
+      };
+    }
+    if (turmaAlvo) {
+      return {
+        turmaSelecionada: turmaAlvo,
+        nomeCustom: "",
+        capitao: "",
+        contato: "",
+        jogadores: jogadoresDaTurma(turmaAlvo),
+        escudoUrl: ESCUDOS_TIMES[turmaAlvo] || "",
+      };
+    }
+    return { turmaSelecionada: "", nomeCustom: "", capitao: "", contato: "", jogadores: [], escudoUrl: "" };
+  };
+
+  const [form, setForm] = useState(montarEstadoInicial);
+  const [dirty, setDirty] = useState(false);
   const [sent, setSent] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [codigoGerado, setCodigoGerado] = useState("");
 
   const nomeTime = form.turmaSelecionada === "outro" ? form.nomeCustom.trim() : form.turmaSelecionada;
+  const timeExistente = teams.find((t) => t.nome === nomeTime) || null;
+
+  const atualizarCampo = (patch) => {
+    setForm((prev) => ({ ...prev, ...patch }));
+    setDirty(true);
+  };
 
   const escolherTurma = (valor) => {
     if (valor === "outro") {
-      setForm({ ...form, turmaSelecionada: valor, jogadores: [], escudoUrl: "" });
+      atualizarCampo({ turmaSelecionada: valor, jogadores: [], escudoUrl: "" });
       return;
     }
-    setForm({
-      ...form,
+    const existente = teams.find((t) => t.nome === valor);
+    if (existente) {
+      atualizarCampo({
+        turmaSelecionada: valor,
+        capitao: existente.capitao || "",
+        contato: existente.contato || "",
+        jogadores: existente.jogadores || [],
+        escudoUrl: existente.escudoUrl || "",
+      });
+      return;
+    }
+    atualizarCampo({
       turmaSelecionada: valor,
       jogadores: jogadoresDaTurma(valor),
       escudoUrl: ESCUDOS_TIMES[valor] || "",
     });
   };
 
-  const addJogador = (novo) => {
-    setForm({ ...form, jogadores: [...form.jogadores, novo] });
-  };
+  const addJogador = (novo) => atualizarCampo({ jogadores: [...form.jogadores, novo] });
+  const updateJogador = (updated) =>
+    atualizarCampo({ jogadores: form.jogadores.map((j) => (j.id === updated.id ? updated : j)) });
+  const removeJogador = (id) => atualizarCampo({ jogadores: form.jogadores.filter((j) => j.id !== id) });
 
-  const updateJogador = (updated) => {
-    setForm({ ...form, jogadores: form.jogadores.map((j) => (j.id === updated.id ? updated : j)) });
-  };
-
-  const removeJogador = (id) => {
-    setForm({ ...form, jogadores: form.jogadores.filter((j) => j.id !== id) });
-  };
-
-  const handleSubmit = async (e) => {
+  const handleSalvar = async (e) => {
     e.preventDefault();
     setError("");
     if (!nomeTime || !form.capitao.trim() || !form.contato.trim()) {
@@ -1314,25 +1354,35 @@ function Inscricao({ teams, saveTeams, sessao }) {
       return;
     }
     setSaving(true);
-    const codigo = gerarCodigoTime();
-    const novoTime = {
-      id: `time_${Date.now()}`,
-      nome: nomeTime,
-      capitao: form.capitao.trim(),
-      contato: form.contato.trim(),
-      jogadores: form.jogadores,
-      escudoUrl: form.escudoUrl,
-      codigo,
-      inscritoEm: new Date().toISOString(),
-    };
-    await saveTeams([...teams, novoTime]);
+    if (timeExistente) {
+      const atualizado = {
+        ...timeExistente,
+        capitao: form.capitao.trim(),
+        contato: form.contato.trim(),
+        jogadores: form.jogadores,
+        escudoUrl: form.escudoUrl,
+      };
+      await saveTeams(teams.map((t) => (t.id === atualizado.id ? atualizado : t)));
+    } else {
+      const codigo = gerarCodigoTime();
+      const novoTime = {
+        id: `time_${Date.now()}`,
+        nome: nomeTime,
+        capitao: form.capitao.trim(),
+        contato: form.contato.trim(),
+        jogadores: form.jogadores,
+        escudoUrl: form.escudoUrl,
+        codigo,
+        inscritoEm: new Date().toISOString(),
+      };
+      await saveTeams([...teams, novoTime]);
+      setCodigoGerado(codigo);
+    }
     setSaving(false);
     setSent(true);
-    setCodigoGerado(codigo);
-    setForm({ turmaSelecionada: "", nomeCustom: "", capitao: "", contato: "", jogadores: [], escudoUrl: "" });
+    setDirty(false);
+    setTimeout(() => setSent(false), 3000);
   };
-
-  const podeAcessar = sessao && (sessao.tipo === "admin" || sessao.representanteAprovado);
 
   if (!podeAcessar) {
     return (
@@ -1358,6 +1408,23 @@ function Inscricao({ teams, saveTeams, sessao }) {
     );
   }
 
+  if (!isAdmin && !turmaFixa) {
+    return (
+      <div>
+        <SectionLabel eyebrow="Participe" title="Inscrição de time" />
+        <div
+          className="rounded-2xl p-6 max-w-md"
+          style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
+        >
+          <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Você já foi aprovado como representante, mas ainda falta um organizador definir qual
+            é a sua turma. Assim que isso acontecer, o time dela aparece aqui automaticamente.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (!inscricaoAberta()) {
     return (
       <div>
@@ -1376,7 +1443,7 @@ function Inscricao({ teams, saveTeams, sessao }) {
       <SectionLabel eyebrow="Participe" title="Inscrição de time" />
 
       <div className="grid sm:grid-cols-5 gap-8">
-        <form onSubmit={handleSubmit} className="sm:col-span-3 space-y-4">
+        <form onSubmit={handleSalvar} className="sm:col-span-3 space-y-4">
           <div>
             <label
               className="block text-xs font-semibold uppercase tracking-wide mb-1.5"
@@ -1387,7 +1454,7 @@ function Inscricao({ teams, saveTeams, sessao }) {
             <input
               type="text"
               value={form.capitao}
-              onChange={(e) => setForm({ ...form, capitao: e.target.value })}
+              onChange={(e) => atualizarCampo({ capitao: e.target.value })}
               placeholder="Seu nome completo"
               className="w-full px-4 py-2.5 rounded-xl outline-none text-sm"
               style={{ backgroundColor: COLORS.card, border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
@@ -1404,37 +1471,51 @@ function Inscricao({ teams, saveTeams, sessao }) {
             <input
               type="text"
               value={form.contato}
-              onChange={(e) => setForm({ ...form, contato: e.target.value })}
+              onChange={(e) => atualizarCampo({ contato: e.target.value })}
               placeholder="(00) 00000-0000"
               className="w-full px-4 py-2.5 rounded-xl outline-none text-sm"
               style={{ backgroundColor: COLORS.card, border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
             />
           </div>
 
-          <div>
-            <label
-              className="block text-xs font-semibold uppercase tracking-wide mb-1.5"
-              style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
-            >
-              Sua turma / ano
-            </label>
-            <select
-              value={form.turmaSelecionada}
-              onChange={(e) => escolherTurma(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl outline-none text-sm"
-              style={{ backgroundColor: COLORS.card, border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
-            >
-              <option value="">Selecione depois de preencher seus dados acima</option>
-              {TURMAS_HISTORICAS.map((t) => (
-                <option key={t.turma} value={t.turma}>
-                  {t.turma}
-                </option>
-              ))}
-              <option value="outro">Outra turma / time novo</option>
-            </select>
-          </div>
+          {isAdmin ? (
+            <div>
+              <label
+                className="block text-xs font-semibold uppercase tracking-wide mb-1.5"
+                style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+              >
+                Turma / ano
+              </label>
+              <select
+                value={form.turmaSelecionada}
+                onChange={(e) => escolherTurma(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl outline-none text-sm"
+                style={{ backgroundColor: COLORS.card, border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+              >
+                <option value="">Selecione</option>
+                {TURMAS_HISTORICAS.map((t) => (
+                  <option key={t.turma} value={t.turma}>
+                    {t.turma}
+                  </option>
+                ))}
+                <option value="outro">Outra turma / time novo</option>
+              </select>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 rounded-xl p-3" style={{ backgroundColor: COLORS.accentSoft }}>
+              {form.escudoUrl && <img src={form.escudoUrl} alt="" className="w-10 h-10 object-contain shrink-0" />}
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
+                  Sua turma
+                </div>
+                <div className="text-sm font-semibold" style={{ color: COLORS.accent, fontFamily: "'Sora', sans-serif" }}>
+                  {turmaFixa}
+                </div>
+              </div>
+            </div>
+          )}
 
-          {form.turmaSelecionada === "outro" && (
+          {isAdmin && form.turmaSelecionada === "outro" && (
             <div>
               <label
                 className="block text-xs font-semibold uppercase tracking-wide mb-1.5"
@@ -1445,7 +1526,7 @@ function Inscricao({ teams, saveTeams, sessao }) {
               <input
                 type="text"
                 value={form.nomeCustom}
-                onChange={(e) => setForm({ ...form, nomeCustom: e.target.value })}
+                onChange={(e) => atualizarCampo({ nomeCustom: e.target.value })}
                 placeholder="Ex: Turma de 2011"
                 className="w-full px-4 py-2.5 rounded-xl outline-none text-sm"
                 style={{ backgroundColor: COLORS.card, border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
@@ -1455,22 +1536,17 @@ function Inscricao({ teams, saveTeams, sessao }) {
 
           {form.turmaSelecionada && (
             <>
-              <div className="flex items-center gap-3 rounded-xl p-3" style={{ backgroundColor: COLORS.accentSoft }}>
-                {form.escudoUrl && <img src={form.escudoUrl} alt="" className="w-10 h-10 object-contain shrink-0" />}
-                <div className="text-sm font-semibold" style={{ color: COLORS.accent, fontFamily: "'Sora', sans-serif" }}>
-                  {nomeTime || "Time novo"}
+              {isAdmin && (
+                <div>
+                  <label
+                    className="block text-xs font-semibold uppercase tracking-wide mb-1.5"
+                    style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+                  >
+                    Escudo
+                  </label>
+                  <EscudoPicker value={form.escudoUrl} onChange={(v) => atualizarCampo({ escudoUrl: v })} />
                 </div>
-              </div>
-
-              <div>
-                <label
-                  className="block text-xs font-semibold uppercase tracking-wide mb-1.5"
-                  style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
-                >
-                  Escudo
-                </label>
-                <EscudoPicker value={form.escudoUrl} onChange={(v) => setForm({ ...form, escudoUrl: v })} />
-              </div>
+              )}
 
               <div>
                 <label
@@ -1514,12 +1590,12 @@ function Inscricao({ teams, saveTeams, sessao }) {
 
           <button
             type="submit"
-            disabled={saving}
-            className="px-5 py-3 rounded-xl font-semibold text-sm inline-flex items-center gap-2 disabled:opacity-60"
+            disabled={saving || !dirty}
+            className="px-5 py-3 rounded-xl font-semibold text-sm inline-flex items-center gap-2 disabled:opacity-50"
             style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
           >
             {saving && <Loader2 size={16} className="animate-spin" />}
-            Inscrever time
+            {dirty ? "Salvar" : "Sem alterações pra salvar"}
           </button>
 
           {sent && (
@@ -1528,16 +1604,16 @@ function Inscricao({ teams, saveTeams, sessao }) {
               style={{ backgroundColor: COLORS.accentSoft, color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}
             >
               <div className="flex items-center gap-2 mb-1">
-                <Check size={16} /> Time inscrito. Boa sorte na {EDITION_ROMAN} Copa!
+                <Check size={16} /> Salvo! Boa sorte na {EDITION_ROMAN} Copa!
               </div>
-              <div>
-                Guarde este código para editar seu time depois:{" "}
-                <strong style={{ fontFamily: "'JetBrains Mono', monospace" }}>{codigoGerado}</strong>
-              </div>
+              {codigoGerado && (
+                <div>
+                  Guarde este código de segurança:{" "}
+                  <strong style={{ fontFamily: "'JetBrains Mono', monospace" }}>{codigoGerado}</strong>
+                </div>
+              )}
             </div>
           )}
-
-          <EditarMeuTime teams={teams} saveTeams={saveTeams} />
         </form>
 
         <div className="sm:col-span-2">
@@ -3133,6 +3209,7 @@ function LoginGate({ onLogin }) {
         nome: (perfil && perfil.nome) || user.email,
         tipo: "usuario",
         representanteAprovado: !!(perfil && perfil.status === "aprovado"),
+        turma: (perfil && perfil.turma) || "",
       });
     } catch (err) {
       console.error("Erro ao entrar:", err);
@@ -3313,9 +3390,12 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
     await saveAdminRequests(adminRequests.map((r) => (r.id === req.id ? { ...r, status: "recusado" } : r)));
   };
 
+  const [turmaEdicao, setTurmaEdicao] = useState({});
+
   const aprovarUsuario = async (p) => {
-    await atualizarPerfil(p.id, { status: "aprovado" });
-    setPerfis(perfis.map((x) => (x.id === p.id ? { ...x, status: "aprovado" } : x)));
+    const turmaEscolhida = (turmaEdicao[p.id] ?? p.turma ?? "").trim();
+    await atualizarPerfil(p.id, { status: "aprovado", turma: turmaEscolhida });
+    setPerfis(perfis.map((x) => (x.id === p.id ? { ...x, status: "aprovado", turma: turmaEscolhida } : x)));
   };
 
   const recusarUsuario = async (p) => {
@@ -3481,19 +3561,32 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
                 .map((p) => (
                   <li
                     key={p.id}
-                    className="flex items-center gap-3 text-sm px-3 py-2 rounded-lg"
+                    className="flex flex-wrap items-center gap-2 text-sm px-3 py-2 rounded-lg"
                     style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
                   >
-                    <span className="flex-1 min-w-0 truncate">
-                      {p.nome} — {p.tipo === "jogador" ? `jogador (${p.turma})` : "torcedor"} — {p.email}
+                    <span className="flex-1 min-w-[10rem] truncate">
+                      {p.nome} — {p.tipo === "jogador" ? "jogador" : "torcedor"} — {p.email}
                     </span>
+                    <select
+                      value={turmaEdicao[p.id] ?? p.turma ?? ""}
+                      onChange={(e) => setTurmaEdicao({ ...turmaEdicao, [p.id]: e.target.value })}
+                      className="px-2 py-1 rounded-lg text-xs"
+                      style={{ border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+                    >
+                      <option value="">Turma não definida</option>
+                      {TURMAS_HISTORICAS.map((t) => (
+                        <option key={t.turma} value={t.turma}>
+                          {t.turma}
+                        </option>
+                      ))}
+                    </select>
                     <button
                       type="button"
                       onClick={() => aprovarUsuario(p)}
                       className="px-3 py-1 rounded-lg text-xs font-semibold shrink-0"
                       style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
                     >
-                      Aprovar
+                      Aprovar como representante
                     </button>
                     <button
                       type="button"
@@ -3809,6 +3902,7 @@ export default function App() {
         nome: (perfil && perfil.nome) || user.email,
         tipo: "usuario",
         representanteAprovado: !!(perfil && perfil.status === "aprovado"),
+        turma: (perfil && perfil.turma) || "",
       });
     } catch (e) {
       console.error("Falha ao montar sessão", e);
