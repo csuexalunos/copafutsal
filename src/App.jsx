@@ -1268,7 +1268,7 @@ function AddPlayerForm({ onAdd }) {
   );
 }
 
-function Inscricao({ teams, saveTeams }) {
+function Inscricao({ teams, saveTeams, sessao }) {
   const [form, setForm] = useState({ turmaSelecionada: "", nomeCustom: "", capitao: "", contato: "", jogadores: [], escudoUrl: "" });
   const [sent, setSent] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1331,6 +1331,32 @@ function Inscricao({ teams, saveTeams }) {
     setCodigoGerado(codigo);
     setForm({ turmaSelecionada: "", nomeCustom: "", capitao: "", contato: "", jogadores: [], escudoUrl: "" });
   };
+
+  const podeAcessar = sessao && (sessao.tipo === "admin" || sessao.representanteAprovado);
+
+  if (!podeAcessar) {
+    return (
+      <div>
+        <SectionLabel eyebrow="Participe" title="Inscrição de time" />
+        <div
+          className="rounded-2xl p-6 max-w-md"
+          style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <Lock size={18} color={COLORS.ink} />
+            <span style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }} className="text-sm font-medium">
+              Só representantes de time acessam
+            </span>
+          </div>
+          <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Essa aba é reservada pra quem vai representar um time na Copa. Se você já se
+            cadastrou no app, seu pedido já está na fila — é só esperar um organizador aprovar.
+            Se ainda não se cadastrou, faz isso primeiro pela tela de login.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (!inscricaoAberta()) {
     return (
@@ -2888,8 +2914,8 @@ function Cadastro({ onVoltar }) {
           >
             <div className="flex items-center gap-2 mb-2">
               <Check size={16} /> Conta criada. Se o Supabase pedir confirmação por e-mail, confirma
-              antes de entrar. Depois disso, seu cadastro ainda fica pendente até um organizador
-              aprovar.
+              antes de entrar. Você já pode fazer login normalmente — se for representar um
+              time, seu acesso à Inscrição fica pendente até um organizador aprovar.
             </div>
             {onVoltar && (
               <button type="button" onClick={onVoltar} className="text-sm font-semibold underline">
@@ -3098,26 +3124,16 @@ function LoginGate({ onLogin }) {
         return;
       }
 
+      // Login não exige aprovação — só a aba de Inscrição (representante)
+      // e a de Organização (admin) são restritas.
       const perfil = await buscarPerfil(user.id);
-      if (perfil && perfil.status === "aprovado") {
-        onLogin({ id: user.id, email: user.email, nome: perfil.nome || user.email, tipo: "usuario" });
-        return;
-      }
-      if (perfil && perfil.status === "pendente") {
-        setErro("Seu cadastro ainda não foi aprovado por um organizador.");
-        await sairConta();
-        setEntrando(false);
-        return;
-      }
-      if (perfil && perfil.status === "recusado") {
-        setErro("Seu cadastro foi recusado. Fale com a organização.");
-        await sairConta();
-        setEntrando(false);
-        return;
-      }
-      setErro("Não encontrei seu perfil. Tenta se cadastrar de novo.");
-      await sairConta();
-      setEntrando(false);
+      onLogin({
+        id: user.id,
+        email: user.email,
+        nome: (perfil && perfil.nome) || user.email,
+        tipo: "usuario",
+        representanteAprovado: !!(perfil && perfil.status === "aprovado"),
+      });
     } catch (err) {
       console.error("Erro ao entrar:", err);
       setErro(
@@ -3451,9 +3467,14 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
             className="rounded-2xl p-5 mb-8"
             style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
           >
-            <h3 className="font-semibold mb-3" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
-              Cadastros pendentes ({perfis.filter((p) => p.status === "pendente").length})
+            <h3 className="font-semibold mb-1" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+              Pedidos de acesso à Inscrição ({perfis.filter((p) => p.status === "pendente").length})
             </h3>
+            <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+              Aprovar libera a pessoa como representante de time — pra ela acessar a aba de
+              Inscrição e cadastrar o time dela. Não afeta o login normal, que já funciona sem
+              isso.
+            </p>
             <ul className="space-y-2">
               {perfis
                 .filter((p) => p.status === "pendente")
@@ -3782,11 +3803,13 @@ export default function App() {
         return;
       }
       const perfil = await buscarPerfil(user.id);
-      if (perfil && perfil.status === "aprovado") {
-        setSessao({ id: user.id, email: user.email, nome: perfil.nome || user.email, tipo: "usuario" });
-      } else {
-        setSessao(null);
-      }
+      setSessao({
+        id: user.id,
+        email: user.email,
+        nome: (perfil && perfil.nome) || user.email,
+        tipo: "usuario",
+        representanteAprovado: !!(perfil && perfil.status === "aprovado"),
+      });
     } catch (e) {
       console.error("Falha ao montar sessão", e);
       setSessao(null);
@@ -3915,7 +3938,7 @@ export default function App() {
         ) : (
           <>
             {tab === "inicio" && <Home teams={teams} matches={matches} setTab={setTab} config={config} />}
-            {tab === "inscricao" && <Inscricao teams={teams} saveTeams={saveTeams} />}
+            {tab === "inscricao" && <Inscricao teams={teams} saveTeams={saveTeams} sessao={sessao} />}
             {tab === "sorteio" && <Sorteio teams={teams} sorteio={sorteio} saveSorteio={saveSorteio} sessao={sessao} />}
             {tab === "chaveamento" && <Chaveamento matches={matches} teams={teams} />}
             {tab === "classificacao" && <Classificacao matches={matches} teams={teams} />}
