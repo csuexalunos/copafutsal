@@ -1776,7 +1776,7 @@ function Chaveamento({ matches, teams }) {
   }, [matches]);
   const faseRank = (f) => {
     if (f.startsWith("Grupo")) return 0;
-    const ordem = ["Oitavas", "Quartas", "Semifinal", "Final"];
+    const ordem = ["Oitavas", "Quartas", "Semifinal", "3º Lugar", "Final"];
     const i = ordem.indexOf(f);
     return i === -1 ? 99 : i + 1;
   };
@@ -1825,100 +1825,113 @@ function Chaveamento({ matches, teams }) {
 // ---------------------------------------------------------------------------
 // TAB: Classificação
 // ---------------------------------------------------------------------------
-function Classificacao({ matches, teams }) {
-  const table = useMemo(() => {
-    const stats = {};
-    teams.forEach((t) => {
-      stats[t.id] = { nome: t.nome, j: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0, pts: 0 };
-    });
-    matches.forEach((m) => {
-      if (m.golsA === "" || m.golsB === "" || m.golsA == null || m.golsB == null) return;
-      const a = stats[m.timeA];
-      const b = stats[m.timeB];
-      if (!a || !b) return;
-      const ga = Number(m.golsA);
-      const gb = Number(m.golsB);
-      a.j += 1;
-      b.j += 1;
-      a.gp += ga;
-      a.gc += gb;
-      b.gp += gb;
-      b.gc += ga;
-      if (ga > gb) {
-        a.v += 1;
-        a.pts += 3;
-        b.d += 1;
-      } else if (gb > ga) {
-        b.v += 1;
-        b.pts += 3;
-        a.d += 1;
-      } else {
-        a.e += 1;
-        b.e += 1;
-        a.pts += 1;
-        b.pts += 1;
-      }
-    });
-    return Object.values(stats).sort((x, y) => y.pts - x.pts || y.gp - y.gc - (x.gp - x.gc));
-  }, [matches, teams]);
-
+function TabelaClassificacao({ titulo, linhas, destaqueTop }) {
   const cols = ["Time", "J", "V", "E", "D", "GP", "GC", "SG", "Pts"];
+  return (
+    <div className="mb-8">
+      {titulo && (
+        <h3 className="text-sm font-bold mb-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+          {titulo}
+        </h3>
+      )}
+      <div className="overflow-x-auto rounded-2xl" style={{ border: `1px solid ${COLORS.border}` }}>
+        <table className="w-full text-sm" style={{ fontFamily: "'Inter', sans-serif" }}>
+          <thead>
+            <tr style={{ backgroundColor: COLORS.card, borderBottom: `2px solid ${COLORS.ink}` }}>
+              {cols.map((c, i) => (
+                <th
+                  key={c}
+                  className={`px-3 py-2.5 text-xs font-semibold uppercase tracking-wide ${i === 0 ? "text-left" : "text-center"}`}
+                  style={{ color: COLORS.ink }}
+                >
+                  {c}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {linhas.map((t, idx) => (
+              <tr
+                key={t.id || t.nome}
+                style={{
+                  backgroundColor: idx % 2 === 0 ? COLORS.card : COLORS.zebra,
+                  borderLeft: destaqueTop && idx < destaqueTop ? `3px solid ${COLORS.accent}` : "3px solid transparent",
+                }}
+              >
+                <td className="px-3 py-2.5 font-medium" style={{ color: COLORS.ink }}>
+                  <span className="flex items-center gap-2">
+                    <span className="text-xs" style={{ color: COLORS.slate, fontFamily: "'JetBrains Mono', monospace" }}>
+                      {idx + 1}
+                    </span>
+                    {ESCUDOS_TIMES[t.nome] && (
+                      <img src={ESCUDOS_TIMES[t.nome]} alt="" className="w-5 h-5 object-contain shrink-0" />
+                    )}
+                    {t.nome}
+                  </span>
+                </td>
+                {[t.j, t.v, t.e, t.d, t.gp, t.gc, t.gp - t.gc, t.pts].map((v, i) => (
+                  <td
+                    key={i}
+                    className="px-3 py-2.5 text-center"
+                    style={{
+                      fontFamily: "'JetBrains Mono', monospace",
+                      color: i === 7 ? COLORS.accent : COLORS.ink,
+                      fontWeight: i === 7 ? 700 : 500,
+                    }}
+                  >
+                    {v}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function Classificacao({ matches, teams }) {
+  const geral = useMemo(() => calcularClassificacaoGeral(matches, teams), [matches, teams]);
+
+  const gruposNomes = useMemo(() => {
+    const nomes = new Set();
+    matches.forEach((m) => {
+      if ((m.fase || "").startsWith("Grupo")) nomes.add(m.fase);
+    });
+    return Array.from(nomes).sort();
+  }, [matches]);
+
+  const temGrupos = gruposNomes.length > 0;
 
   return (
     <div>
       <SectionLabel eyebrow="Tabela" title="Classificação" />
       {teams.length === 0 ? (
         <EmptyState>Ainda não há times inscritos.</EmptyState>
+      ) : !temGrupos ? (
+        <TabelaClassificacao linhas={geral} />
       ) : (
-        <div className="overflow-x-auto rounded-2xl" style={{ border: `1px solid ${COLORS.border}` }}>
-          <table className="w-full text-sm" style={{ fontFamily: "'Inter', sans-serif" }}>
-            <thead>
-              <tr style={{ backgroundColor: COLORS.card, borderBottom: `2px solid ${COLORS.ink}` }}>
-                {cols.map((c, i) => (
-                  <th
-                    key={c}
-                    className={`px-3 py-2.5 text-xs font-semibold uppercase tracking-wide ${i === 0 ? "text-left" : "text-center"}`}
-                    style={{ color: COLORS.ink }}
-                  >
-                    {c}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {table.map((t, idx) => (
-                <tr key={t.nome} style={{ backgroundColor: idx % 2 === 0 ? COLORS.card : COLORS.zebra }}>
-                  <td className="px-3 py-2.5 font-medium" style={{ color: COLORS.ink }}>
-                    <span className="flex items-center gap-2">
-                      {ESCUDOS_TIMES[t.nome] && (
-                        <img src={ESCUDOS_TIMES[t.nome]} alt="" className="w-5 h-5 object-contain shrink-0" />
-                      )}
-                      {t.nome}
-                    </span>
-                  </td>
-                  {[t.j, t.v, t.e, t.d, t.gp, t.gc, t.gp - t.gc, t.pts].map((v, i) => (
-                    <td
-                      key={i}
-                      className="px-3 py-2.5 text-center"
-                      style={{
-                        fontFamily: "'JetBrains Mono', monospace",
-                        color: i === 7 ? COLORS.accent : COLORS.ink,
-                        fontWeight: i === 7 ? 700 : 500,
-                      }}
-                    >
-                      {v}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          <p className="text-sm mb-4 max-w-xl" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Atualiza sozinha conforme os jogos acontecem. Os 8 primeiros da geral (destacados)
+            avançam pro mata-mata automaticamente.
+          </p>
+          <TabelaClassificacao titulo="Classificação geral" linhas={geral} destaqueTop={8} />
+          {gruposNomes.map((fase) => (
+            <TabelaClassificacao
+              key={fase}
+              titulo={fase}
+              linhas={pontosPartida(matches.filter((m) => m.fase === fase), teams).filter((t) =>
+                matches.some((m) => m.fase === fase && (m.timeA === t.id || m.timeB === t.id))
+              )}
+            />
+          ))}
+        </>
       )}
     </div>
   );
 }
-
 // ---------------------------------------------------------------------------
 // TAB: Galeria
 // ---------------------------------------------------------------------------
@@ -3379,6 +3392,131 @@ function formatarHorarioJogo(iso) {
   return `${dias[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1} · ${hh}:${mm}`;
 }
 
+// ---------------------------------------------------------------------------
+// Mata-mata automático — classificação geral (todos os grupos juntos),
+// avanço de fase sozinho a partir dos resultados. Nada disso é lançado à
+// mão: assim que os jogos de grupo terminam, gera quartas com o
+// cruzamento 1º x 8º, 2º x 7º, 3º x 6º, 4º x 5º; e vai gerando semifinal,
+// final e disputa de 3º lugar conforme os jogos anteriores terminam.
+// ---------------------------------------------------------------------------
+function pontosPartida(jogos, teams) {
+  const tabela = {};
+  teams.forEach((t) => {
+    tabela[t.id] = { id: t.id, nome: t.nome, j: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0, pts: 0 };
+  });
+  jogos.forEach((m) => {
+    if (m.golsA == null || m.golsB == null || m.golsA === "" || m.golsB === "") return;
+    const a = tabela[m.timeA];
+    const b = tabela[m.timeB];
+    if (!a || !b) return;
+    const ga = Number(m.golsA);
+    const gb = Number(m.golsB);
+    a.j += 1;
+    b.j += 1;
+    a.gp += ga;
+    a.gc += gb;
+    b.gp += gb;
+    b.gc += ga;
+    if (ga > gb) {
+      a.v += 1;
+      a.pts += 3;
+      b.d += 1;
+    } else if (gb > ga) {
+      b.v += 1;
+      b.pts += 3;
+      a.d += 1;
+    } else {
+      a.e += 1;
+      b.e += 1;
+      a.pts += 1;
+      b.pts += 1;
+    }
+  });
+  return Object.values(tabela).sort((x, y) => y.pts - x.pts || y.gp - y.gc - (x.gp - x.gc) || y.gp - x.gp);
+}
+
+// Classificação geral — todos os times, contando só os jogos da fase de
+// grupos (não mistura com mata-mata).
+function calcularClassificacaoGeral(matches, teams) {
+  return pontosPartida(matches.filter((m) => (m.fase || "").startsWith("Grupo")), teams);
+}
+
+function jogoDecidido(m) {
+  return m.golsA != null && m.golsB != null && m.golsA !== "" && m.golsB !== "" && Number(m.golsA) !== Number(m.golsB);
+}
+
+function vencedorJogo(m) {
+  if (!jogoDecidido(m)) return null;
+  return Number(m.golsA) > Number(m.golsB) ? m.timeA : m.timeB;
+}
+
+function perdedorJogo(m) {
+  if (!jogoDecidido(m)) return null;
+  return Number(m.golsA) > Number(m.golsB) ? m.timeB : m.timeA;
+}
+
+function novoJogoVazio(id, fase, timeA, timeB) {
+  return {
+    id,
+    fase,
+    timeA,
+    timeB,
+    golsA: null,
+    golsB: null,
+    status: "agendado",
+    tempoAtual: 1,
+    tempoIniciadoEm: null,
+    tempoAcumuladoMs: 0,
+    eventos: [],
+    horario: null,
+  };
+}
+
+// Roda a cada atualização de placar — gera a próxima fase sozinho quando
+// a fase anterior estiver 100% decidida, sem precisar de ação manual.
+function gerarMataMataAutomatico(matches, teams) {
+  let novos = [...matches];
+  const temFase = (prefixo) => novos.some((m) => (m.fase || "").startsWith(prefixo));
+
+  const jogosGrupo = novos.filter((m) => (m.fase || "").startsWith("Grupo"));
+  const gruposCompletos = jogosGrupo.length > 0 && jogosGrupo.every((m) => jogoDecidido(m));
+
+  if (gruposCompletos && !temFase("Quartas")) {
+    const geral = calcularClassificacaoGeral(novos, teams).slice(0, 8);
+    if (geral.length === 8) {
+      const pares = [
+        [0, 7],
+        [3, 4],
+        [1, 6],
+        [2, 5],
+      ];
+      const quartas = pares.map(([i, j], idx) => novoJogoVazio(`jogo_qf${idx}_${Date.now()}`, "Quartas", geral[i].id, geral[j].id));
+      novos = agendarHorarios([...novos, ...quartas]);
+    }
+  }
+
+  const quartas = novos.filter((m) => (m.fase || "") === "Quartas");
+  if (quartas.length === 4 && quartas.every(jogoDecidido) && !temFase("Semifinal")) {
+    const v = quartas.map(vencedorJogo);
+    const semis = [
+      novoJogoVazio(`jogo_sf0_${Date.now()}`, "Semifinal", v[0], v[1]),
+      novoJogoVazio(`jogo_sf1_${Date.now()}`, "Semifinal", v[2], v[3]),
+    ];
+    novos = agendarHorarios([...novos, ...semis]);
+  }
+
+  const semis = novos.filter((m) => (m.fase || "") === "Semifinal");
+  if (semis.length === 2 && semis.every(jogoDecidido) && !temFase("Final")) {
+    const vencedores = semis.map(vencedorJogo);
+    const perdedores = semis.map(perdedorJogo);
+    const final = novoJogoVazio(`jogo_final_${Date.now()}`, "Final", vencedores[0], vencedores[1]);
+    const terceiro = novoJogoVazio(`jogo_3lugar_${Date.now()}`, "3º Lugar", perdedores[0], perdedores[1]);
+    novos = agendarHorarios([...novos, final, terceiro]);
+  }
+
+  return novos;
+}
+
 function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao }) {
   const souAdmin = sessao && sessao.tipo === "admin";
   const [numGrupos, setNumGrupos] = useState(() => sugerirNumGrupos(teams.length));
@@ -3771,7 +3909,9 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   };
 
   const updateMatch = async (updated) => {
-    await saveMatches(matches.map((m) => (m.id === updated.id ? updated : m)));
+    const atualizado = matches.map((m) => (m.id === updated.id ? updated : m));
+    const comMataMata = gerarMataMataAutomatico(atualizado, teams);
+    await saveMatches(comMataMata);
   };
 
   const removeMatch = async (id) => {
@@ -4098,9 +4238,10 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
             Adicionar jogo do mata-mata
           </h3>
           <p className="text-xs mb-4" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-            Os jogos da fase de grupos são gerados automaticamente na aba Sorteio, a partir do
-            resultado do sorteio — não precisa (e não deve) lançar eles aqui. Use isso só depois
-            que os grupos terminarem, pra cadastrar oitavas, quartas, semifinal e final.
+            Grupos, quartas, semifinal, 3º lugar e final são gerados sozinhos conforme os
+            resultados vão saindo (a classificação geral define quem cruza com quem: 1º x 8º, 2º x
+            7º, 3º x 6º, 4º x 5º). Use este formulário só como exceção — por exemplo, se precisar
+            de uma fase extra de "Oitavas" antes das quartas.
           </p>
           <form onSubmit={addMatch} className="space-y-3">
             <select
@@ -4109,7 +4250,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
               className="w-full px-3 py-2 rounded-xl text-sm"
               style={{ border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
             >
-              {["Oitavas", "Quartas", "Semifinal", "Final"].map((f) => (
+              {["Oitavas", "Quartas", "Semifinal", "3º Lugar", "Final"].map((f) => (
                 <option key={f} value={f}>
                   {f}
                 </option>
