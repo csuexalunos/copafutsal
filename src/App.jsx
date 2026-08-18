@@ -904,11 +904,11 @@ function jogadoresDaTurma(turma) {
   return [];
 }
 
-function PlayerRow({ player, onChange, onRemove, turmaTime }) {
+function PlayerRow({ player, onChange, onRemove, turmaTime, onSolicitarAvaliacao }) {
   const [expanded, setExpanded] = useState(false);
   const titulo = player.apelido || player.nome || "Jogador sem nome";
   const regular = anoConclusaoRegular(player.anoConclusao, turmaTime);
-  const irregular = regular === false;
+  const irregular = regular === false && !player.excecaoAprovada;
 
   return (
     <div
@@ -935,6 +935,10 @@ function PlayerRow({ player, onChange, onRemove, turmaTime }) {
             <div className="text-xs truncate font-medium" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
               Ano de conclusão ({player.anoConclusao}) não bate com a turma {turmaTime} — Art. 6º/7º
             </div>
+          ) : player.excecaoAprovada ? (
+            <div className="text-xs truncate" style={{ color: "#16A34A", fontFamily: "'Inter', sans-serif" }}>
+              Exceção aprovada pela organização
+            </div>
           ) : (
             (player.periodo || (player.apelido && player.nome)) && (
               <div className="text-xs truncate" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
@@ -953,6 +957,28 @@ function PlayerRow({ player, onChange, onRemove, turmaTime }) {
           <X size={14} color={COLORS.slate} />
         </span>
       </button>
+
+      {irregular && onSolicitarAvaliacao && (
+        <div className="px-3 pb-2.5">
+          {player.avaliacaoPendente ? (
+            <span className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+              Avaliação solicitada — aguardando a comissão.
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSolicitarAvaliacao(player);
+              }}
+              className="text-xs font-semibold underline"
+              style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}
+            >
+              Solicitar avaliação da comissão
+            </button>
+          )}
+        </div>
+      )}
 
       {expanded && (
         <div className="px-3 pb-3 grid grid-cols-2 gap-2" onClick={(e) => e.stopPropagation()}>
@@ -1318,7 +1344,7 @@ function AddPlayerForm({ onAdd }) {
   );
 }
 
-function Inscricao({ teams, saveTeams, sessao }) {
+function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes }) {
   const isAdmin = sessao && sessao.tipo === "admin";
   const podeAcessar = sessao && (isAdmin || sessao.representanteAprovado);
   const turmaFixa = !isAdmin && sessao ? sessao.turma || "" : "";
@@ -1391,6 +1417,26 @@ function Inscricao({ teams, saveTeams, sessao }) {
   const updateJogador = (updated) =>
     atualizarCampo({ jogadores: form.jogadores.map((j) => (j.id === updated.id ? updated : j)) });
   const removeJogador = (id) => atualizarCampo({ jogadores: form.jogadores.filter((j) => j.id !== id) });
+
+  const solicitarAvaliacao = async (jogador) => {
+    const jaTemPendente = avaliacoes.some((a) => a.jogadorId === jogador.id && a.status === "pendente");
+    if (jaTemPendente) {
+      updateJogador({ ...jogador, avaliacaoPendente: true });
+      return;
+    }
+    const caso = {
+      id: `aval_${Date.now()}`,
+      timeNome: nomeTime,
+      jogadorId: jogador.id,
+      jogadorApelido: jogador.apelido,
+      jogadorNome: jogador.nome,
+      anoConclusao: jogador.anoConclusao,
+      status: "pendente",
+      criadoEm: new Date().toISOString(),
+    };
+    await saveAvaliacoes([...avaliacoes, caso]);
+    updateJogador({ ...jogador, avaliacaoPendente: true });
+  };
 
   const handleSalvar = async (e) => {
     e.preventDefault();
@@ -1622,6 +1668,7 @@ function Inscricao({ teams, saveTeams, sessao }) {
                         onChange={updateJogador}
                         onRemove={() => removeJogador(j.id)}
                         turmaTime={nomeTime}
+                        onSolicitarAvaliacao={solicitarAvaliacao}
                       />
                     ))}
                   </div>
@@ -2830,7 +2877,7 @@ function diagnosticarTime(team) {
     problemas.push(`${jogadores.length} jogadores — máximo é ${MAX_JOGADORES_TIME} (Art. 6º).`);
   }
   jogadores.forEach((j) => {
-    if (anoConclusaoRegular(j.anoConclusao, team.nome) === false) {
+    if (!j.excecaoAprovada && anoConclusaoRegular(j.anoConclusao, team.nome) === false) {
       problemas.push(`${j.nome || "Jogador"}: ano de conclusão (${j.anoConclusao}) não bate com a turma ${team.nome} (Art. 6º/7º).`);
     }
   });
@@ -3789,7 +3836,7 @@ function LoginGate({ onLogin }) {
   );
 }
 
-function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, saveAdminRequests, sessao, config, saveConfig }) {
+function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, saveAdminRequests, sessao, config, saveConfig, avaliacoes, saveAvaliacoes }) {
   const souAdminLogado = sessao && sessao.tipo === "admin";
   const souSuperAdmin = souAdminLogado && sessao.superAdmin;
 
@@ -3886,6 +3933,28 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
     if (!confirm(`Revogar o acesso de representante de "${p.nome || p.email}"? Ela precisa ser aprovada de novo pra voltar a editar o time.`)) return;
     await atualizarPerfil(p.id, { status: "pendente" });
     setPerfis(perfis.map((x) => (x.id === p.id ? { ...x, status: "pendente" } : x)));
+  };
+
+  const aprovarExcecao = async (caso) => {
+    const time = teams.find((t) => t.nome === caso.timeNome);
+    if (time) {
+      const jogadoresAtualizados = (time.jogadores || []).map((j) =>
+        j.id === caso.jogadorId ? { ...j, excecaoAprovada: true, avaliacaoPendente: false } : j
+      );
+      await saveTeams(teams.map((t) => (t.id === time.id ? { ...t, jogadores: jogadoresAtualizados } : t)));
+    }
+    await saveAvaliacoes(avaliacoes.map((a) => (a.id === caso.id ? { ...a, status: "aprovada" } : a)));
+  };
+
+  const manterIrregularidade = async (caso) => {
+    const time = teams.find((t) => t.nome === caso.timeNome);
+    if (time) {
+      const jogadoresAtualizados = (time.jogadores || []).map((j) =>
+        j.id === caso.jogadorId ? { ...j, avaliacaoPendente: false } : j
+      );
+      await saveTeams(teams.map((t) => (t.id === time.id ? { ...t, jogadores: jogadoresAtualizados } : t)));
+    }
+    await saveAvaliacoes(avaliacoes.map((a) => (a.id === caso.id ? { ...a, status: "mantida" } : a)));
   };
 
   const addMatch = async (e) => {
@@ -4048,41 +4117,46 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
                 .map((p) => (
                   <li
                     key={p.id}
-                    className="flex flex-wrap items-center gap-2 text-sm px-3 py-2 rounded-lg"
+                    className="flex flex-col gap-2 text-sm px-3 py-2.5 rounded-lg"
                     style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
                   >
-                    <span className="flex-1 min-w-[10rem] truncate">
-                      {p.nome} — {p.tipo === "jogador" ? "jogador" : "torcedor"} — {p.email}
-                    </span>
-                    <select
-                      value={turmaEdicao[p.id] ?? p.turma ?? ""}
-                      onChange={(e) => setTurmaEdicao({ ...turmaEdicao, [p.id]: e.target.value })}
-                      className="px-2 py-1 rounded-lg text-xs"
-                      style={{ border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
-                    >
-                      <option value="">Turma não definida</option>
-                      {TURMAS_HISTORICAS_ORDENADAS.map((t) => (
-                        <option key={t.turma} value={t.turma}>
-                          {t.turma}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => aprovarUsuario(p)}
-                      className="px-3 py-1 rounded-lg text-xs font-semibold shrink-0"
-                      style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
-                    >
-                      Aprovar como representante
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => recusarUsuario(p)}
-                      className="px-3 py-1 rounded-lg text-xs font-semibold shrink-0"
-                      style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
-                    >
-                      Recusar
-                    </button>
+                    <div className="break-words">
+                      <div className="font-medium">{p.nome}</div>
+                      <div className="text-xs" style={{ color: COLORS.slate }}>
+                        {p.tipo === "jogador" ? "jogador" : "torcedor"} · {p.email}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <select
+                        value={turmaEdicao[p.id] ?? p.turma ?? ""}
+                        onChange={(e) => setTurmaEdicao({ ...turmaEdicao, [p.id]: e.target.value })}
+                        className="px-2 py-1.5 rounded-lg text-xs flex-1 min-w-[8rem]"
+                        style={{ border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+                      >
+                        <option value="">Turma não definida</option>
+                        {TURMAS_HISTORICAS_ORDENADAS.map((t) => (
+                          <option key={t.turma} value={t.turma}>
+                            {t.turma}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => aprovarUsuario(p)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0"
+                        style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+                      >
+                        Aprovar como representante
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => recusarUsuario(p)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0"
+                        style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+                      >
+                        Recusar
+                      </button>
+                    </div>
                   </li>
                 ))}
             </ul>
@@ -4113,16 +4187,19 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
                 .map((p) => (
                   <li
                     key={p.id}
-                    className="flex flex-wrap items-center gap-2 text-sm px-3 py-2 rounded-lg"
+                    className="flex flex-col sm:flex-row sm:items-center gap-2 text-sm px-3 py-2.5 rounded-lg"
                     style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
                   >
-                    <span className="flex-1 min-w-[10rem] truncate">
-                      {p.nome} — turma <strong>{p.turma || "não definida"}</strong> — {p.email}
-                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium break-words">{p.nome}</div>
+                      <div className="text-xs break-words" style={{ color: COLORS.slate }}>
+                        turma <strong>{p.turma || "não definida"}</strong> · {p.email}
+                      </div>
+                    </div>
                     <button
                       type="button"
                       onClick={() => revogarAcesso(p)}
-                      className="px-3 py-1 rounded-lg text-xs font-semibold shrink-0"
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 w-full sm:w-auto"
                       style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
                     >
                       Revogar acesso
@@ -4131,6 +4208,57 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
                 ))}
             </ul>
           )}
+        </div>
+      )}
+
+      {avaliacoes.filter((a) => a.status === "pendente").length > 0 && (
+        <div
+          className="rounded-2xl p-5 mb-8"
+          style={{ backgroundColor: COLORS.card, border: `1.5px solid ${COLORS.accent}` }}
+        >
+          <h3 className="font-semibold mb-1 flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+            <AlertTriangle size={16} color={COLORS.accent} /> Casos pra avaliação da comissão ({avaliacoes.filter((a) => a.status === "pendente").length})
+          </h3>
+          <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            O representante pediu revisão de um jogador marcado como irregular — Art. 9º dá
+            direito a esse esclarecimento antes de qualquer punição.
+          </p>
+          <ul className="space-y-2">
+            {avaliacoes
+              .filter((a) => a.status === "pendente")
+              .map((a) => (
+                <li
+                  key={a.id}
+                  className="flex flex-col gap-2 text-sm px-3 py-2.5 rounded-lg"
+                  style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+                >
+                  <div className="break-words">
+                    <div className="font-medium">{a.jogadorApelido || a.jogadorNome || "Jogador"}</div>
+                    <div className="text-xs" style={{ color: COLORS.slate }}>
+                      Time {a.timeNome} · ano de conclusão {a.anoConclusao || "—"} não bate com a turma
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => aprovarExcecao(a)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+                      style={{ backgroundColor: "#16A34A", color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+                    >
+                      Aprovar exceção
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => manterIrregularidade(a)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+                      style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+                    >
+                      Manter irregularidade
+                    </button>
+                  </div>
+                </li>
+              ))}
+          </ul>
         </div>
       )}
 
@@ -4210,18 +4338,18 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
           <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
             <Radio size={16} color={COLORS.accent} /> Link de transmissão ao vivo
           </h3>
-          <form onSubmit={salvarLinkTransmissao} className="flex gap-2">
+          <form onSubmit={salvarLinkTransmissao} className="flex flex-col sm:flex-row gap-2">
             <input
               type="text"
               value={linkTransmissao}
               onChange={(e) => setLinkTransmissao(e.target.value)}
               placeholder="https://youtube.com/... ou instagram.com/..."
-              className="flex-1 px-3 py-2 rounded-xl text-sm"
+              className="flex-1 px-3 py-2 rounded-xl text-sm min-w-0"
               style={{ border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
             />
             <button
               type="submit"
-              className="px-4 py-2 rounded-xl text-sm font-semibold shrink-0"
+              className="px-4 py-2 rounded-xl text-sm font-semibold shrink-0 w-full sm:w-auto"
               style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}
             >
               Salvar
@@ -4415,13 +4543,14 @@ export default function App() {
   const [adminRequests, saveAdminRequests, loadingAdminRequests] = useSharedStorage("copasu:admin_requests", [], 8000);
   const [sorteio, saveSorteio, loadingSorteio] = useSharedStorage("copasu:sorteio", {}, 6000);
   const [config, saveConfig, loadingConfig] = useSharedStorage("copasu:config", {}, 10000);
+  const [avaliacoes, saveAvaliacoes, loadingAvaliacoes] = useSharedStorage("copasu:avaliacoes", [], 8000);
   const [totalPessoas, setTotalPessoas] = useState(0);
   const [fabBusy, setFabBusy] = useState(false);
   const [fabDone, setFabDone] = useState(false);
   const fabInputRef = React.useRef(null);
 
   const loading =
-    loadingTeams || loadingMatches || loadingPosts || loadingAdminRequests || loadingSorteio || loadingConfig || checandoSessao;
+    loadingTeams || loadingMatches || loadingPosts || loadingAdminRequests || loadingSorteio || loadingConfig || loadingAvaliacoes || checandoSessao;
 
   // Contagem pública de pessoas cadastradas — atualiza sozinha de tempos
   // em tempos, igual o resto dos dados compartilhados.
@@ -4603,7 +4732,9 @@ export default function App() {
         ) : (
           <>
             {tab === "inicio" && <Home teams={teams} matches={matches} setTab={setTab} config={config} totalPessoas={totalPessoas} />}
-            {tab === "inscricao" && <Inscricao teams={teams} saveTeams={saveTeams} sessao={sessao} />}
+            {tab === "inscricao" && (
+              <Inscricao teams={teams} saveTeams={saveTeams} sessao={sessao} avaliacoes={avaliacoes} saveAvaliacoes={saveAvaliacoes} />
+            )}
             {tab === "sorteio" && (
               <Sorteio teams={teams} sorteio={sorteio} saveSorteio={saveSorteio} matches={matches} saveMatches={saveMatches} sessao={sessao} />
             )}
@@ -4622,6 +4753,8 @@ export default function App() {
                 sessao={sessao}
                 config={config}
                 saveConfig={saveConfig}
+                avaliacoes={avaliacoes}
+                saveAvaliacoes={saveAvaliacoes}
               />
             )}
           </>
@@ -4635,8 +4768,9 @@ export default function App() {
         Copa de Ex-Alunos de Futsal · Colégio Santa Úrsula · Serviam
       </footer>
 
-      {/* Botão de câmera fixo — acessível em qualquer aba, um toque tira
-          a foto e já publica na Comunidade, sem formulário nenhum. */}
+      {/* Botão de câmera fixo — acessível na maioria das abas, um toque tira
+          a foto e já publica na Comunidade. Escondido na Organização, onde
+          ele ficava sobrepondo os controles administrativos. */}
       <input
         ref={fabInputRef}
         type="file"
@@ -4644,25 +4778,27 @@ export default function App() {
         className="hidden"
         onChange={handleFabCapture}
       />
-      <button
-        type="button"
-        onClick={() => fabInputRef.current && fabInputRef.current.click()}
-        disabled={fabBusy}
-        className="fixed bottom-5 right-5 z-30 w-16 h-16 rounded-full flex items-center justify-center disabled:opacity-70"
-        style={{
-          backgroundColor: fabDone ? "#16A34A" : COLORS.accent,
-          boxShadow: "0 6px 20px rgba(0,0,0,0.4)",
-        }}
-        aria-label="Tirar foto rápida"
-      >
-        {fabBusy ? (
-          <Loader2 size={26} color="#FFFFFF" className="animate-spin" />
-        ) : fabDone ? (
-          <Check size={26} color="#FFFFFF" />
-        ) : (
-          <Camera size={26} color="#FFFFFF" />
-        )}
-      </button>
+      {tab !== "organizacao" && (
+        <button
+          type="button"
+          onClick={() => fabInputRef.current && fabInputRef.current.click()}
+          disabled={fabBusy}
+          className="fixed bottom-5 right-5 z-30 w-16 h-16 rounded-full flex items-center justify-center disabled:opacity-70"
+          style={{
+            backgroundColor: fabDone ? "#16A34A" : COLORS.accent,
+            boxShadow: "0 6px 20px rgba(0,0,0,0.4)",
+          }}
+          aria-label="Tirar foto rápida"
+        >
+          {fabBusy ? (
+            <Loader2 size={26} color="#FFFFFF" className="animate-spin" />
+          ) : fabDone ? (
+            <Check size={26} color="#FFFFFF" />
+          ) : (
+            <Camera size={26} color="#FFFFFF" />
+          )}
+        </button>
+      )}
     </div>
   );
 }
