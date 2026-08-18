@@ -3576,6 +3576,12 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
     setPerfis(perfis.map((x) => (x.id === p.id ? { ...x, status: "recusado" } : x)));
   };
 
+  const revogarAcesso = async (p) => {
+    if (!confirm(`Revogar o acesso de representante de "${p.nome || p.email}"? Ela precisa ser aprovada de novo pra voltar a editar o time.`)) return;
+    await atualizarPerfil(p.id, { status: "pendente" });
+    setPerfis(perfis.map((x) => (x.id === p.id ? { ...x, status: "pendente" } : x)));
+  };
+
   const addMatch = async (e) => {
     e.preventDefault();
     if (!matchForm.timeA || !matchForm.timeB) return;
@@ -3773,6 +3779,50 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
                       style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
                     >
                       Recusar
+                    </button>
+                  </li>
+                ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {!carregandoPainel && (
+        <div
+          className="rounded-2xl p-5 mb-8"
+          style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
+        >
+          <h3 className="font-semibold mb-1" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+            Representantes aprovados ({perfis.filter((p) => p.status === "aprovado").length})
+          </h3>
+          <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Quem já tem acesso à aba de Inscrição, travado no time de cada um. Revogar tira o
+            acesso na hora — ela volta pra fila de pedidos pendentes.
+          </p>
+          {perfis.filter((p) => p.status === "aprovado").length === 0 ? (
+            <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+              Ninguém aprovado como representante ainda.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {perfis
+                .filter((p) => p.status === "aprovado")
+                .map((p) => (
+                  <li
+                    key={p.id}
+                    className="flex flex-wrap items-center gap-2 text-sm px-3 py-2 rounded-lg"
+                    style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+                  >
+                    <span className="flex-1 min-w-[10rem] truncate">
+                      {p.nome} — turma <strong>{p.turma || "não definida"}</strong> — {p.email}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => revogarAcesso(p)}
+                      className="px-3 py-1 rounded-lg text-xs font-semibold shrink-0"
+                      style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+                    >
+                      Revogar acesso
                     </button>
                   </li>
                 ))}
