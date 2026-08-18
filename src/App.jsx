@@ -14,6 +14,9 @@ import {
   Radio,
   Dices,
   Download,
+  MapPin,
+  ChevronUp,
+  ChevronDown,
   ShieldCheck,
   Plus,
   Lock,
@@ -461,6 +464,16 @@ const HALL_DA_FAMA = {
 const DATA_EVENTO = "6, 7 e 8 de novembro";
 const PRAZO_INSCRICAO = "aberta agora até 30 de setembro";
 const VALOR_INSCRICAO_ATLETA = "R$ 110,00 por atleta";
+const LOCAL_NOME = "Ginásio Poliesportivo do Colégio Santa Úrsula";
+const LOCAL_MAPS_LINK = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent("Colégio Santa Úrsula Ginásio Poliesportivo Maceió");
+
+// Regras de horário dos jogos — 2 tempos de 10min (20min de jogo) + 5min
+// de intervalo entre um confronto e outro = 25min entre um início e outro.
+const DURACAO_SLOT_MIN = 25;
+const INICIO_SEXTA = new Date(2026, 10, 6, 19, 0, 0); // sexta 6/nov às 19h
+const JOGOS_SEXTA = 8;
+const INICIO_SABADO = new Date(2026, 10, 7, 8, 0, 0); // sábado 7/nov às 8h
+const INICIO_DOMINGO = new Date(2026, 10, 8, 8, 0, 0); // domingo 8/nov às 8h
 // Datas de verdade — usadas pra travar a aba de Inscrição fora do período.
 const INSCRICAO_INICIO = new Date(2026, 0, 1, 0, 0, 0); // liberada desde já
 const INSCRICAO_FIM = new Date(2026, 8, 30, 23, 59, 59); // 30 de setembro (último dia do mês)
@@ -695,7 +708,7 @@ function Home({ teams, matches, setTab, config, totalPessoas }) {
   const menuItems = [
     { id: "inscricao", label: "Inscrição", desc: "Inscreva seu time para a 8ª edição", icon: Users },
     { id: "sorteio", label: "Sorteio", desc: "Potes e grupos da edição", icon: Dices },
-    { id: "chaveamento", label: "Chaveamento", desc: "Acompanhe o mata-mata em tempo real", icon: Swords },
+    { id: "chaveamento", label: "Jogos ao Vivo", desc: "Todos os confrontos, horários e placares em tempo real", icon: Swords },
     { id: "classificacao", label: "Classificação", desc: "Tabela, resultados e saldo de gols", icon: ListOrdered },
     { id: "comunidade", label: "Fotos e Vídeos", desc: "Compartilhado por quem se inscreveu", icon: Camera },
     { id: "galeria", label: "Galeria", desc: "Hall da fama e histórico das edições", icon: Award },
@@ -758,7 +771,7 @@ function Home({ teams, matches, setTab, config, totalPessoas }) {
           href={config.linkTransmissao}
           target="_blank"
           rel="noreferrer"
-          className="flex items-center gap-3 mb-6 rounded-xl px-4 py-3.5"
+          className="flex items-center gap-3 mb-3 rounded-xl px-4 py-3.5"
           style={{ backgroundColor: COLORS.navy }}
         >
           <span
@@ -778,6 +791,30 @@ function Home({ teams, matches, setTab, config, totalPessoas }) {
           <ArrowRight size={16} color={COLORS.gold} className="shrink-0" />
         </a>
       )}
+
+      <a
+        href={LOCAL_MAPS_LINK}
+        target="_blank"
+        rel="noreferrer"
+        className="flex items-center gap-3 mb-6 rounded-xl px-4 py-3.5"
+        style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
+      >
+        <span
+          className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+          style={{ backgroundColor: COLORS.accentSoft }}
+        >
+          <MapPin size={18} color={COLORS.accent} />
+        </span>
+        <span className="flex-1 min-w-0">
+          <div className="text-sm font-semibold" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+            {LOCAL_NOME}
+          </div>
+          <div className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Toque para abrir no mapa
+          </div>
+        </span>
+        <ArrowRight size={16} color={COLORS.accent} className="shrink-0" />
+      </a>
 
       <div className="flex flex-wrap gap-x-6 gap-y-1 mb-8">
         {stats.map((s) => (
@@ -1693,7 +1730,15 @@ function MatchCard({ match, teamsById }) {
         style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}
       >
         <span>{match.fase || "Fase"}</span>
-        {match.status && match.status !== "agendado" && <MatchClock match={match} />}
+        {match.status && match.status !== "agendado" ? (
+          <MatchClock match={match} />
+        ) : (
+          match.horario && (
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", color: COLORS.slate }}>
+              {formatarHorarioJogo(match.horario)}
+            </span>
+          )
+        )}
       </div>
       {[
         ["A", a, match.golsA, escudoA],
@@ -1729,16 +1774,26 @@ function Chaveamento({ matches, teams }) {
     });
     return byPhase;
   }, [matches]);
-  const phaseOrder = ["Grupos", "Oitavas", "Quartas", "Semifinal", "Final"];
-  const orderedKeys = Object.keys(rounds).sort((a, b) => {
-    const ia = phaseOrder.indexOf(a);
-    const ib = phaseOrder.indexOf(b);
-    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
-  });
+  const faseRank = (f) => {
+    if (f.startsWith("Grupo")) return 0;
+    const ordem = ["Oitavas", "Quartas", "Semifinal", "Final"];
+    const i = ordem.indexOf(f);
+    return i === -1 ? 99 : i + 1;
+  };
+  const orderedKeys = Object.keys(rounds).sort((a, b) => faseRank(a) - faseRank(b) || a.localeCompare(b));
 
   return (
     <div>
-      <SectionLabel eyebrow="Mata-mata" title="Chaveamento" />
+      <SectionLabel eyebrow="Todos os confrontos" title="Jogos ao Vivo" />
+      <a
+        href={LOCAL_MAPS_LINK}
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex items-center gap-1.5 text-xs mb-6"
+        style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}
+      >
+        <MapPin size={13} /> {LOCAL_NOME} — ver no mapa
+      </a>
       {matches.length === 0 ? (
         <EmptyState>
           Nenhum jogo cadastrado ainda. A organização pode lançar os confrontos na aba
@@ -2329,7 +2384,7 @@ function calcularSuspensos(matches) {
     .filter((t) => t.motivos.length > 0);
 }
 
-function MatchAdminRow({ match, teams, onUpdate, onRemove }) {
+function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, podeDescer }) {
   const [expanded, setExpanded] = useState(false);
   const [eventForm, setEventForm] = useState({ tipo: "gol", jogador: "", timeId: "" });
 
@@ -2380,13 +2435,38 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove }) {
   return (
     <div className="rounded-lg overflow-hidden" style={{ backgroundColor: COLORS.zebra }}>
       <div className="flex items-center gap-2 text-sm px-3 py-2">
+        <div className="flex flex-col shrink-0 -my-1">
+          <button
+            type="button"
+            onClick={() => onMover(-1)}
+            disabled={!podeSubir}
+            aria-label="Mover pra cima"
+            className="disabled:opacity-20"
+          >
+            <ChevronUp size={14} color={COLORS.slate} />
+          </button>
+          <button
+            type="button"
+            onClick={() => onMover(1)}
+            disabled={!podeDescer}
+            aria-label="Mover pra baixo"
+            className="disabled:opacity-20"
+          >
+            <ChevronDown size={14} color={COLORS.slate} />
+          </button>
+        </div>
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
           className="flex-1 min-w-0 text-left truncate"
           style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
         >
-          {teamName(match.timeA)} x {teamName(match.timeB)}
+          <div className="truncate">{teamName(match.timeA)} x {teamName(match.timeB)}</div>
+          {match.horario && (
+            <div className="text-xs truncate" style={{ color: COLORS.slate, fontFamily: "'JetBrains Mono', monospace" }}>
+              {formatarHorarioJogo(match.horario)}
+            </div>
+          )}
         </button>
         <MatchClock match={match} />
         <input
@@ -3239,7 +3319,67 @@ function sortearGrupos(potes, numGrupos) {
   return grupos;
 }
 
-function Sorteio({ teams, sorteio, saveSorteio, sessao }) {
+// Gera a tabela de jogos (todos-contra-todos dentro de cada grupo) a
+// partir do resultado do sorteio.
+function gerarJogosDosGrupos(grupos) {
+  const jogos = [];
+  Object.entries(grupos).forEach(([nomeGrupo, times]) => {
+    for (let i = 0; i < times.length; i++) {
+      for (let j = i + 1; j < times.length; j++) {
+        jogos.push({
+          id: `jogo_${Date.now()}_${nomeGrupo}_${i}_${j}_${Math.random().toString(36).slice(2, 6)}`,
+          fase: `Grupo ${nomeGrupo}`,
+          timeA: times[i].id,
+          timeB: times[j].id,
+          golsA: null,
+          golsB: null,
+          status: "agendado",
+          tempoAtual: 1,
+          tempoIniciadoEm: null,
+          tempoAcumuladoMs: 0,
+          eventos: [],
+          horario: null,
+        });
+      }
+    }
+  });
+  return jogos;
+}
+
+// Agenda os horários de todos os jogos, na ordem em que já estão: jogos
+// da fase de grupos entram sexta às 19h (8 jogos) e continuam sábado às
+// 8h; jogos de mata-mata entram domingo às 8h. 25min entre um início e
+// outro (20min de jogo + 5min de intervalo).
+function agendarHorarios(listaJogos) {
+  const grupos = listaJogos.filter((m) => (m.fase || "").startsWith("Grupo"));
+  const mataMata = listaJogos.filter((m) => !(m.fase || "").startsWith("Grupo"));
+
+  const comHorarioGrupos = grupos.map((m, i) => {
+    const slot = i < JOGOS_SEXTA ? i : JOGOS_SEXTA + (i - JOGOS_SEXTA);
+    const base = i < JOGOS_SEXTA ? INICIO_SEXTA : INICIO_SABADO;
+    const offsetSlots = i < JOGOS_SEXTA ? i : i - JOGOS_SEXTA;
+    const horario = new Date(base.getTime() + offsetSlots * DURACAO_SLOT_MIN * 60000);
+    return { ...m, horario: horario.toISOString() };
+  });
+
+  const comHorarioMataMata = mataMata.map((m, i) => {
+    const horario = new Date(INICIO_DOMINGO.getTime() + i * DURACAO_SLOT_MIN * 60000);
+    return { ...m, horario: horario.toISOString() };
+  });
+
+  return [...comHorarioGrupos, ...comHorarioMataMata];
+}
+
+function formatarHorarioJogo(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  const dias = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${dias[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1} · ${hh}:${mm}`;
+}
+
+function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao }) {
   const souAdmin = sessao && sessao.tipo === "admin";
   const [numGrupos, setNumGrupos] = useState(() => sugerirNumGrupos(teams.length));
   const potes = useMemo(() => montarPotes(teams, numGrupos), [teams, numGrupos]);
@@ -3247,6 +3387,21 @@ function Sorteio({ teams, sorteio, saveSorteio, sessao }) {
   const realizarSorteio = async () => {
     const grupos = sortearGrupos(potes, numGrupos);
     await saveSorteio({ grupos, numGrupos, sorteadoEm: new Date().toISOString() });
+  };
+
+  const [gerandoTabela, setGerandoTabela] = useState(false);
+  const jaTemJogosDeGrupo = matches.some((m) => (m.fase || "").startsWith("Grupo"));
+
+  const gerarTabela = async () => {
+    if (!sorteio || !sorteio.grupos) return;
+    if (jaTemJogosDeGrupo && !confirm("Já existem jogos de fase de grupos lançados. Gerar de novo vai ADICIONAR outra rodada completa (não apaga a antiga). Quer continuar?")) {
+      return;
+    }
+    setGerandoTabela(true);
+    const novosJogos = gerarJogosDosGrupos(sorteio.grupos);
+    const todosComHorario = agendarHorarios([...matches, ...novosJogos]);
+    await saveMatches(todosComHorario);
+    setGerandoTabela(false);
   };
 
   return (
@@ -3334,6 +3489,19 @@ function Sorteio({ teams, sorteio, saveSorteio, sessao }) {
               </div>
             ))}
           </div>
+
+          {souAdmin && (
+            <button
+              type="button"
+              onClick={gerarTabela}
+              disabled={gerandoTabela}
+              className="px-5 py-3 rounded-xl font-semibold text-sm inline-flex items-center gap-2 mt-6 disabled:opacity-50"
+              style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}
+            >
+              {gerandoTabela && <Loader2 size={16} className="animate-spin" />}
+              Gerar tabela de jogos (todos-contra-todos + horários)
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -3608,6 +3776,22 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
 
   const removeMatch = async (id) => {
     await saveMatches(matches.filter((m) => m.id !== id));
+  };
+
+  const moverJogo = async (id, direcao) => {
+    const idx = matches.findIndex((m) => m.id === id);
+    const novoIdx = idx + direcao;
+    if (idx === -1 || novoIdx < 0 || novoIdx >= matches.length) return;
+    const copia = [...matches];
+    [copia[idx], copia[novoIdx]] = [copia[novoIdx], copia[idx]];
+    await saveMatches(copia);
+  };
+
+  const [reagendando, setReagendando] = useState(false);
+  const reagendarHorarios = async () => {
+    setReagendando(true);
+    await saveMatches(agendarHorarios(matches));
+    setReagendando(false);
   };
 
   const sortearConfrontos = async () => {
@@ -3984,23 +4168,27 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
             </button>
             <button
               type="button"
-              onClick={sortearConfrontos}
-              disabled={teams.length < 2}
+              onClick={reagendarHorarios}
+              disabled={matches.length === 0 || reagendando}
               className="px-4 py-2 rounded-xl text-sm font-semibold inline-flex items-center gap-1.5 disabled:opacity-50"
-              style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}
+              style={{ color: COLORS.ink, border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
             >
-              <Swords size={15} /> Sortear confrontos ({teams.length} times)
+              {reagendando && <Loader2 size={14} className="animate-spin" />}
+              Reagendar horários (sexta/sábado/domingo)
             </button>
           </form>
 
           <div className="mt-5 space-y-2 max-h-96 overflow-y-auto">
-            {matches.map((m) => (
+            {matches.map((m, i) => (
               <MatchAdminRow
                 key={m.id}
                 match={m}
                 teams={teams}
                 onUpdate={updateMatch}
                 onRemove={() => removeMatch(m.id)}
+                onMover={(dir) => moverJogo(m.id, dir)}
+                podeSubir={i > 0}
+                podeDescer={i < matches.length - 1}
               />
             ))}
           </div>
@@ -4085,7 +4273,7 @@ const TABS = [
   { id: "inicio", label: "Início", icon: Trophy },
   { id: "inscricao", label: "Inscrição", icon: Users },
   { id: "sorteio", label: "Sorteio", icon: Dices },
-  { id: "chaveamento", label: "Chaveamento", icon: Swords },
+  { id: "chaveamento", label: "Jogos ao Vivo", icon: Swords },
   { id: "classificacao", label: "Classificação", icon: ListOrdered },
   { id: "comunidade", label: "Fotos e Vídeos", icon: Camera },
   { id: "galeria", label: "Galeria", icon: Award },
@@ -4291,7 +4479,9 @@ export default function App() {
           <>
             {tab === "inicio" && <Home teams={teams} matches={matches} setTab={setTab} config={config} totalPessoas={totalPessoas} />}
             {tab === "inscricao" && <Inscricao teams={teams} saveTeams={saveTeams} sessao={sessao} />}
-            {tab === "sorteio" && <Sorteio teams={teams} sorteio={sorteio} saveSorteio={saveSorteio} sessao={sessao} />}
+            {tab === "sorteio" && (
+              <Sorteio teams={teams} sorteio={sorteio} saveSorteio={saveSorteio} matches={matches} saveMatches={saveMatches} sessao={sessao} />
+            )}
             {tab === "chaveamento" && <Chaveamento matches={matches} teams={teams} />}
             {tab === "classificacao" && <Classificacao matches={matches} teams={teams} />}
             {tab === "comunidade" && <Comunidade posts={posts} savePosts={savePosts} />}
