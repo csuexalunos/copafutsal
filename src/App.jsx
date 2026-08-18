@@ -493,6 +493,14 @@ function anosDaTurma(turma) {
   return nums.map((n) => (n.length === 2 ? Number("20" + n) : Number(n))).filter((n) => n > 1990 && n < 2030);
 }
 
+// Mesma lista de turmas, só que em ordem crescente de ano — usada em
+// todo lugar que lista turmas pra escolher (cadastro, inscrição, etc.).
+const TURMAS_HISTORICAS_ORDENADAS = [...TURMAS_HISTORICAS].sort((a, b) => {
+  const anoA = Math.min(...anosDaTurma(a.turma));
+  const anoB = Math.min(...anosDaTurma(b.turma));
+  return anoA - anoB;
+});
+
 // Confere se o ano de conclusão do jogador é compatível com a turma do
 // time — Art. 6º/7º do regulamento (não pode misturar anos de conclusão
 // diferentes na mesma equipe, salvo exceção aprovada pela organização).
@@ -1504,7 +1512,7 @@ function Inscricao({ teams, saveTeams, sessao }) {
                 style={{ backgroundColor: COLORS.card, border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
               >
                 <option value="">Selecione</option>
-                {TURMAS_HISTORICAS.map((t) => (
+                {TURMAS_HISTORICAS_ORDENADAS.map((t) => (
                   <option key={t.turma} value={t.turma}>
                     {t.turma}
                   </option>
@@ -2937,7 +2945,7 @@ function Cadastro({ onVoltar }) {
               style={{ backgroundColor: COLORS.card, border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
             >
               <option value="">Selecione</option>
-              {TURMAS_HISTORICAS.map((t) => (
+              {TURMAS_HISTORICAS_ORDENADAS.map((t) => (
                 <option key={t.turma} value={t.turma}>
                   {t.turma}
                 </option>
@@ -3590,7 +3598,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
                       style={{ border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
                     >
                       <option value="">Turma não definida</option>
-                      {TURMAS_HISTORICAS.map((t) => (
+                      {TURMAS_HISTORICAS_ORDENADAS.map((t) => (
                         <option key={t.turma} value={t.turma}>
                           {t.turma}
                         </option>
