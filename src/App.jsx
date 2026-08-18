@@ -458,11 +458,11 @@ const HALL_DA_FAMA = {
 
 // Data e prazo desta edição — atualizar quando a organização confirmar.
 const DATA_EVENTO = "6, 7 e 8 de novembro";
-const PRAZO_INSCRICAO = "1 a 29 de setembro";
+const PRAZO_INSCRICAO = "1 a 30 de setembro";
 // Datas de verdade (ajuste o ano se precisar) — usadas pra travar a aba de
 // Inscrição fora do período.
 const INSCRICAO_INICIO = new Date(2026, 8, 1, 0, 0, 0); // 1 de setembro
-const INSCRICAO_FIM = new Date(2026, 8, 29, 23, 59, 59); // 29 de setembro
+const INSCRICAO_FIM = new Date(2026, 8, 30, 23, 59, 59); // 30 de setembro (último dia do mês)
 function inscricaoAberta() {
   const agora = new Date();
   return agora >= INSCRICAO_INICIO && agora <= INSCRICAO_FIM;
