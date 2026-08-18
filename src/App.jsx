@@ -2819,6 +2819,159 @@ function GerenciarElencos({ teams, saveTeams }) {
 // TAB: Cadastro — primeira página, cadastro de pessoa (jogador ou torcedor),
 // fica pendente até um organizador aprovar.
 // ---------------------------------------------------------------------------
+// Pra quem ficou "preso" no meio do cadastro — a conta de login existe
+// (por isso conseguiu entrar), mas os dados (nome, turma, WhatsApp etc.)
+// nunca chegaram a ser salvos, geralmente porque a confirmação por
+// e-mail interrompeu o processo no meio. Termina o cadastro agora que a
+// pessoa já está autenticada.
+function CompletarPerfil({ sessao, onCompleted }) {
+  const [form, setForm] = useState({ nome: "", tipo: "jogador", turma: "", whatsapp: "", nascimento: "" });
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    if (!form.nome.trim() || !form.whatsapp.trim() || !form.nascimento || (form.tipo === "jogador" && !form.turma)) {
+      setError("Preencha todos os campos" + (form.tipo === "jogador" ? " (inclusive a turma)." : "."));
+      return;
+    }
+    setSaving(true);
+    try {
+      await criarPerfil(sessao.id, {
+        email: sessao.email,
+        nome: form.nome.trim(),
+        tipo: form.tipo,
+        turma: form.tipo === "jogador" ? form.turma : "",
+        whatsapp: form.whatsapp.trim(),
+        nascimento: form.nascimento,
+        status: "pendente",
+      });
+      onCompleted();
+    } catch (err) {
+      setSaving(false);
+      setError("Erro ao salvar: " + err.message);
+    }
+  };
+
+  return (
+    <div style={{ backgroundColor: COLORS.bg, minHeight: "100vh" }}>
+      <div className="max-w-md mx-auto px-6 py-14 sm:py-20">
+        <div className="flex flex-col items-center text-center mb-8">
+          <img src={CSU_BADGE_IMG} alt="" className="w-16 h-16 object-contain mb-3" />
+          <h1 className="text-lg font-bold" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+            Falta pouco pra terminar seu cadastro
+          </h1>
+          <p className="text-sm mt-2" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Sua conta ({sessao.email}) já existe, mas seus dados ainda não foram salvos —
+            provavelmente a confirmação por e-mail interrompeu no meio. Preenche de novo, é
+            rapidinho.
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+              Nome completo
+            </label>
+            <input
+              type="text"
+              value={form.nome}
+              onChange={(e) => setForm({ ...form, nome: e.target.value })}
+              className="w-full px-4 py-2.5 rounded-xl outline-none text-sm"
+              style={{ backgroundColor: COLORS.card, border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+              Você é
+            </label>
+            <div className="flex gap-2">
+              {[
+                { value: "jogador", label: "Jogador" },
+                { value: "torcedor", label: "Torcedor" },
+              ].map((op) => (
+                <button
+                  key={op.value}
+                  type="button"
+                  onClick={() => setForm({ ...form, tipo: op.value })}
+                  className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium"
+                  style={{
+                    backgroundColor: form.tipo === op.value ? COLORS.accent : COLORS.card,
+                    color: form.tipo === op.value ? "#FFFFFF" : COLORS.ink,
+                    border: `1.5px solid ${form.tipo === op.value ? COLORS.accent : COLORS.border}`,
+                    fontFamily: "'Inter', sans-serif",
+                  }}
+                >
+                  {op.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {form.tipo === "jogador" && (
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                Turma
+              </label>
+              <select
+                value={form.turma}
+                onChange={(e) => setForm({ ...form, turma: e.target.value })}
+                className="w-full px-4 py-2.5 rounded-xl outline-none text-sm"
+                style={{ backgroundColor: COLORS.card, border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+              >
+                <option value="">Selecione</option>
+                {TURMAS_HISTORICAS_ORDENADAS.map((t) => (
+                  <option key={t.turma} value={t.turma}>
+                    {t.turma}
+                  </option>
+                ))}
+                <option value="outra">Outra / novo time</option>
+              </select>
+            </div>
+          )}
+
+          {[
+            { key: "whatsapp", label: "WhatsApp", type: "text", placeholder: "(00) 00000-0000" },
+            { key: "nascimento", label: "Data de nascimento", type: "date", placeholder: "" },
+          ].map((f) => (
+            <div key={f.key}>
+              <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                {f.label}
+              </label>
+              <input
+                type={f.type}
+                value={form[f.key]}
+                onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+                placeholder={f.placeholder}
+                className="w-full px-4 py-2.5 rounded-xl outline-none text-sm"
+                style={{ backgroundColor: COLORS.card, border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+              />
+            </div>
+          ))}
+
+          {error && (
+            <div className="text-sm font-medium" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
+              {error}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={saving}
+            className="w-full px-5 py-3 rounded-xl font-semibold text-sm inline-flex items-center justify-center gap-2 disabled:opacity-60"
+            style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+          >
+            {saving && <Loader2 size={16} className="animate-spin" />}
+            Concluir cadastro
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function Cadastro({ onVoltar }) {
   const [form, setForm] = useState({
     nome: "",
@@ -3229,6 +3382,7 @@ function LoginGate({ onLogin }) {
         tipo: "usuario",
         representanteAprovado: !!(perfil && perfil.status === "aprovado"),
         turma: (perfil && perfil.turma) || "",
+        temPerfil: !!perfil,
       });
     } catch (err) {
       console.error("Erro ao entrar:", err);
@@ -3947,6 +4101,7 @@ export default function App() {
         tipo: "usuario",
         representanteAprovado: !!(perfil && perfil.status === "aprovado"),
         turma: (perfil && perfil.turma) || "",
+        temPerfil: !!perfil,
       });
     } catch (e) {
       console.error("Falha ao montar sessão", e);
@@ -4008,6 +4163,15 @@ export default function App() {
 
   if (!sessao) {
     return <LoginGate onLogin={setSessao} />;
+  }
+
+  if (sessao.tipo === "usuario" && !sessao.temPerfil) {
+    return (
+      <CompletarPerfil
+        sessao={sessao}
+        onCompleted={() => setSessao({ ...sessao, temPerfil: true })}
+      />
+    );
   }
 
   return (
