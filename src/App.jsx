@@ -3689,7 +3689,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   const [reqEnviado, setReqEnviado] = useState(false);
   const [ultimaSenhaGerada, setUltimaSenhaGerada] = useState(null);
 
-  const [matchForm, setMatchForm] = useState({ fase: "Grupos", timeA: "", timeB: "", golsA: "", golsB: "" });
+  const [matchForm, setMatchForm] = useState({ fase: "Oitavas", timeA: "", timeB: "", golsA: "", golsB: "" });
   const [linkTransmissao, setLinkTransmissao] = useState((config && config.linkTransmissao) || "");
 
   const salvarLinkTransmissao = async (e) => {
@@ -3792,27 +3792,6 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
     setReagendando(true);
     await saveMatches(agendarHorarios(matches));
     setReagendando(false);
-  };
-
-  const sortearConfrontos = async () => {
-    const embaralhados = [...teams].sort(() => Math.random() - 0.5);
-    const novosJogos = [];
-    for (let i = 0; i + 1 < embaralhados.length; i += 2) {
-      novosJogos.push({
-        id: `jogo_${Date.now()}_${i}`,
-        fase: matchForm.fase,
-        timeA: embaralhados[i].id,
-        timeB: embaralhados[i + 1].id,
-        golsA: null,
-        golsB: null,
-        status: "agendado",
-        tempoAtual: 1,
-        tempoIniciadoEm: null,
-        tempoAcumuladoMs: 0,
-        eventos: [],
-      });
-    }
-    await saveMatches([...matches, ...novosJogos]);
   };
 
   if (!souAdminLogado) {
@@ -4113,11 +4092,16 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
           </p>
         </div>
 
-        {/* Lançar jogo */}
+        {/* Jogo avulso — só pra mata-mata; a fase de grupos vem do Sorteio */}
         <div className="rounded-2xl p-5" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
-          <h3 className="font-semibold mb-4" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
-            Lançar confronto
+          <h3 className="font-semibold mb-1" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+            Adicionar jogo do mata-mata
           </h3>
+          <p className="text-xs mb-4" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Os jogos da fase de grupos são gerados automaticamente na aba Sorteio, a partir do
+            resultado do sorteio — não precisa (e não deve) lançar eles aqui. Use isso só depois
+            que os grupos terminarem, pra cadastrar oitavas, quartas, semifinal e final.
+          </p>
           <form onSubmit={addMatch} className="space-y-3">
             <select
               value={matchForm.fase}
@@ -4125,7 +4109,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
               className="w-full px-3 py-2 rounded-xl text-sm"
               style={{ border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
             >
-              {["Grupos", "Oitavas", "Quartas", "Semifinal", "Final"].map((f) => (
+              {["Oitavas", "Quartas", "Semifinal", "Final"].map((f) => (
                 <option key={f} value={f}>
                   {f}
                 </option>
