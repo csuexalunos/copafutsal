@@ -4765,7 +4765,7 @@ export default function App() {
         className="text-center text-xs py-6"
         style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
       >
-        Copa de Ex-Alunos de Futsal · Colégio Santa Úrsula · Serviam
+        Copa de Ex-Alunos de Futsal · Colégio Santa Úrsula
       </footer>
 
       {/* Botão de câmera fixo — acessível na maioria das abas, um toque tira
