@@ -17,6 +17,7 @@ import {
   MapPin,
   ChevronUp,
   ChevronDown,
+  MessageCircle,
   ShieldCheck,
   Plus,
   Lock,
@@ -466,6 +467,10 @@ const PRAZO_INSCRICAO = "aberta agora até 30 de setembro";
 const VALOR_INSCRICAO_ATLETA = "R$ 110,00 por atleta";
 const LOCAL_NOME = "Ginásio Poliesportivo do Colégio Santa Úrsula";
 const LOCAL_MAPS_LINK = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent("Colégio Santa Úrsula Ginásio Poliesportivo Maceió");
+const WHATSAPP_ORGANIZACAO = "5582996210019";
+const WHATSAPP_MSG_REPRESENTANTE = "Sou o representante do meu time e quero fazer a inscrição.";
+const WHATSAPP_LINK_REPRESENTANTE =
+  `https://wa.me/${WHATSAPP_ORGANIZACAO}?text=` + encodeURIComponent(WHATSAPP_MSG_REPRESENTANTE);
 
 // Regras de horário dos jogos — 2 tempos de 10min (20min de jogo) + 5min
 // de intervalo entre um confronto e outro = 25min entre um início e outro.
@@ -1494,11 +1499,20 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes }) {
               Só representantes de time acessam
             </span>
           </div>
-          <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+          <p className="text-sm mb-4" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
             Essa aba é reservada pra quem vai representar um time na Copa. Se você já se
             cadastrou no app, seu pedido já está na fila — é só esperar um organizador aprovar.
             Se ainda não se cadastrou, faz isso primeiro pela tela de login.
           </p>
+          <a
+            href={WHATSAPP_LINK_REPRESENTANTE}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold"
+            style={{ backgroundColor: "#25D366", color: "#052E16", fontFamily: "'Inter', sans-serif" }}
+          >
+            <MessageCircle size={16} /> Falar com a organização no WhatsApp
+          </a>
         </div>
       </div>
     );
