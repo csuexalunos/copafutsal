@@ -3551,19 +3551,24 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
           <Loader2 size={14} className="animate-spin" /> Carregando cadastros...
         </div>
       ) : (
-        perfis.filter((p) => p.status === "pendente").length > 0 && (
-          <div
-            className="rounded-2xl p-5 mb-8"
-            style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
-          >
-            <h3 className="font-semibold mb-1" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
-              Pedidos de acesso à Inscrição ({perfis.filter((p) => p.status === "pendente").length})
-            </h3>
-            <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-              Aprovar libera a pessoa como representante de time — pra ela acessar a aba de
-              Inscrição e cadastrar o time dela. Não afeta o login normal, que já funciona sem
-              isso.
+        <div
+          className="rounded-2xl p-5 mb-8"
+          style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
+        >
+          <h3 className="font-semibold mb-1" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+            Pedidos de acesso à Inscrição ({perfis.filter((p) => p.status === "pendente").length})
+          </h3>
+          <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Aprovar libera a pessoa como representante de time — pra ela acessar a aba de
+            Inscrição e cadastrar o time dela. Não afeta o login normal, que já funciona sem
+            isso.
+          </p>
+          {perfis.filter((p) => p.status === "pendente").length === 0 ? (
+            <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+              Nenhum pedido pendente no momento. Assim que alguém se cadastrar no app, o pedido
+              aparece aqui.
             </p>
+          ) : (
             <ul className="space-y-2">
               {perfis
                 .filter((p) => p.status === "pendente")
@@ -3608,8 +3613,8 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
                   </li>
                 ))}
             </ul>
-          </div>
-        )
+          )}
+        </div>
       )}
 
       {souSuperAdmin && adminRequests.filter((r) => r.status === "pendente").length > 0 && (
