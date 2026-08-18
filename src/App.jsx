@@ -458,10 +458,10 @@ const HALL_DA_FAMA = {
 
 // Data e prazo desta edição — atualizar quando a organização confirmar.
 const DATA_EVENTO = "6, 7 e 8 de novembro";
-const PRAZO_INSCRICAO = "1 a 30 de setembro";
-// Datas de verdade (ajuste o ano se precisar) — usadas pra travar a aba de
-// Inscrição fora do período.
-const INSCRICAO_INICIO = new Date(2026, 8, 1, 0, 0, 0); // 1 de setembro
+const PRAZO_INSCRICAO = "aberta agora até 30 de setembro";
+const VALOR_INSCRICAO_ATLETA = "R$ 110,00 por atleta";
+// Datas de verdade — usadas pra travar a aba de Inscrição fora do período.
+const INSCRICAO_INICIO = new Date(2026, 0, 1, 0, 0, 0); // liberada desde já
 const INSCRICAO_FIM = new Date(2026, 8, 30, 23, 59, 59); // 30 de setembro (último dia do mês)
 function inscricaoAberta() {
   const agora = new Date();
@@ -737,6 +737,9 @@ function Home({ teams, matches, setTab, config }) {
         </div>
         <div className="text-sm" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
           <strong>Competição:</strong> {DATA_EVENTO}
+        </div>
+        <div className="text-sm" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
+          <strong>Valor:</strong> {VALOR_INSCRICAO_ATLETA}
         </div>
       </div>
 
@@ -1441,6 +1444,12 @@ function Inscricao({ teams, saveTeams, sessao }) {
   return (
     <div>
       <SectionLabel eyebrow="Participe" title="Inscrição de time" />
+      <div
+        className="text-sm px-4 py-2.5 rounded-xl mb-6 inline-block"
+        style={{ backgroundColor: COLORS.accentSoft, color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}
+      >
+        Valor da inscrição: <strong>{VALOR_INSCRICAO_ATLETA}</strong>
+      </div>
 
       <div className="grid sm:grid-cols-5 gap-8">
         <form onSubmit={handleSalvar} className="sm:col-span-3 space-y-4">
