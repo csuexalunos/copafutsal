@@ -465,6 +465,10 @@ const HALL_DA_FAMA = {
 const DATA_EVENTO = "6, 7 e 8 de novembro";
 const PRAZO_INSCRICAO = "aberta agora até 30 de setembro";
 const VALOR_INSCRICAO_ATLETA = "R$ 110,00 por atleta";
+const VALOR_INSCRICAO_ATLETA_NUM = 110;
+function formatarReais(n) {
+  return "R$ " + n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
 const LOCAL_NOME = "Ginásio Poliesportivo do Colégio Santa Úrsula";
 const LOCAL_MAPS_LINK = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent("Colégio Santa Úrsula Ginásio Poliesportivo Maceió");
 const WHATSAPP_ORGANIZACAO = "5582996210019";
@@ -2746,21 +2750,25 @@ function abrirImpressao(titulo, corpoHtml) {
 
 function fichaTimeHtml(team) {
   const jogadores = Array.isArray(team.jogadores) ? team.jogadores : [];
+  const total = jogadores.length * VALOR_INSCRICAO_ATLETA_NUM;
   return `
     <div class="secao">
       <h1>${escapeHtml(team.nome)}</h1>
       <div class="meta">Capitão: ${escapeHtml(team.capitao || "—")} · Contato: ${escapeHtml(team.contato || "—")} · ${jogadores.length} jogador(es)</div>
       <table>
-        <thead><tr><th>Nº</th><th>Nome completo</th><th>Período de estudo</th><th>Ano de conclusão</th></tr></thead>
+        <thead><tr><th>Nº</th><th>Nome completo</th><th>CPF</th><th>Período de estudo</th><th>Ano de conclusão</th></tr></thead>
         <tbody>
           ${jogadores
             .map(
               (j) =>
-                `<tr><td>${escapeHtml(j.numero || "—")}</td><td>${escapeHtml(j.nome || "—")}</td><td>${escapeHtml(j.periodo || "—")}</td><td>${escapeHtml(j.anoConclusao || "—")}</td></tr>`
+                `<tr><td>${escapeHtml(j.numero || "—")}</td><td>${escapeHtml(j.nome || "—")}</td><td>${escapeHtml(j.cpf || "—")}</td><td>${escapeHtml(j.periodo || "—")}</td><td>${escapeHtml(j.anoConclusao || "—")}</td></tr>`
             )
             .join("")}
         </tbody>
       </table>
+      <div class="meta" style="margin-top:16px; font-size:14px;">
+        <strong>Valor da inscrição:</strong> ${jogadores.length} atleta(s) × ${escapeHtml(VALOR_INSCRICAO_ATLETA)} = <strong>${escapeHtml(formatarReais(total))}</strong>
+      </div>
     </div>`;
 }
 
@@ -2809,6 +2817,125 @@ function baixarSumula(match, teams) {
   const timeB = teams.find((t) => t.id === match.timeB);
   const nomeArquivo = `${timeA ? timeA.nome : "TimeA"} x ${timeB ? timeB.nome : "TimeB"}`;
   abrirImpressao(`Súmula — ${nomeArquivo}`, sumulaHtml(match, teams));
+}
+
+// Planilha financeira — times ordenados por data de inscrição, com
+// quantidade de jogadores, valor a pagar e soma total.
+function PlanilhaInscricoes({ teams }) {
+  const linhas = [...teams]
+    .sort((a, b) => new Date(a.inscritoEm || 0) - new Date(b.inscritoEm || 0))
+    .map((t) => {
+      const n = Array.isArray(t.jogadores) ? t.jogadores.length : 0;
+      return { ...t, nJogadores: n, valor: n * VALOR_INSCRICAO_ATLETA_NUM };
+    });
+  const totalGeral = linhas.reduce((acc, t) => acc + t.valor, 0);
+
+  const baixarPlanilha = () => {
+    const linhasHtml = linhas
+      .map(
+        (t, i) => `<tr>
+          <td>${i + 1}</td>
+          <td>${escapeHtml(t.nome)}</td>
+          <td>${t.inscritoEm ? escapeHtml(new Date(t.inscritoEm).toLocaleString("pt-BR")) : "—"}</td>
+          <td>${t.nJogadores}</td>
+          <td>${escapeHtml(formatarReais(t.valor))}</td>
+        </tr>`
+      )
+      .join("");
+    const corpo = `
+      <div class="secao">
+        <h1>Planilha de inscrições</h1>
+        <div class="meta">${linhas.length} time(s) · ${escapeHtml(VALOR_INSCRICAO_ATLETA)}</div>
+        <table>
+          <thead><tr><th>#</th><th>Time</th><th>Data de inscrição</th><th>Jogadores</th><th>Valor</th></tr></thead>
+          <tbody>${linhasHtml}</tbody>
+        </table>
+        <div class="meta" style="margin-top:16px; font-size:15px;">
+          <strong>Total geral: ${escapeHtml(formatarReais(totalGeral))}</strong>
+        </div>
+      </div>`;
+    abrirImpressao("Planilha de inscrições", corpo);
+  };
+
+  return (
+    <div className="rounded-2xl p-5 mt-8" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+      <div className="flex items-center justify-between gap-3 mb-1 flex-wrap">
+        <h3 className="font-semibold flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+          Planilha de inscrições
+        </h3>
+        {linhas.length > 0 && (
+          <button
+            type="button"
+            onClick={baixarPlanilha}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5"
+            style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}
+          >
+            <Download size={12} /> Baixar planilha
+          </button>
+        )}
+      </div>
+      <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+        Por ordem de inscrição · {VALOR_INSCRICAO_ATLETA}
+      </p>
+      {linhas.length === 0 ? (
+        <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+          Nenhum time inscrito ainda.
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm" style={{ fontFamily: "'Inter', sans-serif" }}>
+            <thead>
+              <tr style={{ borderBottom: `1.5px solid ${COLORS.border}` }}>
+                <th className="text-left py-1.5 pr-3 text-xs uppercase tracking-wide" style={{ color: COLORS.slate }}>
+                  Time
+                </th>
+                <th className="text-left py-1.5 pr-3 text-xs uppercase tracking-wide" style={{ color: COLORS.slate }}>
+                  Inscrito em
+                </th>
+                <th className="text-center py-1.5 pr-3 text-xs uppercase tracking-wide" style={{ color: COLORS.slate }}>
+                  Jogadores
+                </th>
+                <th className="text-right py-1.5 text-xs uppercase tracking-wide" style={{ color: COLORS.slate }}>
+                  Valor
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {linhas.map((t, i) => (
+                <tr key={t.id} style={{ backgroundColor: i % 2 === 0 ? "transparent" : COLORS.zebra }}>
+                  <td className="py-2 pr-3" style={{ color: COLORS.ink }}>
+                    <span className="flex items-center gap-1.5">
+                      {ESCUDOS_TIMES[t.nome] && <img src={ESCUDOS_TIMES[t.nome]} alt="" className="w-4 h-4 object-contain shrink-0" />}
+                      {t.nome}
+                    </span>
+                  </td>
+                  <td className="py-2 pr-3 text-xs" style={{ color: COLORS.slate, fontFamily: "'JetBrains Mono', monospace" }}>
+                    {t.inscritoEm ? new Date(t.inscritoEm).toLocaleDateString("pt-BR") : "—"}
+                  </td>
+                  <td className="py-2 pr-3 text-center" style={{ fontFamily: "'JetBrains Mono', monospace", color: COLORS.ink }}>
+                    {t.nJogadores}
+                  </td>
+                  <td className="py-2 text-right font-semibold" style={{ fontFamily: "'JetBrains Mono', monospace", color: COLORS.accent }}>
+                    {formatarReais(t.valor)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr style={{ borderTop: `2px solid ${COLORS.ink}` }}>
+                <td className="py-2 pr-3 font-semibold" style={{ color: COLORS.ink }} colSpan={3}>
+                  Total geral
+                </td>
+                <td className="py-2 text-right font-bold" style={{ fontFamily: "'JetBrains Mono', monospace", color: COLORS.ink }}>
+                  {formatarReais(totalGeral)}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function DocumentosOrganizacao({ teams, matches }) {
@@ -4493,6 +4620,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
 
       <GerenciarElencos teams={teams} saveTeams={saveTeams} />
       <DiagnosticoIrregularidades teams={teams} />
+      <PlanilhaInscricoes teams={teams} />
       <DocumentosOrganizacao teams={teams} matches={matches} />
 
       <div
