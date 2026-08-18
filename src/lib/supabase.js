@@ -121,3 +121,11 @@ export async function urlAssinada(caminho, expiraEmSegundos = 3600) {
   if (error) throw error;
   return data.signedUrl;
 }
+
+// Contagem pública de pessoas cadastradas (só o número, sem expor dados
+// de ninguém) — pra mostrar na página inicial.
+export async function contarPessoasInscritas() {
+  const { data, error } = await supabase.rpc("contar_perfis");
+  if (error) throw error;
+  return data || 0;
+}

@@ -40,6 +40,7 @@ import {
   promoverParaAdmin,
   subirArquivo,
   urlAssinada,
+  contarPessoasInscritas,
 } from "./lib/supabase.js";
 
 // ---------------------------------------------------------------------------
@@ -682,7 +683,7 @@ function EmptyState({ children }) {
 // ---------------------------------------------------------------------------
 // TAB: Início
 // ---------------------------------------------------------------------------
-function Home({ teams, matches, setTab, config }) {
+function Home({ teams, matches, setTab, config, totalPessoas }) {
   const menuItems = [
     { id: "inscricao", label: "Inscrição", desc: "Inscreva seu time para a 8ª edição", icon: Users },
     { id: "sorteio", label: "Sorteio", desc: "Potes e grupos da edição", icon: Dices },
@@ -694,6 +695,7 @@ function Home({ teams, matches, setTab, config }) {
   ];
 
   const stats = [
+    { label: "Pessoas inscritas no app", value: totalPessoas },
     { label: "Times inscritos", value: teams.length },
     { label: "Jogos registrados", value: matches.length },
     { label: "Edições disputadas", value: EDITION - 1 },
@@ -3888,12 +3890,32 @@ export default function App() {
   const [adminRequests, saveAdminRequests, loadingAdminRequests] = useSharedStorage("copasu:admin_requests", [], 8000);
   const [sorteio, saveSorteio, loadingSorteio] = useSharedStorage("copasu:sorteio", {}, 6000);
   const [config, saveConfig, loadingConfig] = useSharedStorage("copasu:config", {}, 10000);
+  const [totalPessoas, setTotalPessoas] = useState(0);
   const [fabBusy, setFabBusy] = useState(false);
   const [fabDone, setFabDone] = useState(false);
   const fabInputRef = React.useRef(null);
 
   const loading =
     loadingTeams || loadingMatches || loadingPosts || loadingAdminRequests || loadingSorteio || loadingConfig || checandoSessao;
+
+  // Contagem pública de pessoas cadastradas — atualiza sozinha de tempos
+  // em tempos, igual o resto dos dados compartilhados.
+  useEffect(() => {
+    let cancelado = false;
+    const buscar = () => {
+      contarPessoasInscritas()
+        .then((n) => {
+          if (!cancelado) setTotalPessoas(n);
+        })
+        .catch((e) => console.error("Falha ao contar pessoas inscritas", e));
+    };
+    buscar();
+    const id = setInterval(buscar, 15000);
+    return () => {
+      cancelado = true;
+      clearInterval(id);
+    };
+  }, []);
 
   // Monta a sessão a partir do usuário autenticado (Supabase Auth) — cobre
   // tanto o login recém-feito quanto a sessão que já estava guardada no
@@ -4045,7 +4067,7 @@ export default function App() {
           </div>
         ) : (
           <>
-            {tab === "inicio" && <Home teams={teams} matches={matches} setTab={setTab} config={config} />}
+            {tab === "inicio" && <Home teams={teams} matches={matches} setTab={setTab} config={config} totalPessoas={totalPessoas} />}
             {tab === "inscricao" && <Inscricao teams={teams} saveTeams={saveTeams} sessao={sessao} />}
             {tab === "sorteio" && <Sorteio teams={teams} sorteio={sorteio} saveSorteio={saveSorteio} sessao={sessao} />}
             {tab === "chaveamento" && <Chaveamento matches={matches} teams={teams} />}
