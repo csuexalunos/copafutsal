@@ -1719,6 +1719,24 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes }) {
             {dirty ? "Salvar" : "Sem alterações pra salvar"}
           </button>
 
+          {form.jogadores.length > 0 && (
+            <button
+              type="button"
+              onClick={() =>
+                baixarFichaTime({
+                  nome: nomeTime,
+                  capitao: form.capitao,
+                  contato: form.contato,
+                  jogadores: form.jogadores,
+                })
+              }
+              className="ml-3 px-4 py-3 rounded-xl text-sm font-semibold inline-flex items-center gap-2"
+              style={{ color: COLORS.ink, border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+            >
+              <Download size={15} /> Baixar ficha do meu time
+            </button>
+          )}
+
           {sent && (
             <div
               className="text-sm font-medium px-4 py-3 rounded-xl mt-2"
@@ -2753,7 +2771,7 @@ function fichaTimeHtml(team) {
   const total = jogadores.length * VALOR_INSCRICAO_ATLETA_NUM;
   return `
     <div class="secao">
-      <h1>${escapeHtml(team.nome)}</h1>
+      <h1>Seleção de ${escapeHtml(team.nome)}</h1>
       <div class="meta">Capitão: ${escapeHtml(team.capitao || "—")} · Contato: ${escapeHtml(team.contato || "—")} · ${jogadores.length} jogador(es)</div>
       <table>
         <thead><tr><th>Nº</th><th>Nome completo</th><th>CPF</th><th>Período de estudo</th><th>Ano de conclusão</th></tr></thead>
