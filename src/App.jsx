@@ -45,6 +45,7 @@ import {
   subirArquivo,
   urlAssinada,
   contarPessoasInscritas,
+  buscarCpfsDaTurma,
 } from "./lib/supabase.js";
 
 // ---------------------------------------------------------------------------
@@ -1420,6 +1421,25 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes }) {
       jogadores: jogadoresDaTurma(valor),
       escudoUrl: ESCUDOS_TIMES[valor] || "",
     });
+    // CPF vem de uma tabela protegida (só quem tem login lê) — busca à
+    // parte e completa o formulário quando chegar, sem guardar CPF no
+    // código público do site.
+    buscarCpfsDaTurma(valor)
+      .then((mapaCpf) => {
+        if (Object.keys(mapaCpf).length === 0) return;
+        setForm((atual) => {
+          if (atual.turmaSelecionada !== valor) return atual;
+          return {
+            ...atual,
+            jogadores: atual.jogadores.map((j) => {
+              if (j.cpf) return j;
+              const cpf = mapaCpf[j.apelido] || mapaCpf[j.nome];
+              return cpf ? { ...j, cpf } : j;
+            }),
+          };
+        });
+      })
+      .catch((e) => console.error("Falha ao buscar CPFs do elenco histórico", e));
   };
 
   const addJogador = (novo) => atualizarCampo({ jogadores: [...form.jogadores, novo] });

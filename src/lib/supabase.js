@@ -129,3 +129,17 @@ export async function contarPessoasInscritas() {
   if (error) throw error;
   return data || 0;
 }
+
+// CPFs do elenco histórico — tabela protegida (só quem tem login
+// consegue ler). Devolve um mapa apelido -> cpf pra completar o
+// formulário sem precisar guardar CPF no código público do site.
+export async function buscarCpfsDaTurma(turma) {
+  const { data, error } = await supabase.from("elenco_historico").select("apelido, nome, cpf").eq("turma", turma);
+  if (error) throw error;
+  const mapa = {};
+  (data || []).forEach((row) => {
+    if (row.apelido) mapa[row.apelido] = row.cpf;
+    if (row.nome) mapa[row.nome] = row.cpf;
+  });
+  return mapa;
+}
