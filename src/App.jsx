@@ -983,7 +983,7 @@ function PlayerRow({ player, onChange, onRemove, turmaTime, onSolicitarAvaliacao
             value={player.numero}
             onChange={(e) => onChange({ ...player, numero: e.target.value })}
             className="px-2.5 py-1.5 rounded-lg text-sm col-span-1"
-            style={{ border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+            style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
           />
           <input
             type="text"
@@ -991,7 +991,7 @@ function PlayerRow({ player, onChange, onRemove, turmaTime, onSolicitarAvaliacao
             value={player.posicao}
             onChange={(e) => onChange({ ...player, posicao: e.target.value })}
             className="px-2.5 py-1.5 rounded-lg text-sm col-span-1"
-            style={{ border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+            style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
           />
           <input
             type="text"
@@ -999,7 +999,7 @@ function PlayerRow({ player, onChange, onRemove, turmaTime, onSolicitarAvaliacao
             value={player.apelido || ""}
             onChange={(e) => onChange({ ...player, apelido: e.target.value })}
             className="px-2.5 py-1.5 rounded-lg text-sm col-span-2"
-            style={{ border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+            style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
           />
           <input
             type="text"
@@ -1007,7 +1007,7 @@ function PlayerRow({ player, onChange, onRemove, turmaTime, onSolicitarAvaliacao
             value={player.nome}
             onChange={(e) => onChange({ ...player, nome: e.target.value })}
             className="px-2.5 py-1.5 rounded-lg text-sm col-span-2"
-            style={{ border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+            style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
           />
           <input
             type="text"
@@ -1015,7 +1015,7 @@ function PlayerRow({ player, onChange, onRemove, turmaTime, onSolicitarAvaliacao
             value={player.periodo || ""}
             onChange={(e) => onChange({ ...player, periodo: e.target.value })}
             className="px-2.5 py-1.5 rounded-lg text-sm col-span-2"
-            style={{ border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+            style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
           />
           <input
             type="text"
@@ -1023,7 +1023,7 @@ function PlayerRow({ player, onChange, onRemove, turmaTime, onSolicitarAvaliacao
             value={player.anoConclusao || ""}
             onChange={(e) => onChange({ ...player, anoConclusao: e.target.value })}
             className="px-2.5 py-1.5 rounded-lg text-sm col-span-2"
-            style={{ border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+            style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
           />
           <input
             type="text"
@@ -1031,7 +1031,7 @@ function PlayerRow({ player, onChange, onRemove, turmaTime, onSolicitarAvaliacao
             value={player.cpf || ""}
             onChange={(e) => onChange({ ...player, cpf: e.target.value })}
             className="px-2.5 py-1.5 rounded-lg text-sm col-span-1"
-            style={{ border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+            style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
           />
           <input
             type="date"
@@ -1039,7 +1039,7 @@ function PlayerRow({ player, onChange, onRemove, turmaTime, onSolicitarAvaliacao
             value={player.nascimento || ""}
             onChange={(e) => onChange({ ...player, nascimento: e.target.value })}
             className="px-2.5 py-1.5 rounded-lg text-sm col-span-1"
-            style={{ border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+            style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
           />
         </div>
       )}
@@ -1243,7 +1243,7 @@ function EditarMeuTime({ teams, saveTeams }) {
         value={timeId}
         onChange={(e) => setTimeId(e.target.value)}
         className="w-full px-3 py-2 rounded-xl text-sm"
-        style={{ border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+        style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
       >
         <option value="">Selecione seu time</option>
         {teams.map((t) => (
@@ -1258,7 +1258,7 @@ function EditarMeuTime({ teams, saveTeams }) {
         onChange={(e) => setCodigo(e.target.value)}
         placeholder="Código de 4 dígitos (recebido na inscrição)"
         className="w-full px-3 py-2 rounded-xl text-sm"
-        style={{ border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+        style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
       />
       {erro && (
         <div className="text-sm" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
@@ -1318,7 +1318,7 @@ function AddPlayerForm({ onAdd }) {
             value={novo[f.key]}
             onChange={(e) => campo(f.key, e.target.value)}
             className={`px-2.5 py-1.5 rounded-lg text-sm ${f.span ? "col-span-2" : ""}`}
-            style={{ border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+            style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
           />
         ))}
       </div>
@@ -2310,7 +2310,7 @@ function Comunidade({ posts, savePosts }) {
             value={legenda}
             onChange={(e) => setLegenda(e.target.value)}
             className="w-full px-3 py-2 rounded-xl text-sm"
-            style={{ border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+            style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
           />
           <div className="flex gap-2">
             <button
@@ -2639,7 +2639,7 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
               value={eventForm.tipo}
               onChange={(e) => setEventForm({ ...eventForm, tipo: e.target.value })}
               className="px-2 py-1.5 rounded-lg text-xs"
-              style={{ border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+              style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
             >
               {TIPOS_EVENTO.map((t) => (
                 <option key={t.value} value={t.value}>
@@ -2651,7 +2651,7 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
               value={eventForm.timeId}
               onChange={(e) => setEventForm({ ...eventForm, timeId: e.target.value })}
               className="px-2 py-1.5 rounded-lg text-xs"
-              style={{ border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+              style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
             >
               <option value="">Time</option>
               {[match.timeA, match.timeB].map((id) => (
@@ -2667,7 +2667,7 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
               value={eventForm.jogador}
               onChange={(e) => setEventForm({ ...eventForm, jogador: e.target.value })}
               className="px-2 py-1.5 rounded-lg text-xs flex-1 min-w-[7rem]"
-              style={{ border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+              style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
             />
             {(() => {
               const time = teams.find((t) => t.id === eventForm.timeId);
@@ -3105,7 +3105,7 @@ function GerenciarElencos({ teams, saveTeams }) {
         value={timeId}
         onChange={(e) => setTimeId(e.target.value)}
         className="w-full px-3 py-2 rounded-xl text-sm mb-4"
-        style={{ border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+        style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
       >
         <option value="">Selecione um time</option>
         {teams.map((t) => (
@@ -4229,7 +4229,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
                   onChange={(e) => setReqNome(e.target.value)}
                   placeholder="Seu nome"
                   className="w-full px-3 py-2 rounded-xl text-sm"
-                  style={{ border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+                  style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
                 />
                 <input
                   type="email"
@@ -4237,7 +4237,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
                   onChange={(e) => setReqEmail(e.target.value)}
                   placeholder="Seu e-mail (o mesmo do cadastro)"
                   className="w-full px-3 py-2 rounded-xl text-sm"
-                  style={{ border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+                  style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
                 />
                 <input
                   type="text"
@@ -4245,7 +4245,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
                   onChange={(e) => setReqMotivo(e.target.value)}
                   placeholder="Por que quer ajudar (opcional)"
                   className="w-full px-3 py-2 rounded-xl text-sm"
-                  style={{ border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+                  style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
                 />
                 <button
                   type="submit"
@@ -4343,7 +4343,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
               onChange={(e) => setEmailNovoAdmin(e.target.value)}
               placeholder="email@exemplo.com"
               className="flex-1 px-3 py-2 rounded-xl text-sm min-w-0"
-              style={{ border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+              style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
             />
             <button
               type="submit"
@@ -4439,7 +4439,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
               onChange={(e) => setLinkTransmissao(e.target.value)}
               placeholder="https://youtube.com/... ou instagram.com/..."
               className="flex-1 px-3 py-2 rounded-xl text-sm min-w-0"
-              style={{ border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+              style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
             />
             <button
               type="submit"
@@ -4470,7 +4470,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
               value={matchForm.fase}
               onChange={(e) => setMatchForm({ ...matchForm, fase: e.target.value })}
               className="w-full px-3 py-2 rounded-xl text-sm"
-              style={{ border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+              style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
             >
               {["Oitavas", "Quartas", "Semifinal", "3º Lugar", "Final"].map((f) => (
                 <option key={f} value={f}>
@@ -4483,7 +4483,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
                 value={matchForm.timeA}
                 onChange={(e) => setMatchForm({ ...matchForm, timeA: e.target.value })}
                 className="px-3 py-2 rounded-xl text-sm"
-                style={{ border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+                style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
               >
                 <option value="">Time A</option>
                 {teams.map((t) => (
@@ -4496,7 +4496,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
                 value={matchForm.timeB}
                 onChange={(e) => setMatchForm({ ...matchForm, timeB: e.target.value })}
                 className="px-3 py-2 rounded-xl text-sm"
-                style={{ border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+                style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
               >
                 <option value="">Time B</option>
                 {teams.map((t) => (
@@ -4704,7 +4704,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
                       value={turmaEdicao[p.id] ?? p.turma ?? ""}
                       onChange={(e) => setTurmaEdicao({ ...turmaEdicao, [p.id]: e.target.value })}
                       className="px-2 py-1.5 rounded-lg text-xs flex-1 min-w-[8rem]"
-                      style={{ border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+                      style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
                     >
                       <option value="">Turma não definida</option>
                       {TURMAS_HISTORICAS_ORDENADAS.map((t) => (
