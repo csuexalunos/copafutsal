@@ -4611,44 +4611,43 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
         )}
       </div>
 
-      {/* Fica por último de propósito — não precisa ser a primeira coisa
+      {/* Ficam por último de propósito — não precisa ser a primeira coisa
           que o admin vê toda vez que abre a Organização. */}
       <div
         className="rounded-2xl p-5 mt-8"
         style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
       >
         <h3 className="font-semibold mb-1" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
-          Pessoas cadastradas no app ({perfis.length})
+          Representantes ({perfis.filter((p) => p.status === "aprovado").length})
         </h3>
         <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-          Todo mundo que já se cadastrou, com a turma de cada um. Tornar representante libera a
-          aba de Inscrição, travada nessa turma.
+          Quem já tem acesso à aba de Inscrição, travado na turma de cada um. Revogar tira o
+          acesso na hora.
         </p>
         {carregandoPainel ? (
           <div className="flex items-center gap-2 text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
             <Loader2 size={14} className="animate-spin" /> Carregando...
           </div>
-        ) : perfis.length === 0 ? (
+        ) : perfis.filter((p) => p.status === "aprovado").length === 0 ? (
           <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-            Ninguém se cadastrou no app ainda.
+            Ninguém é representante ainda.
           </p>
         ) : (
           <ul className="space-y-2">
-            {perfis.map((p) => (
-              <li
-                key={p.id}
-                className="flex flex-col sm:flex-row sm:items-center gap-2 text-sm px-3 py-2.5 rounded-lg"
-                style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium break-words">{p.nome}</div>
-                  <div className="text-xs break-words" style={{ color: COLORS.slate }}>
-                    {p.tipo === "jogador" ? "jogador" : "torcedor"} · turma{" "}
-                    <strong>{p.turma || turmaEdicao[p.id] || "não definida"}</strong> · {p.email} ·{" "}
-                    {p.status === "aprovado" ? "representante" : p.status === "recusado" ? "recusado" : "pendente"}
+            {perfis
+              .filter((p) => p.status === "aprovado")
+              .map((p) => (
+                <li
+                  key={p.id}
+                  className="flex flex-col sm:flex-row sm:items-center gap-2 text-sm px-3 py-2.5 rounded-lg"
+                  style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium break-words">{p.nome}</div>
+                    <div className="text-xs break-words" style={{ color: COLORS.slate }}>
+                      turma <strong>{p.turma || "não definida"}</strong> · {p.email}
+                    </div>
                   </div>
-                </div>
-                {p.status === "aprovado" ? (
                   <button
                     type="button"
                     onClick={() => revogarAcesso(p)}
@@ -4657,7 +4656,49 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
                   >
                     Revogar acesso
                   </button>
-                ) : (
+                </li>
+              ))}
+          </ul>
+        )}
+      </div>
+
+      <div
+        className="rounded-2xl p-5 mt-8"
+        style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
+      >
+        <h3 className="font-semibold mb-1" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+          Inscritos no app ({perfis.filter((p) => p.status !== "aprovado").length})
+        </h3>
+        <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+          Quem se cadastrou mas ainda não é representante. Tornar representante libera a aba de
+          Inscrição, travada na turma escolhida.
+        </p>
+        {carregandoPainel ? (
+          <div className="flex items-center gap-2 text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            <Loader2 size={14} className="animate-spin" /> Carregando...
+          </div>
+        ) : perfis.filter((p) => p.status !== "aprovado").length === 0 ? (
+          <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Ninguém nessa situação no momento.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {perfis
+              .filter((p) => p.status !== "aprovado")
+              .map((p) => (
+                <li
+                  key={p.id}
+                  className="flex flex-col sm:flex-row sm:items-center gap-2 text-sm px-3 py-2.5 rounded-lg"
+                  style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium break-words">{p.nome}</div>
+                    <div className="text-xs break-words" style={{ color: COLORS.slate }}>
+                      {p.tipo === "jogador" ? "jogador" : "torcedor"} · turma{" "}
+                      <strong>{p.turma || turmaEdicao[p.id] || "não definida"}</strong> · {p.email} ·{" "}
+                      {p.status === "recusado" ? "recusado" : "pendente"}
+                    </div>
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     <select
                       value={turmaEdicao[p.id] ?? p.turma ?? ""}
@@ -4681,9 +4722,8 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
                       Tornar representante
                     </button>
                   </div>
-                )}
-              </li>
-            ))}
+                </li>
+              ))}
           </ul>
         )}
       </div>
