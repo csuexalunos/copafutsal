@@ -28,24 +28,9 @@ import {
   ArrowRight,
 } from "lucide-react";
 import {
-  readKey,
-  writeKey,
-  cadastrarConta,
-  entrarConta,
-  sairConta,
-  sessaoAtual,
-  aoMudarSessao,
-  criarPerfil,
-  buscarPerfil,
-  listarPerfis,
-  atualizarPerfil,
-  souAdmin,
-  listarAdmins,
-  promoverParaAdmin,
-  subirArquivo,
-  urlAssinada,
-  contarPessoasInscritas,
-  buscarCpfsDaTurma,
+  readKey, writeKey, cadastrarConta, entrarConta, sairConta, sessaoAtual, aoMudarSessao,
+  criarPerfil, buscarPerfil, listarPerfis, atualizarPerfil, souAdmin, listarAdmins,
+  promoverParaAdmin, subirArquivo, urlAssinada, contarPessoasInscritas, buscarCpfsDaTurma,
 } from "./lib/supabase.js";
 
 // ---------------------------------------------------------------------------
@@ -612,12 +597,12 @@ function useSharedStorage(key, initialValue, pollMs) {
 
   const fetchNow = useCallback(async () => {
     try {
-      const stored = await readKey(key);
-      if (stored != null) {
-        setValue(stored);
+      const res = await window.storage.get(key, true);
+      if (res && res.value) {
+        setValue(JSON.parse(res.value));
       }
     } catch (e) {
-      console.error("Falha ao ler", key, e);
+      // chave ainda não existe — mantém valor atual
     }
   }, [key]);
 
@@ -645,7 +630,7 @@ function useSharedStorage(key, initialValue, pollMs) {
     async (newValue) => {
       setValue(newValue);
       try {
-        await writeKey(key, newValue);
+        await window.storage.set(key, JSON.stringify(newValue), true);
       } catch (e) {
         console.error("Falha ao salvar", key, e);
       }
@@ -4091,6 +4076,23 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
     setUltimaSenhaGerada(null);
   };
 
+  const [emailNovoAdmin, setEmailNovoAdmin] = useState("");
+  const promoverDireto = async (e) => {
+    e.preventDefault();
+    const alvo = perfis.find((p) => (p.email || "").trim().toLowerCase() === emailNovoAdmin.trim().toLowerCase());
+    if (!alvo) {
+      alert("Não achei essa pessoa cadastrada no app com esse e-mail. Ela precisa ter feito o Cadastro primeiro.");
+      return;
+    }
+    if (listaAdmins.some((a) => (a.email || "").trim().toLowerCase() === alvo.email.trim().toLowerCase())) {
+      alert("Essa pessoa já é admin.");
+      return;
+    }
+    await promoverParaAdmin(alvo.id, alvo.email);
+    setListaAdmins(await listarAdmins());
+    setEmailNovoAdmin("");
+  };
+
   const recusarSolicitacao = async (req) => {
     await saveAdminRequests(adminRequests.map((r) => (r.id === req.id ? { ...r, status: "recusado" } : r)));
   };
@@ -4128,9 +4130,11 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   const manterIrregularidade = async (caso) => {
     const time = teams.find((t) => t.nome === caso.timeNome);
     if (time) {
-      const jogadoresAtualizados = (time.jogadores || []).map((j) =>
-        j.id === caso.jogadorId ? { ...j, avaliacaoPendente: false } : j
-      );
+      // Mantida a irregularidade = jogador sai do time. A quantidade de
+      // jogadores (e o valor da inscrição, calculado a partir dela) já
+      // atualiza sozinha em todo lugar, porque é sempre recalculada a
+      // partir do time.jogadores — não precisa mexer em mais nada.
+      const jogadoresAtualizados = (time.jogadores || []).filter((j) => j.id !== caso.jogadorId);
       await saveTeams(teams.map((t) => (t.id === time.id ? { ...t, jogadores: jogadoresAtualizados } : t)));
     }
     await saveAvaliacoes(avaliacoes.map((a) => (a.id === caso.id ? { ...a, status: "mantida" } : a)));
@@ -4267,129 +4271,6 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
         </div>
       </div>
 
-      {carregandoPainel ? (
-        <div className="flex items-center gap-2 text-sm mb-8" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-          <Loader2 size={14} className="animate-spin" /> Carregando cadastros...
-        </div>
-      ) : (
-        <div
-          className="rounded-2xl p-5 mb-8"
-          style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
-        >
-          <h3 className="font-semibold mb-1" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
-            Pedidos de acesso à Inscrição ({perfis.filter((p) => p.status === "pendente").length})
-          </h3>
-          <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-            Aprovar libera a pessoa como representante de time — pra ela acessar a aba de
-            Inscrição e cadastrar o time dela. Não afeta o login normal, que já funciona sem
-            isso.
-          </p>
-          {perfis.filter((p) => p.status === "pendente").length === 0 ? (
-            <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-              Nenhum pedido pendente no momento. Assim que alguém se cadastrar no app, o pedido
-              aparece aqui.
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {perfis
-                .filter((p) => p.status === "pendente")
-                .map((p) => (
-                  <li
-                    key={p.id}
-                    className="flex flex-col gap-2 text-sm px-3 py-2.5 rounded-lg"
-                    style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
-                  >
-                    <div className="break-words">
-                      <div className="font-medium">{p.nome}</div>
-                      <div className="text-xs" style={{ color: COLORS.slate }}>
-                        {p.tipo === "jogador" ? "jogador" : "torcedor"} · {p.email}
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <select
-                        value={turmaEdicao[p.id] ?? p.turma ?? ""}
-                        onChange={(e) => setTurmaEdicao({ ...turmaEdicao, [p.id]: e.target.value })}
-                        className="px-2 py-1.5 rounded-lg text-xs flex-1 min-w-[8rem]"
-                        style={{ border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
-                      >
-                        <option value="">Turma não definida</option>
-                        {TURMAS_HISTORICAS_ORDENADAS.map((t) => (
-                          <option key={t.turma} value={t.turma}>
-                            {t.turma}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        onClick={() => aprovarUsuario(p)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0"
-                        style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
-                      >
-                        Aprovar como representante
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => recusarUsuario(p)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0"
-                        style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
-                      >
-                        Recusar
-                      </button>
-                    </div>
-                  </li>
-                ))}
-            </ul>
-          )}
-        </div>
-      )}
-
-      {!carregandoPainel && (
-        <div
-          className="rounded-2xl p-5 mb-8"
-          style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
-        >
-          <h3 className="font-semibold mb-1" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
-            Representantes aprovados ({perfis.filter((p) => p.status === "aprovado").length})
-          </h3>
-          <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-            Quem já tem acesso à aba de Inscrição, travado no time de cada um. Revogar tira o
-            acesso na hora — ela volta pra fila de pedidos pendentes.
-          </p>
-          {perfis.filter((p) => p.status === "aprovado").length === 0 ? (
-            <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-              Ninguém aprovado como representante ainda.
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {perfis
-                .filter((p) => p.status === "aprovado")
-                .map((p) => (
-                  <li
-                    key={p.id}
-                    className="flex flex-col sm:flex-row sm:items-center gap-2 text-sm px-3 py-2.5 rounded-lg"
-                    style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium break-words">{p.nome}</div>
-                      <div className="text-xs break-words" style={{ color: COLORS.slate }}>
-                        turma <strong>{p.turma || "não definida"}</strong> · {p.email}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => revogarAcesso(p)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 w-full sm:w-auto"
-                      style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
-                    >
-                      Revogar acesso
-                    </button>
-                  </li>
-                ))}
-            </ul>
-          )}
-        </div>
-      )}
-
       {avaliacoes.filter((a) => a.status === "pendente").length > 0 && (
         <div
           className="rounded-2xl p-5 mb-8"
@@ -4400,7 +4281,9 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
           </h3>
           <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
             O representante pediu revisão de um jogador marcado como irregular — Art. 9º dá
-            direito a esse esclarecimento antes de qualquer punição.
+            direito a esse esclarecimento antes de qualquer punição. "Aprovar exceção" libera o
+            jogador; "Manter irregularidade" <strong>remove ele do time</strong> (o representante
+            pode corrigir e adicionar de novo depois).
           </p>
           <ul className="space-y-2">
             {avaliacoes
@@ -4438,6 +4321,38 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
                 </li>
               ))}
           </ul>
+        </div>
+      )}
+
+      {souSuperAdmin && (
+        <div
+          className="rounded-2xl p-5 mb-8"
+          style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
+        >
+          <h3 className="font-semibold mb-1" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+            Tornar alguém admin
+          </h3>
+          <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Digite o e-mail de alguém que já se cadastrou no app pra dar acesso total de
+            organizador direto, sem precisar passar por solicitação. Só você vê isto.
+          </p>
+          <form onSubmit={promoverDireto} className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="email"
+              value={emailNovoAdmin}
+              onChange={(e) => setEmailNovoAdmin(e.target.value)}
+              placeholder="email@exemplo.com"
+              className="flex-1 px-3 py-2 rounded-xl text-sm min-w-0"
+              style={{ border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+            />
+            <button
+              type="submit"
+              className="px-4 py-2 rounded-xl text-sm font-semibold shrink-0 w-full sm:w-auto"
+              style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}
+            >
+              Tornar admin
+            </button>
+          </form>
         </div>
       )}
 
@@ -4693,6 +4608,83 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
               </tbody>
             </table>
           </div>
+        )}
+      </div>
+
+      {/* Fica por último de propósito — não precisa ser a primeira coisa
+          que o admin vê toda vez que abre a Organização. */}
+      <div
+        className="rounded-2xl p-5 mt-8"
+        style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
+      >
+        <h3 className="font-semibold mb-1" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+          Pessoas cadastradas no app ({perfis.length})
+        </h3>
+        <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+          Todo mundo que já se cadastrou, com a turma de cada um. Tornar representante libera a
+          aba de Inscrição, travada nessa turma.
+        </p>
+        {carregandoPainel ? (
+          <div className="flex items-center gap-2 text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            <Loader2 size={14} className="animate-spin" /> Carregando...
+          </div>
+        ) : perfis.length === 0 ? (
+          <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Ninguém se cadastrou no app ainda.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {perfis.map((p) => (
+              <li
+                key={p.id}
+                className="flex flex-col sm:flex-row sm:items-center gap-2 text-sm px-3 py-2.5 rounded-lg"
+                style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium break-words">{p.nome}</div>
+                  <div className="text-xs break-words" style={{ color: COLORS.slate }}>
+                    {p.tipo === "jogador" ? "jogador" : "torcedor"} · turma{" "}
+                    <strong>{p.turma || turmaEdicao[p.id] || "não definida"}</strong> · {p.email} ·{" "}
+                    {p.status === "aprovado" ? "representante" : p.status === "recusado" ? "recusado" : "pendente"}
+                  </div>
+                </div>
+                {p.status === "aprovado" ? (
+                  <button
+                    type="button"
+                    onClick={() => revogarAcesso(p)}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 w-full sm:w-auto"
+                    style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+                  >
+                    Revogar acesso
+                  </button>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    <select
+                      value={turmaEdicao[p.id] ?? p.turma ?? ""}
+                      onChange={(e) => setTurmaEdicao({ ...turmaEdicao, [p.id]: e.target.value })}
+                      className="px-2 py-1.5 rounded-lg text-xs flex-1 min-w-[8rem]"
+                      style={{ border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+                    >
+                      <option value="">Turma não definida</option>
+                      {TURMAS_HISTORICAS_ORDENADAS.map((t) => (
+                        <option key={t.turma} value={t.turma}>
+                          {t.turma}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => aprovarUsuario(p)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0"
+                      style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+                    >
+                      Tornar representante
+                    </button>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
         )}
       </div>
     </div>
