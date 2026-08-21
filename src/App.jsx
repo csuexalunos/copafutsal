@@ -4018,6 +4018,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   const [perfis, setPerfis] = useState([]);
   const [listaAdmins, setListaAdmins] = useState([]);
   const [carregandoPainel, setCarregandoPainel] = useState(true);
+  const jaMarcouVistoRef = React.useRef(false);
 
   useEffect(() => {
     if (!souAdminLogado) return;
@@ -4029,6 +4030,25 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
           setPerfis(p);
           setListaAdmins(a);
           setCarregandoPainel(false);
+
+          // Marca como "visto" alguns segundos depois de abrir a página —
+          // dá tempo da pessoa reparar no selinho "Novo" antes dele sumir.
+          // Só faz isso uma vez por sessão aberta, pra quem chegar depois
+          // (durante a mesma sessão) continuar aparecendo como novo.
+          if (!jaMarcouVistoRef.current) {
+            jaMarcouVistoRef.current = true;
+            const naoVistos = p.filter((x) => x.status !== "aprovado" && !x.visualizado);
+            if (naoVistos.length > 0) {
+              setTimeout(async () => {
+                try {
+                  await Promise.all(naoVistos.map((x) => atualizarPerfil(x.id, { visualizado: true })));
+                  setPerfis((atual) => atual.map((x) => (naoVistos.some((n) => n.id === x.id) ? { ...x, visualizado: true } : x)));
+                } catch (e) {
+                  console.error("Falha ao marcar inscritos como vistos", e);
+                }
+              }, 4000);
+            }
+          }
         }
       } catch (e) {
         console.error("Falha ao carregar painel de organização", e);
@@ -4387,7 +4407,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
               .filter((p) => p.status !== "aprovado")
               .sort((a, b) => new Date(b.criado_em || 0) - new Date(a.criado_em || 0))
               .map((p) => {
-                const ehNovo = p.criado_em && Date.now() - new Date(p.criado_em).getTime() < 48 * 60 * 60 * 1000;
+                const ehNovo = !p.visualizado;
                 return (
                   <li
                     key={p.id}
