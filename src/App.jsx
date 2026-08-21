@@ -4088,6 +4088,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   };
 
   const [emailNovoAdmin, setEmailNovoAdmin] = useState("");
+  const [promovendo, setPromovendo] = useState(false);
   const promoverDireto = async (e) => {
     e.preventDefault();
     const alvo = perfis.find((p) => (p.email || "").trim().toLowerCase() === emailNovoAdmin.trim().toLowerCase());
@@ -4099,9 +4100,18 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
       alert("Essa pessoa já é admin.");
       return;
     }
-    await promoverParaAdmin(alvo.id, alvo.email);
-    setListaAdmins(await listarAdmins());
-    setEmailNovoAdmin("");
+    setPromovendo(true);
+    try {
+      await promoverParaAdmin(alvo.id, alvo.email);
+      setListaAdmins(await listarAdmins());
+      setEmailNovoAdmin("");
+      alert(`${alvo.nome || alvo.email} agora é admin.`);
+    } catch (err) {
+      console.error("Falha ao promover admin:", err);
+      alert("Não consegui tornar essa pessoa admin: " + err.message);
+    } finally {
+      setPromovendo(false);
+    }
   };
 
   const recusarSolicitacao = async (req) => {
@@ -4112,8 +4122,9 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
 
   const aprovarUsuario = async (p) => {
     const turmaEscolhida = (turmaEdicao[p.id] ?? p.turma ?? "").trim();
-    await atualizarPerfil(p.id, { status: "aprovado", turma: turmaEscolhida });
-    setPerfis(perfis.map((x) => (x.id === p.id ? { ...x, status: "aprovado", turma: turmaEscolhida } : x)));
+    const agora = new Date().toISOString();
+    await atualizarPerfil(p.id, { status: "aprovado", turma: turmaEscolhida, aprovado_em: agora });
+    setPerfis(perfis.map((x) => (x.id === p.id ? { ...x, status: "aprovado", turma: turmaEscolhida, aprovado_em: agora } : x)));
   };
 
   const recusarUsuario = async (p) => {
@@ -4305,6 +4316,11 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
           <ul className="space-y-2">
             {perfis
               .filter((p) => p.status === "aprovado")
+              .sort((a, b) => {
+                const anoA = Math.min(...(anosDaTurma(a.turma).length ? anosDaTurma(a.turma) : [9999]));
+                const anoB = Math.min(...(anosDaTurma(b.turma).length ? anosDaTurma(b.turma) : [9999]));
+                return anoA - anoB;
+              })
               .map((p) => (
                 <li
                   key={p.id}
@@ -4316,6 +4332,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
                     <div className="text-xs break-words" style={{ color: COLORS.slate }}>
                       turma <strong>{p.turma || "não definida"}</strong> · {p.email}
                       {p.whatsapp && ` · ${p.whatsapp}`}
+                      {p.aprovado_em && ` · aprovado em ${new Date(p.aprovado_em).toLocaleDateString("pt-BR")}`}
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2 w-full sm:w-auto">
@@ -4368,20 +4385,39 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
           <ul className="space-y-2">
             {perfis
               .filter((p) => p.status !== "aprovado")
-              .map((p) => (
-                <li
-                  key={p.id}
-                  className="flex flex-col sm:flex-row sm:items-center gap-2 text-sm px-3 py-2.5 rounded-lg"
-                  style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium break-words">{p.nome}</div>
-                    <div className="text-xs break-words" style={{ color: COLORS.slate }}>
-                      {p.tipo === "jogador" ? "jogador" : "torcedor"} · turma{" "}
-                      <strong>{p.turma || turmaEdicao[p.id] || "não definida"}</strong> · {p.email} ·{" "}
-                      {p.status === "recusado" ? "recusado" : "pendente"}
+              .sort((a, b) => new Date(b.criado_em || 0) - new Date(a.criado_em || 0))
+              .map((p) => {
+                const ehNovo = p.criado_em && Date.now() - new Date(p.criado_em).getTime() < 48 * 60 * 60 * 1000;
+                return (
+                  <li
+                    key={p.id}
+                    className="flex flex-col sm:flex-row sm:items-center gap-2 text-sm px-3 py-2.5 rounded-lg"
+                    style={{
+                      backgroundColor: COLORS.zebra,
+                      color: COLORS.ink,
+                      fontFamily: "'Inter', sans-serif",
+                      border: ehNovo ? `1.5px solid ${COLORS.accent}` : "1.5px solid transparent",
+                    }}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium break-words flex items-center gap-1.5">
+                        {p.nome}
+                        {ehNovo && (
+                          <span
+                            className="text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide"
+                            style={{ backgroundColor: COLORS.accent, color: "#FFFFFF" }}
+                          >
+                            Novo
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs break-words" style={{ color: COLORS.slate }}>
+                        {p.tipo === "jogador" ? "jogador" : "torcedor"} · turma{" "}
+                        <strong>{p.turma || turmaEdicao[p.id] || "não definida"}</strong> · {p.email} ·{" "}
+                        {p.status === "recusado" ? "recusado" : "pendente"}
+                        {p.criado_em && ` · cadastrado em ${new Date(p.criado_em).toLocaleDateString("pt-BR")}`}
+                      </div>
                     </div>
-                  </div>
                   <div className="flex flex-wrap gap-2">
                     <select
                       value={turmaEdicao[p.id] ?? p.turma ?? ""}
@@ -4406,7 +4442,8 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
                     </button>
                   </div>
                 </li>
-              ))}
+                );
+              })}
           </ul>
         )}
       </div>
@@ -4486,11 +4523,13 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
               style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
             />
             <button
-              type="submit"
-              className="px-4 py-2 rounded-xl text-sm font-semibold shrink-0 w-full sm:w-auto"
+              type="button"
+              onClick={promoverDireto}
+              disabled={promovendo}
+              className="px-4 py-2 rounded-xl text-sm font-semibold shrink-0 w-full sm:w-auto disabled:opacity-60"
               style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}
             >
-              Tornar admin
+              {promovendo ? "Tornando admin..." : "Tornar admin"}
             </button>
           </form>
         </div>
