@@ -1862,24 +1862,143 @@ function MatchCard({ match, teamsById }) {
   );
 }
 
-function Chaveamento({ matches, teams }) {
-  const teamsById = useMemo(() => Object.fromEntries(teams.map((t) => [t.id, t])), [teams]);
-  const rounds = useMemo(() => {
-    const byPhase = {};
-    matches.forEach((m) => {
-      const key = m.fase || "Fase";
-      byPhase[key] = byPhase[key] || [];
-      byPhase[key].push(m);
-    });
-    return byPhase;
-  }, [matches]);
+// Card de jogo que qualquer um pode clicar pra ver elenco de cada time e
+// os eventos (gols/assistências/cartões) já registrados. Só quem está
+// logado como admin vê os controles pra editar — pros demais é só
+// leitura, mas já mostra tudo em tempo real.
+function MatchCardExpansivel({ match, teams, sessao, saveMatches, matches }) {
+  const [expanded, setExpanded] = useState(false);
+  const isAdmin = sessao && sessao.tipo === "admin";
+  const timeA = teams.find((t) => t.id === match.timeA);
+  const timeB = teams.find((t) => t.id === match.timeB);
+  const nomeA = timeA?.nome || match.timeA || "A definir";
+  const nomeB = timeB?.nome || match.timeB || "A definir";
+  const escudoA = (timeA && timeA.escudoUrl) || ESCUDOS_TIMES[nomeA];
+  const escudoB = (timeB && timeB.escudoUrl) || ESCUDOS_TIMES[nomeB];
+  const played = match.golsA !== "" && match.golsB !== "" && match.golsA != null && match.golsB != null;
+
+  if (isAdmin && saveMatches) {
+    const onUpdate = async (updated) => {
+      const atualizado = matches.map((m) => (m.id === updated.id ? updated : m));
+      await saveMatches(gerarMataMataAutomatico(atualizado, teams));
+    };
+    return (
+      <div className="w-72 shrink-0">
+        <MatchAdminRow match={match} teams={teams} onUpdate={onUpdate} />
+      </div>
+    );
+  }
+
+  const rotuloEvento = (tipo) =>
+    ({ gol: "⚽ Gol", assistencia: "🅰️ Assistência", cartao_amarelo: "🟨 Amarelo", cartao_vermelho: "🟥 Vermelho" }[tipo] || tipo);
+
+  return (
+    <div
+      className="rounded-xl overflow-hidden w-72 shrink-0"
+      style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
+    >
+      <button type="button" onClick={() => setExpanded((v) => !v)} className="w-full text-left px-4 py-3">
+        <div
+          className="text-[10px] uppercase tracking-widest mb-2 font-semibold flex items-center justify-between"
+          style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}
+        >
+          <span>{match.fase || "Fase"}</span>
+          {match.status && match.status !== "agendado" ? (
+            <MatchClock match={match} />
+          ) : (
+            match.horario && (
+              <span style={{ fontFamily: "'JetBrains Mono', monospace", color: COLORS.slate }}>
+                {formatarHorarioJogo(match.horario)}
+              </span>
+            )
+          )}
+        </div>
+        {[
+          ["A", nomeA, match.golsA, escudoA],
+          ["B", nomeB, match.golsB, escudoB],
+        ].map(([k, nome, gols, escudo]) => (
+          <div key={k} className="flex items-center justify-between py-0.5 gap-2">
+            <span className="flex items-center gap-1.5 min-w-0">
+              {escudo && <img src={escudo} alt="" className="w-5 h-5 object-contain shrink-0" />}
+              <span className="text-sm truncate" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+                {nome}
+              </span>
+            </span>
+            <span
+              className="text-sm font-bold w-6 text-right shrink-0"
+              style={{ fontFamily: "'JetBrains Mono', monospace", color: played ? COLORS.ink : COLORS.border }}
+            >
+              {played ? gols : "—"}
+            </span>
+          </div>
+        ))}
+      </button>
+
+      {expanded && (
+        <div className="px-4 pb-3 pt-1 border-t" style={{ borderColor: COLORS.border }}>
+          {(match.eventos || []).length > 0 && (
+            <div className="mb-3">
+              <div className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                Eventos
+              </div>
+              <ul className="space-y-0.5">
+                {match.eventos.map((ev) => (
+                  <li key={ev.id} className="text-xs" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+                    {rotuloEvento(ev.tipo)} — {ev.jogador}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              [nomeA, timeA],
+              [nomeB, timeB],
+            ].map(([nome, time]) => (
+              <div key={nome}>
+                <div className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                  {nome}
+                </div>
+                <ul className="space-y-0.5">
+                  {(time?.jogadores || []).map((j) => (
+                    <li key={j.id} className="text-xs truncate" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+                      {j.numero ? `${j.numero} · ` : ""}
+                      {j.apelido || j.nome}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Chaveamento({ matches, teams, sessao, saveMatches }) {
   const faseRank = (f) => {
     if (f.startsWith("Grupo")) return 0;
     const ordem = ["Oitavas", "Quartas", "Semifinal", "3º Lugar", "Final"];
     const i = ordem.indexOf(f);
     return i === -1 ? 99 : i + 1;
   };
-  const orderedKeys = Object.keys(rounds).sort((a, b) => faseRank(a) - faseRank(b) || a.localeCompare(b));
+
+  const gruposDeGrupo = useMemo(() => {
+    const nomes = new Set();
+    matches.forEach((m) => {
+      if ((m.fase || "").startsWith("Grupo")) nomes.add(m.fase);
+    });
+    return Array.from(nomes).sort();
+  }, [matches]);
+
+  const fasesEliminatorias = useMemo(() => {
+    const nomes = new Set();
+    matches.forEach((m) => {
+      if (!(m.fase || "").startsWith("Grupo")) nomes.add(m.fase);
+    });
+    return Array.from(nomes).sort((a, b) => faseRank(a) - faseRank(b));
+  }, [matches]);
 
   return (
     <div>
@@ -1895,27 +2014,65 @@ function Chaveamento({ matches, teams }) {
       </a>
       {matches.length === 0 ? (
         <EmptyState>
-          Nenhum jogo cadastrado ainda. A organização pode lançar os confrontos na aba
-          Organização.
+          Nenhum jogo cadastrado ainda. A organização pode gerar a tabela na aba Sorteio.
         </EmptyState>
       ) : (
-        <div className="space-y-8 overflow-x-auto pb-2">
-          {orderedKeys.map((key) => (
-            <div key={key}>
-              <div
-                className="text-sm font-semibold mb-3"
-                style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}
-              >
-                {key}
+        <>
+          {gruposDeGrupo.length > 0 && (
+            <div className="mb-10">
+              <div className="text-xs font-semibold uppercase tracking-wide mb-4" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
+                Fase de grupos
               </div>
-              <div className="flex gap-4">
-                {rounds[key].map((m) => (
-                  <MatchCard key={m.id} match={m} teamsById={teamsById} />
-                ))}
-              </div>
+              {gruposDeGrupo.map((fase) => {
+                const jogosDoGrupo = matches.filter((m) => m.fase === fase);
+                const rodadas = Array.from(new Set(jogosDoGrupo.map((m) => m.rodada || 1))).sort((a, b) => a - b);
+                return (
+                  <div key={fase} className="mb-8">
+                    <div className="text-sm font-semibold mb-3" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>
+                      {fase}
+                    </div>
+                    {rodadas.map((r) => (
+                      <div key={r} className="mb-4">
+                        <div className="text-xs font-medium mb-2" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                          Rodada {r}
+                        </div>
+                        <div className="flex gap-4 overflow-x-auto pb-2">
+                          {jogosDoGrupo
+                            .filter((m) => (m.rodada || 1) === r)
+                            .map((m) => (
+                              <MatchCardExpansivel key={m.id} match={m} teams={teams} sessao={sessao} saveMatches={saveMatches} matches={matches} />
+                            ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
             </div>
-          ))}
-        </div>
+          )}
+
+          {fasesEliminatorias.length > 0 && (
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide mb-4" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
+                Fase eliminatória
+              </div>
+              {fasesEliminatorias.map((fase) => (
+                <div key={fase} className="mb-8">
+                  <div className="text-sm font-semibold mb-3" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>
+                    {fase}
+                  </div>
+                  <div className="flex gap-4 overflow-x-auto pb-2">
+                    {matches
+                      .filter((m) => m.fase === fase)
+                      .map((m) => (
+                        <MatchCardExpansivel key={m.id} match={m} teams={teams} sessao={sessao} saveMatches={saveMatches} matches={matches} />
+                      ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -1949,40 +2106,43 @@ function TabelaClassificacao({ titulo, linhas, destaqueTop }) {
             </tr>
           </thead>
           <tbody>
-            {linhas.map((t, idx) => (
-              <tr
-                key={t.id || t.nome}
-                style={{
-                  backgroundColor: idx % 2 === 0 ? COLORS.card : COLORS.zebra,
-                  borderLeft: destaqueTop && idx < destaqueTop ? `3px solid ${COLORS.accent}` : "3px solid transparent",
-                }}
-              >
-                <td className="px-3 py-2.5 font-medium" style={{ color: COLORS.ink }}>
-                  <span className="flex items-center gap-2">
-                    <span className="text-xs" style={{ color: COLORS.slate, fontFamily: "'JetBrains Mono', monospace" }}>
-                      {idx + 1}
+            {linhas.map((t, idx) => {
+              const classificado = destaqueTop && idx < destaqueTop;
+              return (
+                <tr
+                  key={t.id || t.nome}
+                  style={{
+                    backgroundColor: classificado ? "rgba(22,163,74,0.18)" : idx % 2 === 0 ? COLORS.card : COLORS.zebra,
+                    borderLeft: classificado ? "3px solid #16A34A" : "3px solid transparent",
+                  }}
+                >
+                  <td className="px-3 py-2.5 font-medium" style={{ color: COLORS.ink }}>
+                    <span className="flex items-center gap-2">
+                      <span className="text-xs" style={{ color: COLORS.slate, fontFamily: "'JetBrains Mono', monospace" }}>
+                        {idx + 1}
+                      </span>
+                      {ESCUDOS_TIMES[t.nome] && (
+                        <img src={ESCUDOS_TIMES[t.nome]} alt="" className="w-5 h-5 object-contain shrink-0" />
+                      )}
+                      {t.nome}
                     </span>
-                    {ESCUDOS_TIMES[t.nome] && (
-                      <img src={ESCUDOS_TIMES[t.nome]} alt="" className="w-5 h-5 object-contain shrink-0" />
-                    )}
-                    {t.nome}
-                  </span>
-                </td>
-                {[t.j, t.v, t.e, t.d, t.gp, t.gc, t.gp - t.gc, t.pts].map((v, i) => (
-                  <td
-                    key={i}
-                    className="px-3 py-2.5 text-center"
-                    style={{
-                      fontFamily: "'JetBrains Mono', monospace",
-                      color: i === 7 ? COLORS.accent : COLORS.ink,
-                      fontWeight: i === 7 ? 700 : 500,
-                    }}
-                  >
-                    {v}
                   </td>
-                ))}
-              </tr>
-            ))}
+                  {[t.j, t.v, t.e, t.d, t.gp, t.gc, t.gp - t.gc, t.pts].map((v, i) => (
+                    <td
+                      key={i}
+                      className="px-3 py-2.5 text-center"
+                      style={{
+                        fontFamily: "'JetBrains Mono', monospace",
+                        color: i === 7 ? COLORS.accent : COLORS.ink,
+                        fontWeight: i === 7 ? 700 : 500,
+                      }}
+                    >
+                      {v}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -2001,7 +2161,23 @@ function Classificacao({ matches, teams }) {
     return Array.from(nomes).sort();
   }, [matches]);
 
+  const fasesEliminatorias = useMemo(() => {
+    const nomes = new Set();
+    matches.forEach((m) => {
+      if (!(m.fase || "").startsWith("Grupo")) nomes.add(m.fase);
+    });
+    const ordem = ["Oitavas", "Quartas", "Semifinal", "3º Lugar", "Final"];
+    return Array.from(nomes).sort((a, b) => {
+      const ia = ordem.indexOf(a);
+      const ib = ordem.indexOf(b);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    });
+  }, [matches]);
+
   const temGrupos = gruposNomes.length > 0;
+  const [modo, setModo] = useState("grupos"); // "grupos" | "geral"
+
+  const teamName = (id) => teams.find((t) => t.id === id)?.nome || "?";
 
   return (
     <div>
@@ -2012,21 +2188,74 @@ function Classificacao({ matches, teams }) {
         <TabelaClassificacao linhas={geral} />
       ) : (
         <>
-          <p className="text-sm mb-4 max-w-xl" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-            Atualiza sozinha conforme os jogos acontecem. Os 8 primeiros da geral (destacados)
-            avançam pro mata-mata automaticamente.
-          </p>
-          <TabelaClassificacao titulo="Classificação geral" linhas={geral} destaqueTop={8} />
-          {gruposNomes.map((fase) => (
-            <TabelaClassificacao
-              key={fase}
-              titulo={fase}
-              linhas={pontosPartida(matches.filter((m) => m.fase === fase), teams).filter((t) =>
-                matches.some((m) => m.fase === fase && (m.timeA === t.id || m.timeB === t.id))
-              )}
-            />
-          ))}
+          <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+            <p className="text-sm max-w-xl" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+              Atualiza sozinha conforme os jogos acontecem. Os classificados (em verde) avançam
+              pro mata-mata automaticamente.
+            </p>
+            <button
+              type="button"
+              onClick={() => setModo(modo === "grupos" ? "geral" : "grupos")}
+              className="px-4 py-2 rounded-xl text-xs font-semibold shrink-0"
+              style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}
+            >
+              {modo === "grupos" ? "Ver classificação geral" : "Ver por grupos"}
+            </button>
+          </div>
+
+          {modo === "geral" ? (
+            <TabelaClassificacao titulo="Classificação geral" linhas={geral} destaqueTop={8} />
+          ) : (
+            gruposNomes.map((fase) => (
+              <TabelaClassificacao
+                key={fase}
+                titulo={fase}
+                destaqueTop={2}
+                linhas={pontosPartida(matches.filter((m) => m.fase === fase), teams).filter((t) =>
+                  matches.some((m) => m.fase === fase && (m.timeA === t.id || m.timeB === t.id))
+                )}
+              />
+            ))
+          )}
         </>
+      )}
+
+      {fasesEliminatorias.length > 0 && (
+        <div className="mt-4">
+          <SectionLabel eyebrow="Segunda fase" title="Eliminatórias" />
+          {fasesEliminatorias.map((fase) => (
+            <div key={fase} className="mb-6">
+              <h3 className="text-sm font-bold mb-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+                {fase}
+              </h3>
+              <div className="grid sm:grid-cols-2 gap-2">
+                {matches
+                  .filter((m) => m.fase === fase)
+                  .map((m) => {
+                    const decidido = jogoDecidido(m);
+                    const vencedorId = decidido ? vencedorJogo(m) : null;
+                    return (
+                      <div
+                        key={m.id}
+                        className="rounded-xl px-4 py-2.5 flex items-center justify-between gap-2 text-sm"
+                        style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+                      >
+                        <span style={{ color: vencedorId === m.timeA ? "#16A34A" : COLORS.ink, fontWeight: vencedorId === m.timeA ? 700 : 500 }}>
+                          {teamName(m.timeA)}
+                        </span>
+                        <span style={{ color: COLORS.slate, fontFamily: "'JetBrains Mono', monospace" }}>
+                          {m.golsA ?? "–"} x {m.golsB ?? "–"}
+                        </span>
+                        <span style={{ color: vencedorId === m.timeB ? "#16A34A" : COLORS.ink, fontWeight: vencedorId === m.timeB ? 700 : 500 }}>
+                          {teamName(m.timeB)}
+                        </span>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -2547,26 +2776,28 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
   return (
     <div className="rounded-lg overflow-hidden" style={{ backgroundColor: COLORS.zebra }}>
       <div className="flex items-center gap-2 text-sm px-3 py-2">
-        <div className="flex flex-col shrink-0 -my-1">
-          <button
-            type="button"
-            onClick={() => onMover(-1)}
-            disabled={!podeSubir}
-            aria-label="Mover pra cima"
-            className="disabled:opacity-20"
-          >
-            <ChevronUp size={14} color={COLORS.slate} />
-          </button>
-          <button
-            type="button"
-            onClick={() => onMover(1)}
-            disabled={!podeDescer}
-            aria-label="Mover pra baixo"
-            className="disabled:opacity-20"
-          >
-            <ChevronDown size={14} color={COLORS.slate} />
-          </button>
-        </div>
+        {onMover && (
+          <div className="flex flex-col shrink-0 -my-1">
+            <button
+              type="button"
+              onClick={() => onMover(-1)}
+              disabled={!podeSubir}
+              aria-label="Mover pra cima"
+              className="disabled:opacity-20"
+            >
+              <ChevronUp size={14} color={COLORS.slate} />
+            </button>
+            <button
+              type="button"
+              onClick={() => onMover(1)}
+              disabled={!podeDescer}
+              aria-label="Mover pra baixo"
+              className="disabled:opacity-20"
+            >
+              <ChevronDown size={14} color={COLORS.slate} />
+            </button>
+          </div>
+        )}
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
@@ -2595,9 +2826,11 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
           className="w-11 px-1 py-1 rounded text-center text-sm"
           style={{ border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'JetBrains Mono', monospace" }}
         />
-        <button onClick={onRemove} aria-label="Remover jogo">
-          <X size={15} color={COLORS.accent} />
-        </button>
+        {onRemove && (
+          <button onClick={onRemove} aria-label="Remover jogo">
+            <X size={15} color={COLORS.accent} />
+          </button>
+        )}
       </div>
 
       {expanded && (
@@ -3556,16 +3789,42 @@ function sortearGrupos(potes, numGrupos) {
 
 // Gera a tabela de jogos (todos-contra-todos dentro de cada grupo) a
 // partir do resultado do sorteio.
+// Método do círculo — divide os confrontos de um grupo em rodadas de
+// verdade: rodada 1 é todo mundo jogando uma vez, e assim por diante até
+// todos terem se enfrentado. Se o grupo tiver número ímpar de times, um
+// fica de folga (bye) em cada rodada.
+function gerarRodadasGrupo(times) {
+  const lista = [...times];
+  if (lista.length % 2 !== 0) lista.push(null); // bye
+  const n = lista.length;
+  if (n < 2) return [];
+  const rodadas = [];
+  const copia = [...lista];
+  for (let r = 0; r < n - 1; r++) {
+    const confrontos = [];
+    for (let i = 0; i < n / 2; i++) {
+      const a = copia[i];
+      const b = copia[n - 1 - i];
+      if (a && b) confrontos.push([a, b]);
+    }
+    rodadas.push(confrontos);
+    copia.splice(1, 0, copia.pop());
+  }
+  return rodadas;
+}
+
 function gerarJogosDosGrupos(grupos) {
   const jogos = [];
   Object.entries(grupos).forEach(([nomeGrupo, times]) => {
-    for (let i = 0; i < times.length; i++) {
-      for (let j = i + 1; j < times.length; j++) {
+    const rodadas = gerarRodadasGrupo(times);
+    rodadas.forEach((confrontos, idxRodada) => {
+      confrontos.forEach(([timeA, timeB], idxJogo) => {
         jogos.push({
-          id: `jogo_${Date.now()}_${nomeGrupo}_${i}_${j}_${Math.random().toString(36).slice(2, 6)}`,
+          id: `jogo_${Date.now()}_${nomeGrupo}_${idxRodada}_${idxJogo}_${Math.random().toString(36).slice(2, 6)}`,
           fase: `Grupo ${nomeGrupo}`,
-          timeA: times[i].id,
-          timeB: times[j].id,
+          rodada: idxRodada + 1,
+          timeA: timeA.id,
+          timeB: timeB.id,
           golsA: null,
           golsB: null,
           status: "agendado",
@@ -3575,8 +3834,8 @@ function gerarJogosDosGrupos(grupos) {
           eventos: [],
           horario: null,
         });
-      }
-    }
+      });
+    });
   });
   return jogos;
 }
@@ -3740,9 +3999,34 @@ function gerarMataMataAutomatico(matches, teams) {
 }
 
 function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao }) {
-  const souAdmin = sessao && sessao.tipo === "admin";
+  const souSuperAdmin = sessao && sessao.tipo === "admin" && sessao.superAdmin;
   const [numGrupos, setNumGrupos] = useState(() => sugerirNumGrupos(teams.length));
-  const potes = useMemo(() => montarPotes(teams, numGrupos), [teams, numGrupos]);
+  const potesSugeridos = useMemo(() => montarPotes(teams, numGrupos), [teams, numGrupos]);
+  const [numPotes, setNumPotes] = useState(() => potesSugeridos.length || 5);
+  const [atribuicoes, setAtribuicoes] = useState({}); // teamId -> índice do pote (0-based)
+
+  // Toda vez que o número de grupos mudar (ou times mudarem), recomeça a
+  // sugestão automática — o super admin pode ajustar time por time depois.
+  useEffect(() => {
+    const mapa = {};
+    potesSugeridos.forEach((pote, i) => pote.forEach((t) => (mapa[t.id] = i)));
+    setAtribuicoes(mapa);
+    setNumPotes(potesSugeridos.length || 5);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [numGrupos, teams.length]);
+
+  const potes = useMemo(() => {
+    const lista = Array.from({ length: numPotes }, () => []);
+    teams.forEach((t) => {
+      const idx = atribuicoes[t.id] ?? 0;
+      if (lista[idx]) lista[idx].push(t);
+    });
+    return lista;
+  }, [teams, atribuicoes, numPotes]);
+
+  const moverTimeDePote = (teamId, novoPote) => {
+    setAtribuicoes((atual) => ({ ...atual, [teamId]: novoPote }));
+  };
 
   const realizarSorteio = async () => {
     const grupos = sortearGrupos(potes, numGrupos);
@@ -3768,27 +4052,43 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao }) 
     <div>
       <SectionLabel eyebrow="Art. 13 do regulamento" title="Sorteio dos grupos" />
       <p className="text-sm mb-4 max-w-xl" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-        Os potes seguem a classificação final da última edição (do 1º ao 15º) — cada pote traz um
-        time pra cada grupo. Times que nunca disputaram antes ficam no último pote. O campeão sai
-        sempre como cabeça de chave do Grupo A.
+        Os potes já vêm sugeridos pela classificação da última edição, mas o super admin pode
+        ajustar time por time, quantos grupos e quantos potes fizer sentido. Só o super admin
+        edita — o resto só acompanha.
       </p>
 
-      {souAdmin && (
-        <div className="flex items-center gap-3 mb-6">
-          <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-            Número de grupos (times de 4)
-          </label>
-          <input
-            type="number"
-            min={1}
-            max={10}
-            value={numGrupos}
-            onChange={(e) => setNumGrupos(Math.max(1, Number(e.target.value) || 1))}
-            className="w-16 px-2 py-1.5 rounded-lg text-sm text-center"
-            style={{ border: `1.5px solid ${COLORS.border}`, fontFamily: "'JetBrains Mono', monospace" }}
-          />
+      {souSuperAdmin && (
+        <div className="flex flex-wrap items-center gap-4 mb-6">
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+              Grupos
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={10}
+              value={numGrupos}
+              onChange={(e) => setNumGrupos(Math.max(1, Number(e.target.value) || 1))}
+              className="w-16 px-2 py-1.5 rounded-lg text-sm text-center"
+              style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1.5px solid ${COLORS.border}`, fontFamily: "'JetBrains Mono', monospace" }}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+              Potes
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={10}
+              value={numPotes}
+              onChange={(e) => setNumPotes(Math.max(1, Number(e.target.value) || 1))}
+              className="w-16 px-2 py-1.5 rounded-lg text-sm text-center"
+              style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1.5px solid ${COLORS.border}`, fontFamily: "'JetBrains Mono', monospace" }}
+            />
+          </div>
           <span className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-            {teams.length} times inscritos — sugestão automática: {sugerirNumGrupos(teams.length)} grupos
+            {teams.length} times inscritos
           </span>
         </div>
       )}
@@ -3804,11 +4104,25 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao }) 
                 Vazio
               </div>
             ) : (
-              <ul className="space-y-1">
+              <ul className="space-y-1.5">
                 {pote.map((t) => (
                   <li key={t.id} className="flex items-center gap-1.5 text-xs" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
                     {ESCUDOS_TIMES[t.nome] && <img src={ESCUDOS_TIMES[t.nome]} alt="" className="w-4 h-4 object-contain shrink-0" />}
-                    <span className="truncate">{t.nome}</span>
+                    <span className="truncate flex-1">{t.nome}</span>
+                    {souSuperAdmin && (
+                      <select
+                        value={i}
+                        onChange={(e) => moverTimeDePote(t.id, Number(e.target.value))}
+                        className="text-[10px] px-1 py-0.5 rounded shrink-0"
+                        style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, border: `1px solid ${COLORS.border}` }}
+                      >
+                        {Array.from({ length: numPotes }, (_, p) => (
+                          <option key={p} value={p}>
+                            {p + 1}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -3817,7 +4131,7 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao }) 
         ))}
       </div>
 
-      {souAdmin && (
+      {souSuperAdmin && (
         <button
           type="button"
           onClick={realizarSorteio}
@@ -3850,7 +4164,7 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao }) 
             ))}
           </div>
 
-          {souAdmin && (
+          {souSuperAdmin && (
             <button
               type="button"
               onClick={gerarTabela}
@@ -5136,7 +5450,9 @@ export default function App() {
             {tab === "sorteio" && (
               <Sorteio teams={teams} sorteio={sorteio} saveSorteio={saveSorteio} matches={matches} saveMatches={saveMatches} sessao={sessao} />
             )}
-            {tab === "chaveamento" && <Chaveamento matches={matches} teams={teams} />}
+            {tab === "chaveamento" && (
+              <Chaveamento matches={matches} teams={teams} sessao={sessao} saveMatches={saveMatches} />
+            )}
             {tab === "classificacao" && <Classificacao matches={matches} teams={teams} />}
             {tab === "comunidade" && <Comunidade posts={posts} savePosts={savePosts} />}
             {tab === "galeria" && <Galeria />}
