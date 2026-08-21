@@ -4109,6 +4109,73 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
 
   const [emailNovoAdmin, setEmailNovoAdmin] = useState("");
   const [promovendo, setPromovendo] = useState(false);
+
+  const [criandoTeste, setCriandoTeste] = useState(false);
+  const temDadosTeste = teams.some((t) => t.teste) || matches.some((m) => m.teste);
+
+  const criarAmbienteTeste = async () => {
+    if (
+      !confirm(
+        'Isso cria 8 times fictícios, sorteia grupos e gera a tabela de jogos — tudo marcado como TESTE, visível pra quem estiver no app agora. Depois é só clicar em "Revogar teste" pra limpar. Continuar?'
+      )
+    )
+      return;
+    setCriandoTeste(true);
+    try {
+      const agora = Date.now();
+      const timesTeste = Array.from({ length: 8 }, (_, i) => {
+        const n = i + 1;
+        const jogadores = Array.from({ length: 8 }, (_, j) => ({
+          id: `jteste_${agora}_${n}_${j}`,
+          numero: String(j + 1),
+          apelido: `Jog. ${j + 1}`,
+          nome: `Jogador Teste ${n}-${j + 1}`,
+          periodo: "",
+          anoConclusao: "",
+          cpf: "",
+          nascimento: "",
+          posicao: "",
+        }));
+        return {
+          id: `time_teste_${agora}_${n}`,
+          nome: `Teste ${n}`,
+          capitao: `Capitão Teste ${n}`,
+          contato: "(00) 00000-0000",
+          jogadores,
+          escudoUrl: "",
+          codigo: gerarCodigoTime(),
+          inscritoEm: new Date().toISOString(),
+          teste: true,
+        };
+      });
+
+      const numGruposTeste = sugerirNumGrupos(timesTeste.length);
+      const potesTeste = montarPotes(timesTeste, numGruposTeste);
+      const gruposTeste = sortearGrupos(potesTeste, numGruposTeste);
+      const jogosTesteBrutos = gerarJogosDosGrupos(gruposTeste);
+      const jogosTeste = jogosTesteBrutos.map((m, i) => ({
+        ...m,
+        teste: true,
+        horario: new Date(agora + i * 5 * 60000).toISOString(),
+      }));
+
+      await saveTeams([...teams, ...timesTeste]);
+      await saveMatches([...matches, ...jogosTeste]);
+      alert("Ambiente de teste criado: 8 times, grupos sorteados e tabela de jogos pronta.");
+    } catch (e) {
+      console.error("Falha ao criar ambiente de teste", e);
+      alert("Deu erro ao criar o ambiente de teste: " + e.message);
+    } finally {
+      setCriandoTeste(false);
+    }
+  };
+
+  const revogarTeste = async () => {
+    if (!confirm("Isso remove TODOS os times e jogos marcados como teste (não mexe em nada real). Continuar?")) return;
+    await saveTeams(teams.filter((t) => !t.teste));
+    await saveMatches(matches.filter((m) => !m.teste));
+  };
+
   const promoverDireto = async (e) => {
     e.preventDefault();
     const alvo = perfis.find((p) => (p.email || "").trim().toLowerCase() === emailNovoAdmin.trim().toLowerCase());
@@ -4310,6 +4377,42 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
         <SectionLabel eyebrow="Painel" title="Organização" />
         <div className="flex items-center gap-1.5 text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
           <Unlock size={14} /> {sessao.superAdmin ? "super admin" : "admin"}
+        </div>
+      </div>
+
+      <div
+        className="rounded-2xl p-5 mb-8"
+        style={{ backgroundColor: "#3A1E00", border: `1.5px dashed ${COLORS.gold}` }}
+      >
+        <h3 className="font-semibold mb-1 flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.gold }}>
+          <AlertTriangle size={16} color={COLORS.gold} /> Ambiente de teste
+        </h3>
+        <p className="text-xs mb-3" style={{ color: COLORS.ice, fontFamily: "'Inter', sans-serif" }}>
+          Cria 8 times fictícios já com jogadores, sorteio de grupos e tabela de jogos completa
+          — tudo marcado como TESTE, num clique só. Aparece pra quem estiver no app na hora
+          (é o banco de verdade), então revoga quando terminar.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={criarAmbienteTeste}
+            disabled={criandoTeste}
+            className="px-4 py-2 rounded-xl text-sm font-semibold inline-flex items-center gap-1.5 disabled:opacity-60"
+            style={{ backgroundColor: COLORS.gold, color: "#3A1E00", fontFamily: "'Inter', sans-serif" }}
+          >
+            {criandoTeste && <Loader2 size={14} className="animate-spin" />}
+            Criar ambiente de teste completo
+          </button>
+          {temDadosTeste && (
+            <button
+              type="button"
+              onClick={revogarTeste}
+              className="px-4 py-2 rounded-xl text-sm font-semibold"
+              style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+            >
+              Revogar teste
+            </button>
+          )}
         </div>
       </div>
 
