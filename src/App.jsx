@@ -4084,7 +4084,7 @@ function gerarMataMataAutomatico(matches, teams) {
 
 function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao }) {
   const souSuperAdmin = sessao && sessao.tipo === "admin" && sessao.superAdmin;
-  const [numGrupos, setNumGrupos] = useState(() => sugerirNumGrupos(teams.length));
+  const [numGrupos, setNumGrupos] = useState(4);
   const potesSugeridos = useMemo(() => montarPotes(teams, numGrupos), [teams, numGrupos]);
   const [atribuicoes, setAtribuicoes] = useState({}); // teamId -> índice do pote (0-based)
 
