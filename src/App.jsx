@@ -450,8 +450,27 @@ const HALL_DA_FAMA = {
 // Data e prazo desta edição — atualizar quando a organização confirmar.
 const DATA_EVENTO = "6, 7 e 8 de novembro";
 const PRAZO_INSCRICAO = "aberta agora até 30 de setembro";
-const VALOR_INSCRICAO_ATLETA = "R$ 110,00 por atleta";
-const VALOR_INSCRICAO_ATLETA_NUM = 110;
+const VALOR_INSCRICAO_ATLETA = "R$ 110,00 a R$ 140,00 por atleta, conforme o lote";
+// Lotes de inscrição — o valor por atleta aumenta conforme a data em que
+// o time se inscreve (Art. 8º, Parágrafo 1º do regulamento).
+const LOTES_INSCRICAO = [
+  { nome: "Lote 1", inicio: new Date(2026, 8, 1, 0, 0, 0), fim: new Date(2026, 8, 10, 23, 59, 59), valor: 110 },
+  { nome: "Lote 2", inicio: new Date(2026, 8, 11, 0, 0, 0), fim: new Date(2026, 8, 20, 23, 59, 59), valor: 120 },
+  { nome: "Lote 3", inicio: new Date(2026, 8, 21, 0, 0, 0), fim: new Date(2026, 8, 30, 23, 59, 59), valor: 140 },
+];
+function valorPorAtletaNaData(data) {
+  const d = data ? new Date(data) : new Date();
+  const lote = LOTES_INSCRICAO.find((l) => d >= l.inicio && d <= l.fim);
+  if (lote) return lote.valor;
+  // fora do período de qualquer lote — usa o valor do lote mais caro como
+  // referência, pra nunca subestimar o que é devido
+  return LOTES_INSCRICAO[LOTES_INSCRICAO.length - 1].valor;
+}
+function loteNaData(data) {
+  const d = data ? new Date(data) : new Date();
+  const lote = LOTES_INSCRICAO.find((l) => d >= l.inicio && d <= l.fim);
+  return lote ? lote.nome : LOTES_INSCRICAO[LOTES_INSCRICAO.length - 1].nome;
+}
 function formatarReais(n) {
   return "R$ " + n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
@@ -501,7 +520,7 @@ const RANKING_ULTIMA_EDICAO = [
 
 // Regras de inscrição vindas do regulamento oficial (Capítulo III), usadas
 // pelo diagnosticador de irregularidades.
-const MIN_JOGADORES_TIME = 7;
+const MIN_JOGADORES_TIME = 6;
 const MAX_JOGADORES_TIME = 15;
 
 // Extrai o(s) ano(s) numéricos de uma turma/nome de time — ex: "2007/06"
@@ -521,7 +540,7 @@ const TURMAS_HISTORICAS_ORDENADAS = [...TURMAS_HISTORICAS].sort((a, b) => {
 });
 
 // Confere se o ano de conclusão do jogador é compatível com a turma do
-// time — Art. 6º/7º do regulamento (não pode misturar anos de conclusão
+// time — Art. 9º do regulamento (não pode misturar anos de conclusão
 // diferentes na mesma equipe, salvo exceção aprovada pela organização).
 function anoConclusaoRegular(anoConclusao, turmaTime) {
   if (!anoConclusao || !turmaTime) return null; // sem dado suficiente pra checar
@@ -602,16 +621,25 @@ function compressImageToBlob(file, maxSize = 1280, quality = 0.75) {
   });
 }
 
+// Duas funções isoladas pra ler/escrever no armazenamento — trocadas
+// pelas equivalentes do Supabase (readKey/writeKey) na hora de publicar
+// o site de verdade. Manter isso separado evita duplicar a lógica de
+// conversão em vários lugares do hook abaixo.
+async function storageGet(key) {
+  return await readKey(key);
+}
+async function storageSet(key, value) {
+  await writeKey(key, value);
+}
+
 function useSharedStorage(key, initialValue, pollMs) {
   const [value, setValue] = useState(initialValue);
   const [loading, setLoading] = useState(true);
 
   const fetchNow = useCallback(async () => {
     try {
-      const res = await window.storage.get(key, true);
-      if (res && res.value) {
-        setValue(JSON.parse(res.value));
-      }
+      const v = await storageGet(key);
+      if (v != null) setValue(v);
     } catch (e) {
       // chave ainda não existe — mantém valor atual
     }
@@ -637,16 +665,39 @@ function useSharedStorage(key, initialValue, pollMs) {
     return () => clearInterval(id);
   }, [pollMs, fetchNow]);
 
+  // Aceita um valor direto OU uma função (igual o setState do React). Com
+  // função, busca o valor mais atual do banco ANTES de aplicar a mudança
+  // — evita que uma tela desatualizada salve por cima e apague o que
+  // outra pessoa acabou de gravar (ex: dois representantes salvando o
+  // time deles quase ao mesmo tempo).
   const persist = useCallback(
-    async (newValue) => {
-      setValue(newValue);
+    async (novoValorOuFuncao) => {
+      if (typeof novoValorOuFuncao === "function") {
+        let base = value;
+        try {
+          const v = await storageGet(key);
+          if (v != null) base = v;
+        } catch (e) {
+          // chave ainda não existe — usa o que já tinha na tela mesmo
+        }
+        const novoValor = novoValorOuFuncao(base);
+        setValue(novoValor);
+        try {
+          await storageSet(key, novoValor);
+        } catch (e) {
+          console.error("Falha ao salvar", key, e);
+        }
+        return novoValor;
+      }
+      setValue(novoValorOuFuncao);
       try {
-        await window.storage.set(key, JSON.stringify(newValue), true);
+        await storageSet(key, novoValorOuFuncao);
       } catch (e) {
         console.error("Falha ao salvar", key, e);
       }
+      return novoValorOuFuncao;
     },
-    [key]
+    [key, value]
   );
 
   return [value, persist, loading];
@@ -771,6 +822,16 @@ function Home({ teams, matches, setTab, config, totalPessoas }) {
           <strong>Valor:</strong> {VALOR_INSCRICAO_ATLETA}
         </div>
       </div>
+
+      <a
+        href="regulamento.pdf"
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex items-center gap-1.5 text-xs mb-6"
+        style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}
+      >
+        <Download size={13} /> Baixar regulamento oficial (PDF)
+      </a>
 
       {config && config.linkTransmissao && (
         <a
@@ -939,7 +1000,7 @@ function PlayerRow({ player, onChange, onRemove, turmaTime, onSolicitarAvaliacao
           </div>
           {irregular ? (
             <div className="text-xs truncate font-medium" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
-              Ano de conclusão ({player.anoConclusao}) não bate com a turma {turmaTime} — Art. 6º/7º
+              Ano de conclusão ({player.anoConclusao}) não bate com a turma {turmaTime} — Art. 9º
             </div>
           ) : player.excecaoAprovada ? (
             <div className="text-xs truncate" style={{ color: "#16A34A", fontFamily: "'Inter', sans-serif" }}>
@@ -1166,7 +1227,7 @@ function RosterEditor({ team, onSave }) {
           style={{ backgroundColor: COLORS.accentSoft, color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}
         >
           <AlertTriangle size={14} />
-          Time precisa ter entre {MIN_JOGADORES_TIME} e {MAX_JOGADORES_TIME} jogadores (Art. 6º) — está com {jogadores.length}.
+          Time precisa ter entre {MIN_JOGADORES_TIME} e {MAX_JOGADORES_TIME} jogadores (Art. 9º) — está com {jogadores.length}.
         </div>
       )}
 
@@ -1475,17 +1536,21 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes }) {
       return;
     }
     setSaving(true);
-    if (timeExistente) {
-      const atualizado = {
-        ...timeExistente,
-        capitao: form.capitao.trim(),
-        contato: form.contato.trim(),
-        jogadores: form.jogadores,
-        escudoUrl: form.escudoUrl,
-      };
-      await saveTeams(teams.map((t) => (t.id === atualizado.id ? atualizado : t)));
-    } else {
-      const codigo = gerarCodigoTime();
+    let codigo = null;
+    await saveTeams((atuais) => {
+      const lista = atuais || [];
+      if (timeExistente) {
+        const existenteReal = lista.find((t) => t.nome === nomeTime) || timeExistente;
+        const atualizado = {
+          ...existenteReal,
+          capitao: form.capitao.trim(),
+          contato: form.contato.trim(),
+          jogadores: form.jogadores,
+          escudoUrl: form.escudoUrl,
+        };
+        return lista.map((t) => (t.id === atualizado.id ? atualizado : t));
+      }
+      codigo = gerarCodigoTime();
       const novoTime = {
         id: `time_${Date.now()}`,
         nome: nomeTime,
@@ -1496,9 +1561,9 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes }) {
         codigo,
         inscritoEm: new Date().toISOString(),
       };
-      await saveTeams([...teams, novoTime]);
-      setCodigoGerado(codigo);
-    }
+      return [...lista, novoTime];
+    });
+    if (codigo) setCodigoGerado(codigo);
     setSaving(false);
     setSent(true);
     setDirty(false);
@@ -1572,10 +1637,21 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes }) {
     <div>
       <SectionLabel eyebrow="Participe" title="Inscrição de time" />
       <div
-        className="text-sm px-4 py-2.5 rounded-xl mb-6 inline-block"
+        className="text-sm px-4 py-2.5 rounded-xl mb-3 inline-block"
         style={{ backgroundColor: COLORS.accentSoft, color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}
       >
         Valor da inscrição: <strong>{VALOR_INSCRICAO_ATLETA}</strong>
+      </div>
+      <div>
+        <a
+          href="regulamento.pdf"
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1.5 text-xs mb-6"
+          style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}
+        >
+          <Download size={13} /> Baixar regulamento oficial (PDF)
+        </a>
       </div>
 
       <div className="grid sm:grid-cols-5 gap-8">
@@ -2703,7 +2779,7 @@ const TIPOS_EVENTO = [
 ];
 
 // Regra padrão de suspensão — ajustável quando as regras oficiais chegarem:
-// 2 cartões amarelos = suspenso; 1 cartão vermelho = suspenso no próximo jogo.
+// 3 cartões amarelos = suspenso; 1 cartão vermelho = suspenso no próximo jogo (Art. 27).
 function calcularSuspensos(matches) {
   const tally = {};
   matches.forEach((m) => {
@@ -2718,7 +2794,7 @@ function calcularSuspensos(matches) {
   return Object.values(tally)
     .map((t) => {
       const motivos = [];
-      if (t.amarelos >= 2) motivos.push(`${t.amarelos} cartões amarelos`);
+      if (t.amarelos >= 3) motivos.push(`${t.amarelos} cartões amarelos`);
       if (t.vermelhos >= 1) motivos.push(`cartão vermelho`);
       return { ...t, motivos };
     })
@@ -3017,7 +3093,9 @@ function abrirImpressao(titulo, corpoHtml) {
 
 function fichaTimeHtml(team) {
   const jogadores = Array.isArray(team.jogadores) ? team.jogadores : [];
-  const total = jogadores.length * VALOR_INSCRICAO_ATLETA_NUM;
+  const valorUnitario = valorPorAtletaNaData(team.inscritoEm);
+  const lote = loteNaData(team.inscritoEm);
+  const total = jogadores.length * valorUnitario;
   return `
     <div class="secao">
       <h1>Seleção de ${escapeHtml(team.nome)}</h1>
@@ -3034,7 +3112,7 @@ function fichaTimeHtml(team) {
         </tbody>
       </table>
       <div class="meta" style="margin-top:16px; font-size:14px;">
-        <strong>Valor da inscrição:</strong> ${jogadores.length} atleta(s) × ${escapeHtml(VALOR_INSCRICAO_ATLETA)} = <strong>${escapeHtml(formatarReais(total))}</strong>
+        <strong>Valor da inscrição (${escapeHtml(lote)}):</strong> ${jogadores.length} atleta(s) × ${escapeHtml(formatarReais(valorUnitario))} = <strong>${escapeHtml(formatarReais(total))}</strong>
       </div>
     </div>`;
 }
@@ -3093,7 +3171,8 @@ function PlanilhaInscricoes({ teams }) {
     .sort((a, b) => new Date(a.inscritoEm || 0) - new Date(b.inscritoEm || 0))
     .map((t) => {
       const n = Array.isArray(t.jogadores) ? t.jogadores.length : 0;
-      return { ...t, nJogadores: n, valor: n * VALOR_INSCRICAO_ATLETA_NUM };
+      const valorUnitario = valorPorAtletaNaData(t.inscritoEm);
+      return { ...t, nJogadores: n, lote: loteNaData(t.inscritoEm), valorUnitario, valor: n * valorUnitario };
     });
   const totalGeral = linhas.reduce((acc, t) => acc + t.valor, 0);
 
@@ -3104,7 +3183,9 @@ function PlanilhaInscricoes({ teams }) {
           <td>${i + 1}</td>
           <td>${escapeHtml(t.nome)}</td>
           <td>${t.inscritoEm ? escapeHtml(new Date(t.inscritoEm).toLocaleString("pt-BR")) : "—"}</td>
+          <td>${escapeHtml(t.lote)}</td>
           <td>${t.nJogadores}</td>
+          <td>${escapeHtml(formatarReais(t.valorUnitario))}</td>
           <td>${escapeHtml(formatarReais(t.valor))}</td>
         </tr>`
       )
@@ -3112,9 +3193,9 @@ function PlanilhaInscricoes({ teams }) {
     const corpo = `
       <div class="secao">
         <h1>Planilha de inscrições</h1>
-        <div class="meta">${linhas.length} time(s) · ${escapeHtml(VALOR_INSCRICAO_ATLETA)}</div>
+        <div class="meta">${linhas.length} time(s) · valor por atleta conforme o lote (Art. 8º)</div>
         <table>
-          <thead><tr><th>#</th><th>Time</th><th>Data de inscrição</th><th>Jogadores</th><th>Valor</th></tr></thead>
+          <thead><tr><th>#</th><th>Time</th><th>Data de inscrição</th><th>Lote</th><th>Jogadores</th><th>Valor/atleta</th><th>Total</th></tr></thead>
           <tbody>${linhasHtml}</tbody>
         </table>
         <div class="meta" style="margin-top:16px; font-size:15px;">
@@ -3142,7 +3223,8 @@ function PlanilhaInscricoes({ teams }) {
         )}
       </div>
       <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-        Por ordem de inscrição · {VALOR_INSCRICAO_ATLETA}
+        Por ordem de inscrição · valor por atleta conforme o lote (Art. 8º):{" "}
+        {LOTES_INSCRICAO.map((l) => `${l.nome} ${formatarReais(l.valor)}`).join(" · ")}
       </p>
       {linhas.length === 0 ? (
         <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
@@ -3158,6 +3240,9 @@ function PlanilhaInscricoes({ teams }) {
                 </th>
                 <th className="text-left py-1.5 pr-3 text-xs uppercase tracking-wide" style={{ color: COLORS.slate }}>
                   Inscrito em
+                </th>
+                <th className="text-left py-1.5 pr-3 text-xs uppercase tracking-wide" style={{ color: COLORS.slate }}>
+                  Lote
                 </th>
                 <th className="text-center py-1.5 pr-3 text-xs uppercase tracking-wide" style={{ color: COLORS.slate }}>
                   Jogadores
@@ -3179,6 +3264,9 @@ function PlanilhaInscricoes({ teams }) {
                   <td className="py-2 pr-3 text-xs" style={{ color: COLORS.slate, fontFamily: "'JetBrains Mono', monospace" }}>
                     {t.inscritoEm ? new Date(t.inscritoEm).toLocaleDateString("pt-BR") : "—"}
                   </td>
+                  <td className="py-2 pr-3 text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                    {t.lote}
+                  </td>
                   <td className="py-2 pr-3 text-center" style={{ fontFamily: "'JetBrains Mono', monospace", color: COLORS.ink }}>
                     {t.nJogadores}
                   </td>
@@ -3190,7 +3278,7 @@ function PlanilhaInscricoes({ teams }) {
             </tbody>
             <tfoot>
               <tr style={{ borderTop: `2px solid ${COLORS.ink}` }}>
-                <td className="py-2 pr-3 font-semibold" style={{ color: COLORS.ink }} colSpan={3}>
+                <td className="py-2 pr-3 font-semibold" style={{ color: COLORS.ink }} colSpan={4}>
                   Total geral
                 </td>
                 <td className="py-2 text-right font-bold" style={{ fontFamily: "'JetBrains Mono', monospace", color: COLORS.ink }}>
@@ -3279,14 +3367,14 @@ function diagnosticarTime(team) {
   const problemas = [];
   const jogadores = Array.isArray(team.jogadores) ? team.jogadores : [];
   if (jogadores.length > 0 && jogadores.length < MIN_JOGADORES_TIME) {
-    problemas.push(`Só ${jogadores.length} jogador(es) — mínimo é ${MIN_JOGADORES_TIME} (Art. 6º).`);
+    problemas.push(`Só ${jogadores.length} jogador(es) — mínimo é ${MIN_JOGADORES_TIME} (Art. 9º).`);
   }
   if (jogadores.length > MAX_JOGADORES_TIME) {
-    problemas.push(`${jogadores.length} jogadores — máximo é ${MAX_JOGADORES_TIME} (Art. 6º).`);
+    problemas.push(`${jogadores.length} jogadores — máximo é ${MAX_JOGADORES_TIME} (Art. 9º).`);
   }
   jogadores.forEach((j) => {
     if (!j.excecaoAprovada && anoConclusaoRegular(j.anoConclusao, team.nome) === false) {
-      problemas.push(`${j.nome || "Jogador"}: ano de conclusão (${j.anoConclusao}) não bate com a turma ${team.nome} (Art. 6º/7º).`);
+      problemas.push(`${j.nome || "Jogador"}: ano de conclusão (${j.anoConclusao}) não bate com a turma ${team.nome} (Art. 9º).`);
     }
   });
   return problemas;
@@ -3334,7 +3422,7 @@ function GerenciarElencos({ teams, saveTeams }) {
   const time = teams.find((t) => t.id === timeId);
 
   const salvarTime = async (atualizado) => {
-    await saveTeams(teams.map((t) => (t.id === atualizado.id ? atualizado : t)));
+    await saveTeams((atuais) => (atuais || []).map((t) => (t.id === atualizado.id ? atualizado : t)));
   };
 
   return (
@@ -4430,7 +4518,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   const criarAmbienteTeste = async () => {
     if (
       !confirm(
-        'Isso cria 8 times fictícios, sorteia grupos e gera a tabela de jogos — tudo marcado como TESTE, visível pra quem estiver no app agora. Depois é só clicar em "Revogar teste" pra limpar. Continuar?'
+        'Isso cria 8 times fictícios (marcados como TESTE) — o resto do fluxo (Sorteio, gerar tabela, lançar placar) você faz igual seria numa competição de verdade. Continuar?'
       )
     )
       return;
@@ -4463,19 +4551,11 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
         };
       });
 
-      const numGruposTeste = sugerirNumGrupos(timesTeste.length);
-      const potesTeste = montarPotes(timesTeste, numGruposTeste);
-      const gruposTeste = sortearGrupos(potesTeste, numGruposTeste);
-      const jogosTesteBrutos = gerarJogosDosGrupos(gruposTeste);
-      const jogosTeste = jogosTesteBrutos.map((m, i) => ({
-        ...m,
-        teste: true,
-        horario: new Date(agora + i * 5 * 60000).toISOString(),
-      }));
-
-      await saveTeams([...teams, ...timesTeste]);
-      await saveMatches([...matches, ...jogosTeste]);
-      alert("Ambiente de teste criado: 8 times, grupos sorteados e tabela de jogos pronta.");
+      // Busca a lista de times DIRETO do banco (não confia no que já está
+      // carregado na tela) — evita salvar por cima uma lista desatualizada
+      // e apagar time de verdade sem querer.
+      await saveTeams((atuais) => [...(atuais || []), ...timesTeste]);
+      alert('8 times de teste criados. Agora segue o fluxo normal: vai em Sorteio, sorteia os grupos, gera a tabela, e depois lança os jogos na Organização.');
     } catch (e) {
       console.error("Falha ao criar ambiente de teste", e);
       alert("Deu erro ao criar o ambiente de teste: " + e.message);
@@ -4486,8 +4566,8 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
 
   const revogarTeste = async () => {
     if (!confirm("Isso remove TODOS os times e jogos marcados como teste (não mexe em nada real). Continuar?")) return;
-    await saveTeams(teams.filter((t) => !t.teste));
-    await saveMatches(matches.filter((m) => !m.teste));
+    await saveTeams((atuais) => (atuais || []).filter((t) => !t.teste));
+    await saveMatches((atuais) => (atuais || []).filter((m) => !m.teste));
   };
 
   const promoverDireto = async (e) => {
@@ -4520,6 +4600,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   };
 
   const [turmaEdicao, setTurmaEdicao] = useState({});
+  const [novoTimeModo, setNovoTimeModo] = useState({});
 
   const aprovarUsuario = async (p) => {
     const turmaEscolhida = (turmaEdicao[p.id] ?? p.turma ?? "").trim();
@@ -4540,26 +4621,29 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   };
 
   const aprovarExcecao = async (caso) => {
-    const time = teams.find((t) => t.nome === caso.timeNome);
-    if (time) {
-      const jogadoresAtualizados = (time.jogadores || []).map((j) =>
-        j.id === caso.jogadorId ? { ...j, excecaoAprovada: true, avaliacaoPendente: false } : j
-      );
-      await saveTeams(teams.map((t) => (t.id === time.id ? { ...t, jogadores: jogadoresAtualizados } : t)));
-    }
+    await saveTeams((atuais) =>
+      (atuais || []).map((t) => {
+        if (t.nome !== caso.timeNome) return t;
+        const jogadoresAtualizados = (t.jogadores || []).map((j) =>
+          j.id === caso.jogadorId ? { ...j, excecaoAprovada: true, avaliacaoPendente: false } : j
+        );
+        return { ...t, jogadores: jogadoresAtualizados };
+      })
+    );
     await saveAvaliacoes(avaliacoes.map((a) => (a.id === caso.id ? { ...a, status: "aprovada" } : a)));
   };
 
   const manterIrregularidade = async (caso) => {
-    const time = teams.find((t) => t.nome === caso.timeNome);
-    if (time) {
-      // Mantida a irregularidade = jogador sai do time. A quantidade de
-      // jogadores (e o valor da inscrição, calculado a partir dela) já
-      // atualiza sozinha em todo lugar, porque é sempre recalculada a
-      // partir do time.jogadores — não precisa mexer em mais nada.
-      const jogadoresAtualizados = (time.jogadores || []).filter((j) => j.id !== caso.jogadorId);
-      await saveTeams(teams.map((t) => (t.id === time.id ? { ...t, jogadores: jogadoresAtualizados } : t)));
-    }
+    // Mantida a irregularidade = jogador sai do time. A quantidade de
+    // jogadores (e o valor da inscrição, calculado a partir dela) já
+    // atualiza sozinha em todo lugar, porque é sempre recalculada a
+    // partir do time.jogadores — não precisa mexer em mais nada.
+    await saveTeams((atuais) =>
+      (atuais || []).map((t) => {
+        if (t.nome !== caso.timeNome) return t;
+        return { ...t, jogadores: (t.jogadores || []).filter((j) => j.id !== caso.jogadorId) };
+      })
+    );
     await saveAvaliacoes(avaliacoes.map((a) => (a.id === caso.id ? { ...a, status: "mantida" } : a)));
   };
 
@@ -4702,9 +4786,10 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
           <AlertTriangle size={16} color={COLORS.gold} /> Ambiente de teste
         </h3>
         <p className="text-xs mb-3" style={{ color: COLORS.ice, fontFamily: "'Inter', sans-serif" }}>
-          Cria 8 times fictícios já com jogadores, sorteio de grupos e tabela de jogos completa
-          — tudo marcado como TESTE, num clique só. Aparece pra quem estiver no app na hora
-          (é o banco de verdade), então revoga quando terminar.
+          Cria 8 times fictícios com jogadores, marcados como TESTE. Daí é só seguir o fluxo
+          normal, do começo: Sorteio → gerar tabela → lançar os jogos — igual seria de verdade.
+          Aparece pra quem estiver no app na hora (é o banco de verdade), então revoga quando
+          terminar.
         </p>
         <div className="flex flex-wrap gap-2">
           <button
@@ -4856,19 +4941,39 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
                       </div>
                     </div>
                   <div className="flex flex-wrap gap-2">
-                    <select
-                      value={turmaEdicao[p.id] ?? p.turma ?? ""}
-                      onChange={(e) => setTurmaEdicao({ ...turmaEdicao, [p.id]: e.target.value })}
-                      className="px-2 py-1.5 rounded-lg text-xs flex-1 min-w-[8rem]"
-                      style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
-                    >
-                      <option value="">Turma não definida</option>
-                      {TURMAS_HISTORICAS_ORDENADAS.map((t) => (
-                        <option key={t.turma} value={t.turma}>
-                          {t.turma}
-                        </option>
-                      ))}
-                    </select>
+                    {novoTimeModo[p.id] ? (
+                      <input
+                        type="text"
+                        autoFocus
+                        value={turmaEdicao[p.id] ?? ""}
+                        onChange={(e) => setTurmaEdicao({ ...turmaEdicao, [p.id]: e.target.value })}
+                        placeholder="Nome do novo time"
+                        className="px-2 py-1.5 rounded-lg text-xs flex-1 min-w-[8rem]"
+                        style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+                      />
+                    ) : (
+                      <select
+                        value={turmaEdicao[p.id] ?? p.turma ?? ""}
+                        onChange={(e) => {
+                          if (e.target.value === "__novo__") {
+                            setNovoTimeModo({ ...novoTimeModo, [p.id]: true });
+                            setTurmaEdicao({ ...turmaEdicao, [p.id]: "" });
+                          } else {
+                            setTurmaEdicao({ ...turmaEdicao, [p.id]: e.target.value });
+                          }
+                        }}
+                        className="px-2 py-1.5 rounded-lg text-xs flex-1 min-w-[8rem]"
+                        style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+                      >
+                        <option value="">Turma não definida</option>
+                        {TURMAS_HISTORICAS_ORDENADAS.map((t) => (
+                          <option key={t.turma} value={t.turma}>
+                            {t.turma}
+                          </option>
+                        ))}
+                        <option value="__novo__">Outra / novo time</option>
+                      </select>
+                    )}
                     <button
                       type="button"
                       onClick={() => aprovarUsuario(p)}
@@ -5169,7 +5274,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
               <Lock size={16} color={COLORS.accent} /> Suspensos
             </h3>
             <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-              Regra padrão: 2 cartões amarelos ou 1 vermelho = suspenso no próximo jogo.
+              3 cartões amarelos ou 1 vermelho = suspenso no próximo jogo (Art. 27).
               Ajusto isso quando você mandar as regras oficiais do campeonato.
             </p>
             <ul className="space-y-1.5">
