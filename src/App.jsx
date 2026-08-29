@@ -4605,19 +4605,34 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   const aprovarUsuario = async (p) => {
     const turmaEscolhida = (turmaEdicao[p.id] ?? p.turma ?? "").trim();
     const agora = new Date().toISOString();
-    await atualizarPerfil(p.id, { status: "aprovado", turma: turmaEscolhida, aprovado_em: agora });
-    setPerfis(perfis.map((x) => (x.id === p.id ? { ...x, status: "aprovado", turma: turmaEscolhida, aprovado_em: agora } : x)));
+    try {
+      await atualizarPerfil(p.id, { status: "aprovado", turma: turmaEscolhida, aprovado_em: agora });
+      setPerfis(perfis.map((x) => (x.id === p.id ? { ...x, status: "aprovado", turma: turmaEscolhida, aprovado_em: agora } : x)));
+    } catch (err) {
+      console.error("Falha ao tornar representante:", err);
+      alert("Não consegui tornar essa pessoa representante: " + err.message);
+    }
   };
 
   const recusarUsuario = async (p) => {
-    await atualizarPerfil(p.id, { status: "recusado" });
-    setPerfis(perfis.map((x) => (x.id === p.id ? { ...x, status: "recusado" } : x)));
+    try {
+      await atualizarPerfil(p.id, { status: "recusado" });
+      setPerfis(perfis.map((x) => (x.id === p.id ? { ...x, status: "recusado" } : x)));
+    } catch (err) {
+      console.error("Falha ao recusar:", err);
+      alert("Não consegui recusar: " + err.message);
+    }
   };
 
   const revogarAcesso = async (p) => {
     if (!confirm(`Revogar o acesso de representante de "${p.nome || p.email}"? Ela precisa ser aprovada de novo pra voltar a editar o time.`)) return;
-    await atualizarPerfil(p.id, { status: "pendente" });
-    setPerfis(perfis.map((x) => (x.id === p.id ? { ...x, status: "pendente" } : x)));
+    try {
+      await atualizarPerfil(p.id, { status: "pendente" });
+      setPerfis(perfis.map((x) => (x.id === p.id ? { ...x, status: "pendente" } : x)));
+    } catch (err) {
+      console.error("Falha ao revogar acesso:", err);
+      alert("Não consegui revogar o acesso: " + err.message);
+    }
   };
 
   const aprovarExcecao = async (caso) => {
