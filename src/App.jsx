@@ -3818,27 +3818,23 @@ function Cadastro({ onVoltar }) {
 // melhores colocados da última edição, pote 5 = times novos) e sorteia os
 // grupos. Só admin sorteia; todo mundo vê o resultado.
 // ---------------------------------------------------------------------------
+// Monta os potes só com quem já está inscrito, na ordem do ranking da
+// última edição — times novos (fora do ranking) sempre por último. Os
+// potes vão se preenchendo em blocos do tamanho do número de grupos, à
+// medida que times forem se inscrevendo (não deixa "buraco" esperando
+// alguém que ainda não se inscreveu).
 function montarPotes(teams, numGrupos) {
+  const comPosicao = teams.map((t) => {
+    const pos = RANKING_ULTIMA_EDICAO.indexOf(t.nome);
+    return { time: t, pos: pos === -1 ? Infinity : pos };
+  });
+  const ordenados = comPosicao.sort((a, b) => a.pos - b.pos).map((x) => x.time);
+
   const potes = [];
-  const usados = new Set();
-
-  // Cada pote tem o tamanho do número de grupos (um time de cada pote pra
-  // cada grupo) — os blocos seguem a classificação final da última edição.
-  for (let i = 0; i < RANKING_ULTIMA_EDICAO.length; i += numGrupos) {
-    const bloco = RANKING_ULTIMA_EDICAO.slice(i, i + numGrupos)
-      .map((nome) => teams.find((t) => t.nome === nome))
-      .filter(Boolean);
-    if (bloco.length > 0) {
-      potes.push(bloco);
-      bloco.forEach((t) => usados.add(t.id));
-    }
+  for (let i = 0; i < ordenados.length; i += numGrupos) {
+    potes.push(ordenados.slice(i, i + numGrupos));
   }
-
-  // Pote extra só para times que nunca disputaram antes (fora do ranking).
-  const novos = teams.filter((t) => !usados.has(t.id));
-  if (novos.length > 0) potes.push(novos);
-
-  return potes;
+  return potes.length > 0 ? potes : [[]];
 }
 
 function sugerirNumGrupos(totalTimes) {
@@ -4090,24 +4086,30 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao }) 
   const souSuperAdmin = sessao && sessao.tipo === "admin" && sessao.superAdmin;
   const [numGrupos, setNumGrupos] = useState(() => sugerirNumGrupos(teams.length));
   const potesSugeridos = useMemo(() => montarPotes(teams, numGrupos), [teams, numGrupos]);
-  const [numPotes, setNumPotes] = useState(() => potesSugeridos.length || 5);
   const [atribuicoes, setAtribuicoes] = useState({}); // teamId -> índice do pote (0-based)
 
   // Toda vez que o número de grupos mudar (ou times mudarem), recomeça a
   // sugestão automática — o super admin pode ajustar time por time depois.
+  // O número de potes nunca é editado à parte — ele é sempre recalculado
+  // a partir de quantos times realmente têm atribuição, pra nunca sobrar
+  // um pote "vazio demais" que esconda time sem querer.
   useEffect(() => {
     const mapa = {};
     potesSugeridos.forEach((pote, i) => pote.forEach((t) => (mapa[t.id] = i)));
     setAtribuicoes(mapa);
-    setNumPotes(potesSugeridos.length || 5);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [numGrupos, teams.length]);
+
+  const numPotes = useMemo(() => {
+    const maiorIndice = Object.values(atribuicoes).reduce((max, i) => Math.max(max, i), -1);
+    return Math.max(potesSugeridos.length, maiorIndice + 1, 1);
+  }, [atribuicoes, potesSugeridos.length]);
 
   const potes = useMemo(() => {
     const lista = Array.from({ length: numPotes }, () => []);
     teams.forEach((t) => {
       const idx = atribuicoes[t.id] ?? 0;
-      if (lista[idx]) lista[idx].push(t);
+      lista[idx].push(t);
     });
     return lista;
   }, [teams, atribuicoes, numPotes]);
@@ -4161,22 +4163,8 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao }) 
               style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1.5px solid ${COLORS.border}`, fontFamily: "'JetBrains Mono', monospace" }}
             />
           </div>
-          <div className="flex items-center gap-2">
-            <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-              Potes
-            </label>
-            <input
-              type="number"
-              min={1}
-              max={10}
-              value={numPotes}
-              onChange={(e) => setNumPotes(Math.max(1, Number(e.target.value) || 1))}
-              className="w-16 px-2 py-1.5 rounded-lg text-sm text-center"
-              style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1.5px solid ${COLORS.border}`, fontFamily: "'JetBrains Mono', monospace" }}
-            />
-          </div>
           <span className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-            {teams.length} times inscritos
+            {teams.length} times inscritos · {numPotes} pote(s) (se ajusta sozinho conforme os times vão se inscrevendo)
           </span>
         </div>
       )}
@@ -4204,7 +4192,7 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao }) 
                         className="text-[10px] px-1 py-0.5 rounded shrink-0"
                         style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, border: `1px solid ${COLORS.border}` }}
                       >
-                        {Array.from({ length: numPotes }, (_, p) => (
+                        {Array.from({ length: numPotes + 1 }, (_, p) => (
                           <option key={p} value={p}>
                             {p + 1}
                           </option>
