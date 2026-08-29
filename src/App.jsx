@@ -4140,11 +4140,10 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao }) 
 
   return (
     <div>
-      <SectionLabel eyebrow="Art. 13 do regulamento" title="Sorteio dos grupos" />
+      <SectionLabel eyebrow="Definição dos potes" title="Sorteio dos grupos" />
       <p className="text-sm mb-4 max-w-xl" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
         Os potes já vêm sugeridos pela classificação da última edição, mas o super admin pode
-        ajustar time por time, quantos grupos e quantos potes fizer sentido. Só o super admin
-        edita — o resto só acompanha.
+        ajustar time por time. Só o super admin edita — o resto só acompanha.
       </p>
 
       {souSuperAdmin && (
@@ -4207,17 +4206,19 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao }) 
         ))}
       </div>
 
-      {souSuperAdmin && (
-        <button
-          type="button"
-          onClick={realizarSorteio}
-          disabled={teams.length === 0}
-          className="px-5 py-3 rounded-xl font-semibold text-sm inline-flex items-center gap-2 mb-8 disabled:opacity-50"
-          style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
-        >
-          <Dices size={16} /> {sorteio && sorteio.grupos ? "Sortear de novo" : "Sortear grupos"}
-        </button>
-      )}
+      <div
+        className="rounded-xl px-4 py-3.5 mb-8"
+        style={{ backgroundColor: COLORS.accentSoft }}
+      >
+        <div className="text-sm font-semibold mb-1" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
+          O sorteio dos grupos será feito presencialmente
+        </div>
+        <p className="text-xs" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
+          Data e local ainda serão definidos, com direito de presença do público e dos
+          representantes de cada time. Essa aba serve só pra deixar os potes organizados até
+          lá — assim que o sorteio acontecer, os grupos são atualizados aqui.
+        </p>
+      </div>
 
       {sorteio && sorteio.grupos && (
         <div>
