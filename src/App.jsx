@@ -4142,8 +4142,8 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao }) 
     <div>
       <SectionLabel eyebrow="Definição dos potes" title="Sorteio dos grupos" />
       <p className="text-sm mb-4 max-w-xl" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-        Os potes já vêm sugeridos pela classificação da última edição, mas o super admin pode
-        ajustar time por time. Só o super admin edita — o resto só acompanha.
+        Os potes já vêm sugeridos pela classificação da última edição, ajustável time por time
+        pela organização — o resto só acompanha.
       </p>
 
       {souSuperAdmin && (
@@ -4778,7 +4778,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
       <div className="flex items-center justify-between mb-6">
         <SectionLabel eyebrow="Painel" title="Organização" />
         <div className="flex items-center gap-1.5 text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-          <Unlock size={14} /> {sessao.superAdmin ? "super admin" : "admin"}
+          <Unlock size={14} /> liberado
         </div>
       </div>
 
@@ -5090,7 +5090,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
             Solicitações para virar organizador ({adminRequests.filter((r) => r.status === "pendente").length})
           </h3>
           <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-            Só você (super admin) vê e aprova isto.
+            Só você vê e aprova isto.
           </p>
           <ul className="space-y-2">
             {adminRequests
