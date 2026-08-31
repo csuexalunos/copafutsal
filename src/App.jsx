@@ -31,6 +31,7 @@ import {
   readKey, writeKey, cadastrarConta, entrarConta, sairConta, sessaoAtual, aoMudarSessao,
   criarPerfil, buscarPerfil, listarPerfis, atualizarPerfil, souAdmin, listarAdmins,
   promoverParaAdmin, subirArquivo, urlAssinada, contarPessoasInscritas, buscarCpfsDaTurma,
+  registrarAcesso, contarAcessos,
 } from "./lib/supabase.js";
 
 // ---------------------------------------------------------------------------
@@ -3450,7 +3451,7 @@ function GerenciarElencos({ teams, saveTeams }) {
           </option>
         ))}
       </select>
-      {time && <RosterEditor team={time} onSave={salvarTime} />}
+      {time && <RosterEditor key={time.id} team={time} onSave={salvarTime} />}
     </div>
   );
 }
@@ -4413,6 +4414,20 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   const [perfis, setPerfis] = useState([]);
   const [listaAdmins, setListaAdmins] = useState([]);
   const [carregandoPainel, setCarregandoPainel] = useState(true);
+  const [acessos, setAcessos] = useState(null);
+
+  useEffect(() => {
+    if (!souAdminLogado) return;
+    let cancelado = false;
+    contarAcessos()
+      .then((n) => {
+        if (!cancelado) setAcessos(n);
+      })
+      .catch((e) => console.error("Falha ao contar acessos", e));
+    return () => {
+      cancelado = true;
+    };
+  }, [souAdminLogado]);
   const jaMarcouVistoRef = React.useRef(false);
 
   useEffect(() => {
@@ -5340,6 +5355,20 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
         )}
       </div>
 
+      <div
+        className="rounded-2xl p-5 mt-8"
+        style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
+      >
+        <h3 className="font-semibold mb-1" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+          Métricas do app
+        </h3>
+        <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+          Total de vezes que o app foi aberto (não é visitante único, é toda vez que alguém entra).
+        </p>
+        <div className="text-3xl font-bold" style={{ color: COLORS.accent, fontFamily: "'JetBrains Mono', monospace" }}>
+          {acessos === null ? "—" : acessos.toLocaleString("pt-BR")}
+        </div>
+      </div>
     </div>
   );
 }
@@ -5370,12 +5399,20 @@ export default function App() {
   const [config, saveConfig, loadingConfig] = useSharedStorage("copasu:config", {}, 10000);
   const [avaliacoes, saveAvaliacoes, loadingAvaliacoes] = useSharedStorage("copasu:avaliacoes", [], 8000);
   const [totalPessoas, setTotalPessoas] = useState(0);
+  const acessoRegistradoRef = React.useRef(false);
   const [fabBusy, setFabBusy] = useState(false);
   const [fabDone, setFabDone] = useState(false);
   const fabInputRef = React.useRef(null);
 
   const loading =
     loadingTeams || loadingMatches || loadingPosts || loadingAdminRequests || loadingSorteio || loadingConfig || loadingAvaliacoes || checandoSessao;
+
+  // Registra 1 acesso por abertura do app — só uma vez por sessão aberta.
+  useEffect(() => {
+    if (acessoRegistradoRef.current) return;
+    acessoRegistradoRef.current = true;
+    registrarAcesso().catch((e) => console.error("Falha ao registrar acesso", e));
+  }, []);
 
   // Contagem pública de pessoas cadastradas — atualiza sozinha de tempos
   // em tempos, igual o resto dos dados compartilhados.

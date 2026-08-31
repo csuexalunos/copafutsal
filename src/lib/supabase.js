@@ -143,3 +143,14 @@ export async function buscarCpfsDaTurma(turma) {
   });
   return mapa;
 }
+
+// Métricas simples de acesso ao app.
+export async function registrarAcesso() {
+  const { error } = await supabase.rpc("incrementar_acesso");
+  if (error) throw error;
+}
+export async function contarAcessos() {
+  const { data, error } = await supabase.rpc("contar_acessos");
+  if (error) throw error;
+  return data || 0;
+}
