@@ -479,7 +479,7 @@ function formatarReais(n) {
   return "R$ " + n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 const LOCAL_NOME = "Ginásio Poliesportivo do Colégio Santa Úrsula";
-const LOCAL_MAPS_LINK = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent("Colégio Santa Úrsula Ginásio Poliesportivo Maceió");
+const LOCAL_MAPS_LINK = "https://www.google.com/maps/place/Gin%C3%A1sio+Col%C3%A9gio+Santa+Ursula/@-9.6519727,-35.7061545,17z/data=!4m7!3m6!1s0x70145b3c77ca373:0xe3558847d1b3d687!8m2!3d-9.6519727!4d-35.7013909!15sCjVDb2zDqWdpbyBTYW50YSDDmnJzdWxhIEdpbsOhc2lvIFBvbGllc3BvcnRpdm8gTWFjZWnDs5IBGGdlbmVyYWxfZWR1Y2F0aW9uX3NjaG9vbOABAA!16s%2Fg%2F11btwrds9d?entry=tts";
 const WHATSAPP_ORGANIZACAO = "5582996210019";
 const WHATSAPP_MSG_REPRESENTANTE = "Sou o representante do meu time e quero fazer a inscrição.";
 const WHATSAPP_LINK_REPRESENTANTE =
