@@ -458,18 +458,22 @@ const LOTES_INSCRICAO = [
   { nome: "Lote 2", inicio: new Date(2026, 8, 11, 0, 0, 0), fim: new Date(2026, 8, 20, 23, 59, 59), valor: 120 },
   { nome: "Lote 3", inicio: new Date(2026, 8, 21, 0, 0, 0), fim: new Date(2026, 8, 30, 23, 59, 59), valor: 130 },
 ];
-function valorPorAtletaNaData(data) {
+// Acha o lote certo pra uma data — se for antes do Lote 1 começar (ex:
+// inscrição de teste feita antes de 1º/09), cai no Lote 1; se for depois
+// do Lote 3 terminar, cai no Lote 3. Só usa o lote errado se a data
+// realmente cair fora de qualquer janela por engano.
+function encontrarLote(data) {
   const d = data ? new Date(data) : new Date();
   const lote = LOTES_INSCRICAO.find((l) => d >= l.inicio && d <= l.fim);
-  if (lote) return lote.valor;
-  // fora do período de qualquer lote — usa o valor do lote mais caro como
-  // referência, pra nunca subestimar o que é devido
-  return LOTES_INSCRICAO[LOTES_INSCRICAO.length - 1].valor;
+  if (lote) return lote;
+  if (d < LOTES_INSCRICAO[0].inicio) return LOTES_INSCRICAO[0];
+  return LOTES_INSCRICAO[LOTES_INSCRICAO.length - 1];
+}
+function valorPorAtletaNaData(data) {
+  return encontrarLote(data).valor;
 }
 function loteNaData(data) {
-  const d = data ? new Date(data) : new Date();
-  const lote = LOTES_INSCRICAO.find((l) => d >= l.inicio && d <= l.fim);
-  return lote ? lote.nome : LOTES_INSCRICAO[LOTES_INSCRICAO.length - 1].nome;
+  return encontrarLote(data).nome;
 }
 function formatarReais(n) {
   return "R$ " + n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
