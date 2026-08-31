@@ -4140,10 +4140,10 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao }) 
 
   return (
     <div>
-      <SectionLabel eyebrow="Definição dos potes" title="Sorteio dos grupos" />
+      <SectionLabel eyebrow="Rumo à VIII Copa" title="Sorteio dos grupos" />
       <p className="text-sm mb-4 max-w-xl" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-        Os potes já vêm sugeridos pela classificação da última edição, ajustável time por time
-        pela organização — o resto só acompanha.
+        Quanto melhor a campanha na edição passada, mais cedo o time entra no sorteio. Acompanhe
+        aqui como os potes vão se formando até o grande dia.
       </p>
 
       {souSuperAdmin && (
@@ -4163,7 +4163,7 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao }) 
             />
           </div>
           <span className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-            {teams.length} times inscritos · {numPotes} pote(s) (se ajusta sozinho conforme os times vão se inscrevendo)
+            {teams.length} times inscritos · {numPotes} pote(s)
           </span>
         </div>
       )}
