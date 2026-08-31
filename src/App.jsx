@@ -81,6 +81,7 @@ const TURMAS_HISTORICAS = [
   { turma: "2021", apelido: "A Zebra Silenciosa" },
   { turma: "2018", apelido: "O Pacto de 3 Minutos" },
   { turma: "2012", apelido: "O Talento que Evapora" },
+  { turma: "2016", apelido: "" },
 ];
 
 // Elencos inscritos na edição de 2025 (fonte: PDF de inscrições enviado).
@@ -210,6 +211,19 @@ const ESCUDOS_TIMES = {
 };
 
 const ELENCOS_2025 = {
+  "2016": [
+    { numero: 99, apelido: "Vitor", nome: "Vitor Martins Luz Mariano", periodo: "2015-2016", anoConclusao: "2016" },
+    { numero: 14, apelido: "César", nome: "Bruno César Macedo de Almeida", periodo: "2011-2015", anoConclusao: "2017" },
+    { numero: 11, apelido: "Caio", nome: "Caio Petterson Araújo Pessoa Rangel", periodo: "2008-2010", anoConclusao: "2016" },
+    { numero: 9, apelido: "Gordinho", nome: "Fellipe Matheus Acioli Nunes", periodo: "2015-2016", anoConclusao: "2016" },
+    { numero: 7, apelido: "Clemente", nome: "Mateus Clemente Tenorio Padilha", periodo: "2004-2017", anoConclusao: "2017" },
+    { numero: 10, apelido: "P.A", nome: "Paulo Augusto Nascimento de Alencar", periodo: "2010-2016", anoConclusao: "2016" },
+    { numero: 1, apelido: "Ponnes", nome: "João Victor Vieira Melo", periodo: "2012-2016", anoConclusao: "2016" },
+    { numero: 12, apelido: "Lucas Laykos", nome: "Lucas Rodrigues Pacífico Chagas", periodo: "2010-2016", anoConclusao: "2016" },
+    { numero: 5, apelido: "Yurgan", nome: "Yurgan Montini Corneta Sarmento", periodo: "2005-2016", anoConclusao: "2016" },
+    { numero: 4, apelido: "Dedé", nome: "Marcos André de Holanda Prudente Pessoa", periodo: "2007-2016", anoConclusao: "2016" },
+    { numero: null, apelido: "Nego", nome: "Gabriel Leite Sarmento", periodo: "", anoConclusao: "2016" },
+  ],
   "2022.1": [
     { numero: 1, apelido: "Pedro Miguel", nome: "Pedro Miguel Silva Couto", periodo: "2015-2022", anoConclusao: "2022" },
     { numero: 2, apelido: "Caik", nome: "Caik agra toledo", periodo: "2012-2022", anoConclusao: "2022" },
