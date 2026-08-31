@@ -4142,8 +4142,8 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao }) 
     <div>
       <SectionLabel eyebrow="Rumo à VIII Copa" title="Sorteio dos grupos" />
       <p className="text-sm mb-4 max-w-xl" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-        Quanto melhor a campanha na edição passada, mais cedo o time entra no sorteio. Acompanhe
-        aqui como os potes vão se formando até o grande dia.
+        Os potes seguem o ranking formado a partir da última edição. Times novos entram sempre
+        no último pote.
       </p>
 
       {souSuperAdmin && (
