@@ -3679,7 +3679,7 @@ function Cadastro({ onVoltar }) {
       setForm({ nome: "", tipo: "jogador", turma: "", whatsapp: "", email: "", nascimento: "", senha: "" });
     } catch (err) {
       setSaving(false);
-      setError(err.message === "User already registered" ? "Esse e-mail já tem cadastro — tenta entrar." : "Erro ao cadastrar: " + err.message);
+      setError(err.message === "User already registered" ? "Este e-mail já possui cadastro. Tente fazer login." : "Erro ao cadastrar: " + err.message);
     }
   };
 
@@ -3817,9 +3817,10 @@ function Cadastro({ onVoltar }) {
             style={{ backgroundColor: COLORS.accentSoft, color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}
           >
             <div className="flex items-center gap-2 mb-2">
-              <Check size={16} /> Conta criada. Se o Supabase pedir confirmação por e-mail, confirma
-              antes de entrar. Você já pode fazer login normalmente — se for representar um
-              time, seu acesso à Inscrição fica pendente até um organizador aprovar.
+              <Check size={16} /> Conta criada com sucesso. Se for solicitada confirmação por
+              e-mail, confirme antes de entrar. Você já pode fazer login normalmente — para
+              representar um time, seu acesso à Inscrição ficará pendente até a aprovação de
+              um organizador.
             </div>
             {onVoltar && (
               <button type="button" onClick={onVoltar} className="text-sm font-semibold underline">
@@ -4302,7 +4303,7 @@ function DefinirNovaSenha({ onConcluido }) {
       return;
     }
     if (senha.trim() !== confirmar.trim()) {
-      setErro("As duas senhas não são iguais.");
+      setErro("As senhas informadas não coincidem.");
       return;
     }
     setSalvando(true);
@@ -4311,7 +4312,7 @@ function DefinirNovaSenha({ onConcluido }) {
       onConcluido();
     } catch (err) {
       console.error("Erro ao definir nova senha:", err);
-      setErro("Não consegui salvar a nova senha: " + err.message);
+      setErro("Não foi possível salvar a nova senha: " + err.message);
       setSalvando(false);
     }
   };
@@ -4322,7 +4323,7 @@ function DefinirNovaSenha({ onConcluido }) {
         <div className="flex flex-col items-center text-center mb-8">
           <img src={CSU_BADGE_IMG} alt="" className="w-16 h-16 object-contain mb-3" />
           <h1 className="text-lg font-bold" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
-            Defina sua nova senha
+            Redefinir senha
           </h1>
         </div>
         <form
@@ -4332,7 +4333,7 @@ function DefinirNovaSenha({ onConcluido }) {
         >
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-              Senha nova
+              Nova senha
             </label>
             <PasswordInput
               value={senha}
@@ -4342,7 +4343,7 @@ function DefinirNovaSenha({ onConcluido }) {
           </div>
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-              Confirmar senha nova
+              Confirmar nova senha
             </label>
             <PasswordInput
               value={confirmar}
@@ -4362,7 +4363,7 @@ function DefinirNovaSenha({ onConcluido }) {
             className="w-full px-4 py-3 rounded-xl font-semibold text-sm disabled:opacity-60"
             style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
           >
-            {salvando ? "Salvando..." : "Salvar senha nova"}
+            {salvando ? "Salvando..." : "Salvar nova senha"}
           </button>
         </form>
       </div>
@@ -4391,7 +4392,7 @@ function LoginGate({ onLogin }) {
       setRecuperacaoEnviada(true);
     } catch (err) {
       console.error("Erro ao pedir recuperação:", err);
-      setErroRecuperacao("Não consegui enviar o e-mail: " + err.message);
+      setErroRecuperacao("Não foi possível enviar o e-mail: " + err.message);
     } finally {
       setEnviandoRecuperacao(false);
     }
@@ -4433,7 +4434,7 @@ function LoginGate({ onLogin }) {
         err.message === "Invalid login credentials"
           ? "E-mail ou senha incorretos."
           : err.message === "Email not confirmed"
-          ? "Confirma seu e-mail antes de entrar (verifica a caixa de entrada)."
+          ? "Confirme seu e-mail antes de entrar — verifique sua caixa de entrada."
           : "Erro ao entrar: " + err.message
       );
       setEntrando(false);
@@ -4469,16 +4470,17 @@ function LoginGate({ onLogin }) {
             {recuperacaoEnviada ? (
               <div className="text-sm" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
                 <div className="flex items-center gap-2 mb-1" style={{ color: COLORS.accent, fontWeight: 600 }}>
-                  <Check size={16} /> E-mail enviado
+                  <Check size={16} /> Link de redefinição enviado
                 </div>
-                Se <strong>{emailRecuperacao}</strong> tiver uma conta, chega um link em instantes
-                pra você definir uma senha nova. Confere a caixa de spam também.
+                Se houver uma conta cadastrada com o e-mail <strong>{emailRecuperacao}</strong>,
+                você receberá em instantes uma mensagem com as instruções para criar uma nova
+                senha. Caso não encontre o e-mail, verifique também a caixa de spam.
               </div>
             ) : (
               <form onSubmit={enviarRecuperacao} className="space-y-3">
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-                    Seu e-mail de cadastro
+                    E-mail cadastrado
                   </label>
                   <input
                     type="email"
@@ -4500,7 +4502,7 @@ function LoginGate({ onLogin }) {
                   className="w-full px-4 py-3 rounded-xl font-semibold text-sm disabled:opacity-60"
                   style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
                 >
-                  {enviandoRecuperacao ? "Enviando..." : "Mandar link de recuperação"}
+                  {enviandoRecuperacao ? "Enviando..." : "Enviar link de redefinição"}
                 </button>
               </form>
             )}
@@ -4514,7 +4516,7 @@ function LoginGate({ onLogin }) {
               className="w-full text-center text-sm font-semibold"
               style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
             >
-              Voltar pro login
+              Voltar ao login
             </button>
           </div>
         ) : (
@@ -4587,7 +4589,7 @@ function LoginGate({ onLogin }) {
               className="w-full text-center mt-4 text-sm font-semibold"
               style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}
             >
-              Ainda não tem conta? Quero entrar — cadastre-se
+              Ainda não tem conta? Cadastre-se
             </button>
           </>
         )}
