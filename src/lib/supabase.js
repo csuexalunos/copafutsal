@@ -53,10 +53,22 @@ export async function sessaoAtual() {
 }
 
 export function aoMudarSessao(callback) {
-  const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-    callback(session ? session.user : null);
+  const { data } = supabase.auth.onAuthStateChange((event, session) => {
+    callback(session ? session.user : null, event);
   });
   return () => data.subscription.unsubscribe();
+}
+
+export async function esqueciSenha(email) {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + window.location.pathname,
+  });
+  if (error) throw error;
+}
+
+export async function definirNovaSenha(novaSenha) {
+  const { error } = await supabase.auth.updateUser({ password: novaSenha });
+  if (error) throw error;
 }
 
 export async function criarPerfil(userId, perfil) {

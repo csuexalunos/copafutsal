@@ -31,7 +31,7 @@ import {
   readKey, writeKey, cadastrarConta, entrarConta, sairConta, sessaoAtual, aoMudarSessao,
   criarPerfil, buscarPerfil, listarPerfis, atualizarPerfil, souAdmin, listarAdmins,
   promoverParaAdmin, subirArquivo, urlAssinada, contarPessoasInscritas, buscarCpfsDaTurma,
-  registrarAcesso, contarAcessos,
+  registrarAcesso, contarAcessos, esqueciSenha, definirNovaSenha,
 } from "./lib/supabase.js";
 
 // ---------------------------------------------------------------------------
@@ -4286,12 +4286,116 @@ const SUPER_ADMIN_EMAIL = "csuexalunos@gmail.com";
 // não tem conta cai no Cadastro (que fica pendente até um organizador
 // aprovar); admins também entram por aqui com o e-mail/senha deles.
 // ---------------------------------------------------------------------------
+// Tela que aparece quando a pessoa volta do link de "esqueci minha senha"
+// — pede a senha nova e confirma antes de liberar o resto do app.
+function DefinirNovaSenha({ onConcluido }) {
+  const [senha, setSenha] = useState("");
+  const [confirmar, setConfirmar] = useState("");
+  const [erro, setErro] = useState("");
+  const [salvando, setSalvando] = useState(false);
+
+  const salvar = async (e) => {
+    e.preventDefault();
+    setErro("");
+    if (senha.trim().length < 6) {
+      setErro("A senha precisa ter pelo menos 6 caracteres.");
+      return;
+    }
+    if (senha.trim() !== confirmar.trim()) {
+      setErro("As duas senhas não são iguais.");
+      return;
+    }
+    setSalvando(true);
+    try {
+      await definirNovaSenha(senha.trim());
+      onConcluido();
+    } catch (err) {
+      console.error("Erro ao definir nova senha:", err);
+      setErro("Não consegui salvar a nova senha: " + err.message);
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <div style={{ backgroundColor: COLORS.bg, minHeight: "100vh" }}>
+      <div className="max-w-md mx-auto px-6 py-14 sm:py-20">
+        <div className="flex flex-col items-center text-center mb-8">
+          <img src={CSU_BADGE_IMG} alt="" className="w-16 h-16 object-contain mb-3" />
+          <h1 className="text-lg font-bold" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+            Defina sua nova senha
+          </h1>
+        </div>
+        <form
+          onSubmit={salvar}
+          className="rounded-2xl p-6 space-y-3"
+          style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
+        >
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+              Senha nova
+            </label>
+            <PasswordInput
+              value={senha}
+              onChange={(e) => setSenha(e.target.value)}
+              style={{ backgroundColor: COLORS.surface, border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+              Confirmar senha nova
+            </label>
+            <PasswordInput
+              value={confirmar}
+              onChange={(e) => setConfirmar(e.target.value)}
+              style={{ backgroundColor: COLORS.surface, border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+            />
+          </div>
+          {erro && (
+            <div className="text-sm" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
+              {erro}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={salvar}
+            disabled={salvando}
+            className="w-full px-4 py-3 rounded-xl font-semibold text-sm disabled:opacity-60"
+            style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+          >
+            {salvando ? "Salvando..." : "Salvar senha nova"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function LoginGate({ onLogin }) {
   const [modo, setModo] = useState("login");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState("");
   const [entrando, setEntrando] = useState(false);
+  const [emailRecuperacao, setEmailRecuperacao] = useState("");
+  const [recuperacaoEnviada, setRecuperacaoEnviada] = useState(false);
+  const [enviandoRecuperacao, setEnviandoRecuperacao] = useState(false);
+  const [erroRecuperacao, setErroRecuperacao] = useState("");
+
+  const enviarRecuperacao = async (e) => {
+    e.preventDefault();
+    if (!emailRecuperacao.trim()) return;
+    setErroRecuperacao("");
+    setEnviandoRecuperacao(true);
+    try {
+      await esqueciSenha(emailRecuperacao.trim());
+      setRecuperacaoEnviada(true);
+    } catch (err) {
+      console.error("Erro ao pedir recuperação:", err);
+      setErroRecuperacao("Não consegui enviar o e-mail: " + err.message);
+    } finally {
+      setEnviandoRecuperacao(false);
+    }
+  };
 
   const entrar = async (e) => {
     e.preventDefault();
@@ -4357,6 +4461,62 @@ function LoginGate({ onLogin }) {
 
         {modo === "cadastro" ? (
           <Cadastro onVoltar={() => setModo("login")} />
+        ) : modo === "recuperar" ? (
+          <div
+            className="rounded-2xl p-6 space-y-3"
+            style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
+          >
+            {recuperacaoEnviada ? (
+              <div className="text-sm" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+                <div className="flex items-center gap-2 mb-1" style={{ color: COLORS.accent, fontWeight: 600 }}>
+                  <Check size={16} /> E-mail enviado
+                </div>
+                Se <strong>{emailRecuperacao}</strong> tiver uma conta, chega um link em instantes
+                pra você definir uma senha nova. Confere a caixa de spam também.
+              </div>
+            ) : (
+              <form onSubmit={enviarRecuperacao} className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                    Seu e-mail de cadastro
+                  </label>
+                  <input
+                    type="email"
+                    value={emailRecuperacao}
+                    onChange={(e) => setEmailRecuperacao(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl outline-none text-sm"
+                    style={{ backgroundColor: COLORS.surface, border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+                  />
+                </div>
+                {erroRecuperacao && (
+                  <div className="text-sm" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
+                    {erroRecuperacao}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={enviarRecuperacao}
+                  disabled={enviandoRecuperacao}
+                  className="w-full px-4 py-3 rounded-xl font-semibold text-sm disabled:opacity-60"
+                  style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+                >
+                  {enviandoRecuperacao ? "Enviando..." : "Mandar link de recuperação"}
+                </button>
+              </form>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setModo("login");
+                setRecuperacaoEnviada(false);
+                setErroRecuperacao("");
+              }}
+              className="w-full text-center text-sm font-semibold"
+              style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+            >
+              Voltar pro login
+            </button>
+          </div>
         ) : (
           <>
             <form
@@ -4377,9 +4537,23 @@ function LoginGate({ onLogin }) {
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-                  Senha
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold uppercase tracking-wide" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                    Senha
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setErro("");
+                      setEmailRecuperacao(email);
+                      setModo("recuperar");
+                    }}
+                    className="text-xs font-semibold"
+                    style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}
+                  >
+                    Esqueci minha senha
+                  </button>
+                </div>
                 <PasswordInput
                   value={senha}
                   onChange={(e) => setSenha(e.target.value)}
@@ -5406,6 +5580,7 @@ export default function App() {
   const [tab, setTab] = useState("inicio");
   const [sessao, setSessao] = useState(null);
   const [checandoSessao, setCheckandoSessao] = useState(true);
+  const [emRecuperacaoSenha, setEmRecuperacaoSenha] = useState(false);
   const [teams, saveTeams, loadingTeams] = useSharedStorage("copasu:teams", [], 7000);
   const [matches, saveMatches, loadingMatches] = useSharedStorage("copasu:matches", [], 5000);
   const [posts, savePosts, loadingPosts] = useSharedStorage("copasu:community", [], 6000);
@@ -5487,7 +5662,11 @@ export default function App() {
         setCheckandoSessao(false);
       }
     })();
-    const cancelarInscricao = aoMudarSessao((user) => {
+    const cancelarInscricao = aoMudarSessao((user, event) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setEmRecuperacaoSenha(true);
+        return;
+      }
       montarSessao(user);
     });
     return () => {
@@ -5527,6 +5706,18 @@ export default function App() {
       <div style={{ backgroundColor: COLORS.bg, minHeight: "100vh" }} className="flex items-center justify-center">
         <Loader2 size={22} className="animate-spin" color={COLORS.ink} />
       </div>
+    );
+  }
+
+  if (emRecuperacaoSenha) {
+    return (
+      <DefinirNovaSenha
+        onConcluido={async () => {
+          const user = await sessaoAtual();
+          await montarSessao(user);
+          setEmRecuperacaoSenha(false);
+        }}
+      />
     );
   }
 
