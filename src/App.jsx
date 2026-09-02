@@ -805,7 +805,7 @@ function Home({ teams, matches, setTab, config, totalPessoas }) {
         <img
           src={CSU_BADGE_IMG}
           alt="Santa Úrsula Jogos Ex-Alunos"
-          className="w-16 h-16 object-contain shrink-0"
+          className="h-14 sm:h-16 w-auto object-contain shrink-0"
         />
         <div>
           <h1
@@ -3514,7 +3514,7 @@ function CompletarPerfil({ sessao, onCompleted }) {
     <div style={{ backgroundColor: COLORS.bg, minHeight: "100vh" }}>
       <div className="max-w-md mx-auto px-6 py-14 sm:py-20">
         <div className="flex flex-col items-center text-center mb-8">
-          <img src={CSU_BADGE_IMG} alt="" className="w-16 h-16 object-contain mb-3" />
+          <img src={CSU_BADGE_IMG} alt="" className="h-20 sm:h-24 w-auto object-contain mb-3" />
           <h1 className="text-lg font-bold" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
             Falta pouco pra terminar seu cadastro
           </h1>
@@ -4331,7 +4331,7 @@ function DefinirNovaSenha({ onConcluido }) {
     <div style={{ backgroundColor: COLORS.bg, minHeight: "100vh" }}>
       <div className="max-w-md mx-auto px-6 py-14 sm:py-20">
         <div className="flex flex-col items-center text-center mb-8">
-          <img src={CSU_BADGE_IMG} alt="" className="w-16 h-16 object-contain mb-3" />
+          <img src={CSU_BADGE_IMG} alt="" className="h-20 sm:h-24 w-auto object-contain mb-3" />
           <h1 className="text-lg font-bold" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
             Redefinir senha
           </h1>
@@ -4458,7 +4458,7 @@ function LoginGate({ onLogin }) {
       `}</style>
       <div className="max-w-md mx-auto px-6 py-14 sm:py-20">
         <div className="flex flex-col items-center text-center mb-8">
-          <img src={CSU_BADGE_IMG} alt="Santa Úrsula Jogos Ex-Alunos" className="w-20 h-20 object-contain mb-3" />
+          <img src={CSU_BADGE_IMG} alt="Santa Úrsula Jogos Ex-Alunos" className="h-24 sm:h-28 w-auto object-contain mb-3" />
           <h1
             className="text-xl font-bold"
             style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink, letterSpacing: "-0.01em" }}
