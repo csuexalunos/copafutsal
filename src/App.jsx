@@ -466,13 +466,13 @@ const HALL_DA_FAMA = {
 // Data e prazo desta edição — atualizar quando a organização confirmar.
 const DATA_EVENTO = "6, 7 e 8 de novembro";
 const PRAZO_INSCRICAO = "aberta agora até 30 de setembro";
-const VALOR_INSCRICAO_ATLETA = "R$ 110,00 a R$ 130,00 por atleta, conforme o lote";
+const VALOR_INSCRICAO_ATLETA = "R$ 110,00 a R$ 140,00 por atleta, conforme o lote";
 // Lotes de inscrição — o valor por atleta aumenta conforme a data em que
 // o time se inscreve (Art. 8º, Parágrafo 1º do regulamento).
 const LOTES_INSCRICAO = [
   { nome: "Lote 1", inicio: new Date(2026, 8, 1, 0, 0, 0), fim: new Date(2026, 8, 10, 23, 59, 59), valor: 110 },
   { nome: "Lote 2", inicio: new Date(2026, 8, 11, 0, 0, 0), fim: new Date(2026, 8, 20, 23, 59, 59), valor: 120 },
-  { nome: "Lote 3", inicio: new Date(2026, 8, 21, 0, 0, 0), fim: new Date(2026, 8, 30, 23, 59, 59), valor: 130 },
+  { nome: "Lote 3", inicio: new Date(2026, 8, 21, 0, 0, 0), fim: new Date(2026, 8, 30, 23, 59, 59), valor: 140 },
 ];
 // Acha o lote certo pra uma data — se for antes do Lote 1 começar (ex:
 // inscrição de teste feita antes de 1º/09), cai no Lote 1; se for depois
@@ -4018,7 +4018,17 @@ function pontosPartida(jogos, teams) {
       b.pts += 1;
     }
   });
-  return Object.values(tabela).sort((x, y) => y.pts - x.pts || y.gp - y.gc - (x.gp - x.gc) || y.gp - x.gp);
+  const posicaoRanking = (nome) => {
+    const i = RANKING_ULTIMA_EDICAO.indexOf(nome);
+    return i === -1 ? Infinity : i;
+  };
+  return Object.values(tabela).sort(
+    (x, y) =>
+      y.pts - x.pts ||
+      y.gp - y.gc - (x.gp - x.gc) ||
+      y.gp - x.gp ||
+      posicaoRanking(x.nome) - posicaoRanking(y.nome)
+  );
 }
 
 // Classificação geral — todos os times, contando só os jogos da fase de
