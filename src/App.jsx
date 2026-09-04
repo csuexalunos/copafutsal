@@ -3254,7 +3254,23 @@ async function enviarEmailAprovacaoTime(team, emailDestino) {
       pdfNomeArquivo: `ficha-${team.nome}.pdf`.replace(/[^a-zA-Z0-9._-]/g, "_"),
     },
   });
-  if (error) throw error;
+  if (error) {
+    // O erro padrão do supabase-js só diz "non-2xx status code" — a
+    // mensagem de verdade (a que a função devolveu) fica dentro de
+    // error.context, que é a Response HTTP crua. Tenta ler o corpo dela
+    // pra mostrar o motivo real na tela.
+    if (error.context && typeof error.context.json === "function") {
+      try {
+        const corpo = await error.context.clone().json();
+        if (corpo && corpo.error) {
+          throw new Error(corpo.error);
+        }
+      } catch (e) {
+        // se não der pra ler o corpo, cai no erro genérico mesmo
+      }
+    }
+    throw error;
+  }
   return data;
 }
 
