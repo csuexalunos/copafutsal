@@ -26,13 +26,19 @@ import {
   X,
   Loader2,
   ArrowRight,
+  Mail,
 } from "lucide-react";
+import { jsPDF } from "jspdf";
 import {
   readKey, writeKey, cadastrarConta, entrarConta, sairConta, sessaoAtual, aoMudarSessao,
   criarPerfil, buscarPerfil, listarPerfis, atualizarPerfil, souAdmin, listarAdmins,
   promoverParaAdmin, subirArquivo, urlAssinada, contarPessoasInscritas, buscarCpfsDaTurma,
-  registrarAcesso, contarAcessos, esqueciSenha, definirNovaSenha,
+  registrarAcesso, contarAcessos, esqueciSenha, definirNovaSenha, supabase,
 } from "./lib/supabase.js";
+
+// Link oficial pra finalizar a inscrição (anexar ficha em PDF e pagar),
+// depois que o time é aprovado pela comissão.
+const LINK_FINALIZACAO_INSCRICAO = "https://ursula.com.br/jogos-ex-alunos-2026/";
 
 // ---------------------------------------------------------------------------
 // Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula — 8ª Edição
@@ -3141,6 +3147,117 @@ function baixarFichaTime(team) {
   abrirImpressao(`Ficha — ${team.nome}`, fichaTimeHtml(team));
 }
 
+// ---------------------------------------------------------------------------
+// Ficha do time em PDF de verdade (não é a janela de impressão acima) —
+// usada só pra anexar no e-mail de aprovação da comissão, gerada com jsPDF
+// direto no navegador, sem depender de nenhum serviço externo.
+// ---------------------------------------------------------------------------
+function gerarFichaTimePdfBase64(team) {
+  const jogadores = Array.isArray(team.jogadores) ? team.jogadores : [];
+  const valorUnitario = valorPorAtletaNaData(team.inscritoEm);
+  const lote = loteNaData(team.inscritoEm);
+  const total = jogadores.length * valorUnitario;
+
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  const marginX = 40;
+  const larguraUtil = 515;
+  let y = 50;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text(`Seleção de ${team.nome}`, marginX, y);
+  y += 20;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.text(
+    `Capitão: ${team.capitao || "—"}   ·   Contato: ${team.contato || "—"}   ·   ${jogadores.length} jogador(es)`,
+    marginX,
+    y
+  );
+  y += 22;
+
+  const cols = [
+    { label: "Nº", w: 28 },
+    { label: "Nome completo", w: 185 },
+    { label: "CPF", w: 95 },
+    { label: "Período", w: 100 },
+    { label: "Ano concl.", w: larguraUtil - 28 - 185 - 95 - 100 },
+  ];
+
+  const desenharCabecalho = () => {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    let x = marginX;
+    cols.forEach((c) => {
+      doc.text(c.label, x, y);
+      x += c.w;
+    });
+    y += 6;
+    doc.setLineWidth(0.75);
+    doc.line(marginX, y, marginX + larguraUtil, y);
+    y += 14;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+  };
+
+  desenharCabecalho();
+
+  jogadores.forEach((j) => {
+    if (y > 770) {
+      doc.addPage();
+      y = 50;
+      desenharCabecalho();
+    }
+    let x = marginX;
+    const vals = [j.numero || "—", j.nome || "—", j.cpf || "—", j.periodo || "—", j.anoConclusao || "—"];
+    vals.forEach((v, i) => {
+      doc.text(String(v), x, y, { maxWidth: cols[i].w - 4 });
+      x += cols[i].w;
+    });
+    y += 17;
+  });
+
+  y += 16;
+  if (y > 770) {
+    doc.addPage();
+    y = 50;
+  }
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.text(
+    `Valor da inscrição (${lote}): ${jogadores.length} atleta(s) × ${formatarReais(valorUnitario)} = ${formatarReais(total)}`,
+    marginX,
+    y
+  );
+
+  // "datauristring" já devolve no formato "data:application/pdf;base64,XXXX"
+  const dataUri = doc.output("datauristring");
+  return dataUri.split(",")[1];
+}
+
+// ---------------------------------------------------------------------------
+// Envio do e-mail de aprovação — chama a Edge Function do Supabase
+// ("enviar-email-time"), que é quem de fato fala com a API do Brevo.
+// O app nunca guarda nem expõe a chave do Brevo — ela fica só no servidor
+// (variável de ambiente da função), configurada separadamente.
+// ---------------------------------------------------------------------------
+async function enviarEmailAprovacaoTime(team, emailDestino) {
+  const pdfBase64 = gerarFichaTimePdfBase64(team);
+  const { data, error } = await supabase.functions.invoke("enviar-email-time", {
+    body: {
+      destinatarioEmail: emailDestino.trim(),
+      destinatarioNome: team.capitao || team.nome,
+      timeNome: team.nome,
+      linkFinalizacao: LINK_FINALIZACAO_INSCRICAO,
+      pdfBase64,
+      pdfNomeArquivo: `ficha-${team.nome}.pdf`.replace(/[^a-zA-Z0-9._-]/g, "_"),
+    },
+  });
+  if (error) throw error;
+  return data;
+}
+
 function baixarFichaTodosTimes(teams) {
   const corpo = teams.map(fichaTimeHtml).join("");
   abrirImpressao("Fichas de todos os times", corpo);
@@ -3377,6 +3494,127 @@ function DocumentosOrganizacao({ teams, matches }) {
               );
             })}
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Aprovação da comissão + envio do e-mail com a ficha em PDF e o link pra
+// finalizar a inscrição. O status "aprovado pela comissão" é marcado à mão
+// pela organização, time por time, depois de revisar o cadastro.
+// ---------------------------------------------------------------------------
+function AprovacaoComissao({ teams, saveTeams }) {
+  const [emailPorTime, setEmailPorTime] = useState({});
+  const [enviando, setEnviando] = useState({});
+  const [erro, setErro] = useState({});
+
+  const alternarAprovado = async (team) => {
+    await saveTeams((atuais) =>
+      (atuais || []).map((t) => (t.id === team.id ? { ...t, aprovadoComissao: !t.aprovadoComissao } : t))
+    );
+  };
+
+  const enviar = async (team) => {
+    const email = (emailPorTime[team.id] ?? team.emailComissao ?? "").trim();
+    if (!email) {
+      setErro((s) => ({ ...s, [team.id]: "Informe o e-mail antes de enviar." }));
+      return;
+    }
+    setErro((s) => ({ ...s, [team.id]: "" }));
+    setEnviando((s) => ({ ...s, [team.id]: true }));
+    try {
+      await enviarEmailAprovacaoTime(team, email);
+      await saveTeams((atuais) =>
+        (atuais || []).map((t) =>
+          t.id === team.id ? { ...t, emailComissao: email, emailEnviadoEm: new Date().toISOString() } : t
+        )
+      );
+    } catch (e) {
+      console.error("Falha ao enviar e-mail de aprovação", e);
+      setErro((s) => ({ ...s, [team.id]: "Erro ao enviar: " + e.message }));
+    } finally {
+      setEnviando((s) => ({ ...s, [team.id]: false }));
+    }
+  };
+
+  return (
+    <div className="rounded-2xl p-5 mt-8" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+      <h3 className="font-semibold mb-1 flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+        <Mail size={18} color={COLORS.ink} /> Aprovação da comissão e envio de e-mail
+      </h3>
+      <p className="text-xs mb-4" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+        Marque o time como aprovado depois que a comissão revisar o cadastro. O e-mail leva a
+        ficha do time em PDF e o link pra finalizar a inscrição (anexar o PDF e pagar).
+      </p>
+
+      {teams.length === 0 ? (
+        <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+          Nenhum time inscrito ainda.
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {teams.map((t) => (
+            <div
+              key={t.id}
+              className="rounded-xl p-3.5 flex flex-col gap-2.5"
+              style={{ backgroundColor: COLORS.zebra, border: `1px solid ${COLORS.border}` }}
+            >
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <span className="font-semibold text-sm" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+                  {t.nome}
+                </span>
+                <label
+                  className="flex items-center gap-2 text-xs cursor-pointer select-none"
+                  style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+                >
+                  <input type="checkbox" checked={!!t.aprovadoComissao} onChange={() => alternarAprovado(t)} />
+                  Aprovado pela comissão
+                </label>
+              </div>
+
+              {t.aprovadoComissao && (
+                <>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <input
+                      type="email"
+                      placeholder="e-mail do representante do time"
+                      defaultValue={t.emailComissao || ""}
+                      onChange={(e) => setEmailPorTime((s) => ({ ...s, [t.id]: e.target.value }))}
+                      className="flex-1 min-w-[220px] px-3 py-2 rounded-lg text-sm"
+                      style={{
+                        backgroundColor: COLORS.card,
+                        border: `1px solid ${COLORS.border}`,
+                        color: COLORS.ink,
+                        fontFamily: "'Inter', sans-serif",
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => enviar(t)}
+                      disabled={!!enviando[t.id]}
+                      className="px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-60 shrink-0"
+                      style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+                    >
+                      {enviando[t.id] ? <Loader2 size={13} className="animate-spin" /> : <Mail size={13} />}
+                      {t.emailEnviadoEm ? "Reenviar e-mail" : "Enviar e-mail"}
+                    </button>
+                  </div>
+                  {erro[t.id] && (
+                    <p className="text-xs" style={{ color: "#EF4444", fontFamily: "'Inter', sans-serif" }}>
+                      {erro[t.id]}
+                    </p>
+                  )}
+                  {t.emailEnviadoEm && !erro[t.id] && (
+                    <p className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                      Último envio: {new Date(t.emailEnviadoEm).toLocaleString("pt-BR")} para {t.emailComissao}
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -5518,6 +5756,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
 
       <GerenciarElencos teams={teams} saveTeams={saveTeams} />
       <DiagnosticoIrregularidades teams={teams} />
+      <AprovacaoComissao teams={teams} saveTeams={saveTeams} />
       <PlanilhaInscricoes teams={teams} />
       <DocumentosOrganizacao teams={teams} matches={matches} />
 
