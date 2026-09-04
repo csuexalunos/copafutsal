@@ -57,9 +57,14 @@ Deno.serve(async (req) => {
 
   try {
     if (!BREVO_API_KEY) {
+      console.error("[enviar-email-time] BREVO_API_KEY não configurada.");
       return respostaJson({ error: "BREVO_API_KEY não configurada nos secrets da função." }, 500);
     }
     if (!SUPABASE_URL || !SUPABASE_SECRET_KEY) {
+      console.error("[enviar-email-time] SUPABASE_URL ou SUPABASE_SECRET_KEYS ausentes.", {
+        temUrl: !!SUPABASE_URL,
+        temSecretKey: !!SUPABASE_SECRET_KEY,
+      });
       return respostaJson(
         { error: "SUPABASE_URL e/ou SUPABASE_SECRET_KEYS não disponíveis no ambiente da função." },
         500
@@ -71,22 +76,30 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get("Authorization") || "";
     const token = authHeader.replace("Bearer ", "");
     if (!token) {
+      console.error("[enviar-email-time] Chamada sem Authorization header.");
       return respostaJson({ error: "Não autenticado." }, 401);
     }
 
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY);
     const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
     if (userError || !userData?.user) {
+      console.error("[enviar-email-time] Token inválido ao chamar auth.getUser:", userError);
       return respostaJson({ error: "Sessão inválida." }, 401);
     }
 
-    const { data: adminRow } = await supabaseAdmin
+    const { data: adminRow, error: adminError } = await supabaseAdmin
       .from("admins")
       .select("user_id")
       .eq("user_id", userData.user.id)
       .maybeSingle();
 
+    if (adminError) {
+      console.error("[enviar-email-time] Erro ao consultar tabela admins:", adminError);
+      return respostaJson({ error: "Erro ao verificar permissão de admin: " + adminError.message }, 500);
+    }
+
     if (!adminRow) {
+      console.error("[enviar-email-time] Usuário não é admin:", userData.user.id, userData.user.email);
       return respostaJson({ error: "Só administradores podem enviar esse e-mail." }, 403);
     }
 
@@ -95,6 +108,12 @@ Deno.serve(async (req) => {
     const { destinatarioEmail, destinatarioNome, timeNome, linkFinalizacao, pdfBase64, pdfNomeArquivo } = body || {};
 
     if (!destinatarioEmail || !timeNome || !pdfBase64 || !linkFinalizacao) {
+      console.error("[enviar-email-time] Corpo da requisição incompleto:", {
+        temEmail: !!destinatarioEmail,
+        temTimeNome: !!timeNome,
+        temPdf: !!pdfBase64,
+        temLink: !!linkFinalizacao,
+      });
       return respostaJson({ error: "Faltam dados obrigatórios (e-mail, nome do time, PDF ou link)." }, 400);
     }
 
