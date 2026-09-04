@@ -20,11 +20,23 @@ const REMETENTE_EMAIL = Deno.env.get("REMETENTE_EMAIL") || "csuexalunos@gmail.co
 const REMETENTE_NOME = Deno.env.get("REMETENTE_NOME") || "Copa de Ex-Alunos de Futsal — Santa Úrsula";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-// Chave "secret" do projeto (Settings → API Keys → aba "Publishable and
-// secret API keys", começa com "sb_secret_"). O Supabase não deixa criar
-// secrets com o prefixo "SUPABASE_" (é reservado), por isso o nome é
-// "SB_SECRET_KEY" — cadastre com esse nome exato nos secrets da função.
-const SUPABASE_SECRET_KEY = Deno.env.get("SB_SECRET_KEY");
+
+// A chave secreta agora vem pronta do Supabase dentro de
+// SUPABASE_SECRET_KEYS — um dicionário JSON com uma ou mais chaves
+// "sb_secret_...". Não precisa cadastrar nada manualmente pra isso.
+function pegarChaveSecreta(): string | undefined {
+  const bruto = Deno.env.get("SUPABASE_SECRET_KEYS");
+  if (!bruto) return undefined;
+  try {
+    const dicionario = JSON.parse(bruto);
+    const valores = Object.values(dicionario as Record<string, string>);
+    return valores.length > 0 ? String(valores[0]) : undefined;
+  } catch (e) {
+    console.error("Falha ao interpretar SUPABASE_SECRET_KEYS:", e);
+    return undefined;
+  }
+}
+const SUPABASE_SECRET_KEY = pegarChaveSecreta();
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -49,7 +61,7 @@ Deno.serve(async (req) => {
     }
     if (!SUPABASE_URL || !SUPABASE_SECRET_KEY) {
       return respostaJson(
-        { error: "SUPABASE_URL e/ou SB_SECRET_KEY não configuradas nos secrets da função." },
+        { error: "SUPABASE_URL e/ou SUPABASE_SECRET_KEYS não disponíveis no ambiente da função." },
         500
       );
     }
