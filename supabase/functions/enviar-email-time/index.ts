@@ -21,10 +21,10 @@ const REMETENTE_NOME = Deno.env.get("REMETENTE_NOME") || "Copa de Ex-Alunos de F
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 // Chave "secret" do projeto (Settings → API Keys → aba "Publishable and
-// secret API keys", começa com "sb_secret_"). Cadastre como secret da
-// função com este nome exato — não depende de nenhuma variável que o
-// Supabase injeta sozinho, então funciona igual em qualquer projeto.
-const SUPABASE_SECRET_KEY = Deno.env.get("SUPABASE_SECRET_KEY");
+// secret API keys", começa com "sb_secret_"). O Supabase não deixa criar
+// secrets com o prefixo "SUPABASE_" (é reservado), por isso o nome é
+// "SB_SECRET_KEY" — cadastre com esse nome exato nos secrets da função.
+const SUPABASE_SECRET_KEY = Deno.env.get("SB_SECRET_KEY");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
     }
     if (!SUPABASE_URL || !SUPABASE_SECRET_KEY) {
       return respostaJson(
-        { error: "SUPABASE_URL e/ou SUPABASE_SECRET_KEY não configuradas nos secrets da função." },
+        { error: "SUPABASE_URL e/ou SB_SECRET_KEY não configuradas nos secrets da função." },
         500
       );
     }
