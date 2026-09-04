@@ -6,8 +6,11 @@
 // então a chave de API do Brevo nunca aparece no site público.
 //
 // Só quem estiver logado como ADMIN no app consegue chamar essa função —
-// isso é checado aqui dentro, consultando a tabela `admins` com a
-// service role key (que só existe no ambiente da função, nunca no navegador).
+// isso é checado aqui dentro, consultando a tabela `admins` com a chave
+// secreta do projeto (que só existe no ambiente da função, nunca no
+// navegador). Usa Deno.serve puro (não o template "withSupabase" que o
+// editor do Supabase sugere por padrão) — os dois funcionam, mas este é
+// mais simples de revisar linha a linha.
 // -----------------------------------------------------------------------
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
@@ -17,7 +20,11 @@ const REMETENTE_EMAIL = Deno.env.get("REMETENTE_EMAIL") || "csuexalunos@gmail.co
 const REMETENTE_NOME = Deno.env.get("REMETENTE_NOME") || "Copa de Ex-Alunos de Futsal — Santa Úrsula";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+// Chave "secret" do projeto (Settings → API Keys → aba "Publishable and
+// secret API keys", começa com "sb_secret_"). Cadastre como secret da
+// função com este nome exato — não depende de nenhuma variável que o
+// Supabase injeta sozinho, então funciona igual em qualquer projeto.
+const SUPABASE_SECRET_KEY = Deno.env.get("SUPABASE_SECRET_KEY");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -40,6 +47,12 @@ Deno.serve(async (req) => {
     if (!BREVO_API_KEY) {
       return respostaJson({ error: "BREVO_API_KEY não configurada nos secrets da função." }, 500);
     }
+    if (!SUPABASE_URL || !SUPABASE_SECRET_KEY) {
+      return respostaJson(
+        { error: "SUPABASE_URL e/ou SUPABASE_SECRET_KEY não configuradas nos secrets da função." },
+        500
+      );
+    }
 
     // 1) Confirma que quem está chamando é um admin logado (via token JWT
     //    enviado automaticamente pelo supabase.functions.invoke no app).
@@ -49,7 +62,7 @@ Deno.serve(async (req) => {
       return respostaJson({ error: "Não autenticado." }, 401);
     }
 
-    const supabaseAdmin = createClient(SUPABASE_URL!, SERVICE_ROLE_KEY!);
+    const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY);
     const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
     if (userError || !userData?.user) {
       return respostaJson({ error: "Sessão inválida." }, 401);
