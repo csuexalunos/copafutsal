@@ -3505,10 +3505,25 @@ function DocumentosOrganizacao({ teams, matches }) {
 // finalizar a inscrição. O status "aprovado pela comissão" é marcado à mão
 // pela organização, time por time, depois de revisar o cadastro.
 // ---------------------------------------------------------------------------
-function AprovacaoComissao({ teams, saveTeams }) {
+
+// Acha o e-mail que a pessoa colocou na hora que se cadastrou como
+// representante daquela turma (perfil aprovado com turma === nome do time).
+function emailRepresentanteDoTime(team, perfis) {
+  const candidato = (perfis || []).find(
+    (p) => p.status === "aprovado" && (p.turma || "").trim() === (team.nome || "").trim() && p.email
+  );
+  return candidato ? candidato.email : "";
+}
+
+function AprovacaoComissao({ teams, saveTeams, perfis }) {
   const [emailPorTime, setEmailPorTime] = useState({});
   const [enviando, setEnviando] = useState({});
   const [erro, setErro] = useState({});
+
+  const emailAtual = (team) => {
+    if (emailPorTime[team.id] !== undefined) return emailPorTime[team.id];
+    return team.emailComissao || emailRepresentanteDoTime(team, perfis) || "";
+  };
 
   const alternarAprovado = async (team) => {
     await saveTeams((atuais) =>
@@ -3517,7 +3532,7 @@ function AprovacaoComissao({ teams, saveTeams }) {
   };
 
   const enviar = async (team) => {
-    const email = (emailPorTime[team.id] ?? team.emailComissao ?? "").trim();
+    const email = emailAtual(team).trim();
     if (!email) {
       setErro((s) => ({ ...s, [team.id]: "Informe o e-mail antes de enviar." }));
       return;
@@ -3545,8 +3560,10 @@ function AprovacaoComissao({ teams, saveTeams }) {
         <Mail size={18} color={COLORS.ink} /> Aprovação da comissão e envio de e-mail
       </h3>
       <p className="text-xs mb-4" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-        Marque o time como aprovado depois que a comissão revisar o cadastro. O e-mail leva a
-        ficha do time em PDF e o link pra finalizar a inscrição (anexar o PDF e pagar).
+        Marque o time como aprovado depois que a comissão revisar o cadastro. O e-mail já vem
+        preenchido com o e-mail que o representante usou pra se cadastrar — confira antes de
+        enviar. Leva a ficha do time em PDF e o link pra finalizar a inscrição (anexar o PDF e
+        pagar).
       </p>
 
       {teams.length === 0 ? (
@@ -3555,7 +3572,10 @@ function AprovacaoComissao({ teams, saveTeams }) {
         </p>
       ) : (
         <div className="space-y-3">
-          {teams.map((t) => (
+          {teams.map((t) => {
+            const emailSugerido =
+              emailPorTime[t.id] === undefined && !t.emailComissao && !!emailRepresentanteDoTime(t, perfis);
+            return (
             <div
               key={t.id}
               className="rounded-xl p-3.5 flex flex-col gap-2.5"
@@ -3580,7 +3600,7 @@ function AprovacaoComissao({ teams, saveTeams }) {
                     <input
                       type="email"
                       placeholder="e-mail do representante do time"
-                      defaultValue={t.emailComissao || ""}
+                      value={emailAtual(t)}
                       onChange={(e) => setEmailPorTime((s) => ({ ...s, [t.id]: e.target.value }))}
                       className="flex-1 min-w-[220px] px-3 py-2 rounded-lg text-sm"
                       style={{
@@ -3601,6 +3621,11 @@ function AprovacaoComissao({ teams, saveTeams }) {
                       {t.emailEnviadoEm ? "Reenviar e-mail" : "Enviar e-mail"}
                     </button>
                   </div>
+                  {emailSugerido && (
+                    <p className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                      E-mail preenchido automaticamente com o cadastro do representante da turma.
+                    </p>
+                  )}
                   {erro[t.id] && (
                     <p className="text-xs" style={{ color: "#EF4444", fontFamily: "'Inter', sans-serif" }}>
                       {erro[t.id]}
@@ -3614,7 +3639,8 @@ function AprovacaoComissao({ teams, saveTeams }) {
                 </>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -5756,7 +5782,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
 
       <GerenciarElencos teams={teams} saveTeams={saveTeams} />
       <DiagnosticoIrregularidades teams={teams} />
-      <AprovacaoComissao teams={teams} saveTeams={saveTeams} />
+      <AprovacaoComissao teams={teams} saveTeams={saveTeams} perfis={perfis} />
       <PlanilhaInscricoes teams={teams} />
       <DocumentosOrganizacao teams={teams} matches={matches} />
 
