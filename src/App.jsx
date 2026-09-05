@@ -3171,12 +3171,23 @@ function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
-function abrirImpressao(titulo, corpoHtml) {
+function abrirJanelaImpressao() {
   const win = window.open("", "_blank");
   if (!win) {
     alert("Seu navegador bloqueou a janela. Permite pop-ups pra baixar o PDF.");
-    return;
+    return null;
   }
+  win.document.write(
+    `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8" /><title>Carregando…</title></head>` +
+      `<body style="font-family: Arial, Helvetica, sans-serif; color: #12203D; padding: 28px;">Carregando ficha…</body></html>`
+  );
+  win.document.close();
+  return win;
+}
+
+function preencherJanelaImpressao(win, titulo, corpoHtml) {
+  if (!win || win.closed) return;
+  win.document.open();
   win.document.write(`<!doctype html>
 <html lang="pt-BR">
 <head>
@@ -3211,7 +3222,14 @@ function abrirImpressao(titulo, corpoHtml) {
   }, 400);
 }
 
-function fichaTimeHtml(team, mapaCpf) {
+// Atalho síncrono pra quem não precisa buscar nada assíncrono antes de
+// montar o conteúdo (súmula, planilha) — abre e já preenche na hora.
+function abrirImpressao(titulo, corpoHtml) {
+  const win = abrirJanelaImpressao();
+  preencherJanelaImpressao(win, titulo, corpoHtml);
+}
+
+function fichaTimeHtml(team, mapaCpf, falhaCpf) {
   const jogadores = (Array.isArray(team.jogadores) ? team.jogadores : []).map((j) =>
     mapaCpf && mapaCpf[j.id] ? { ...j, cpf: mapaCpf[j.id] } : j
   );
@@ -3222,6 +3240,7 @@ function fichaTimeHtml(team, mapaCpf) {
     <div class="secao">
       <h1>Seleção de ${escapeHtml(team.nome)}</h1>
       <div class="meta">Capitão: ${escapeHtml(team.capitao || "—")} · Contato: ${escapeHtml(team.contato || "—")} · ${jogadores.length} jogador(es)</div>
+      ${falhaCpf ? `<div class="meta" style="color:#c0392b; font-weight:bold;">⚠ Não foi possível carregar os CPFs (erro ao consultar o banco). Tente de novo ou confira se está logado.</div>` : ""}
       <table>
         <thead><tr><th>Nº</th><th>Nome completo</th><th>CPF</th><th>Período de estudo</th><th>Ano de conclusão</th></tr></thead>
         <tbody>
@@ -3240,13 +3259,16 @@ function fichaTimeHtml(team, mapaCpf) {
 }
 
 async function baixarFichaTime(team) {
+  const win = abrirJanelaImpressao();
   let mapaCpf = {};
+  let falhaCpf = false;
   try {
     mapaCpf = await buscarCpfsDoTime(team.id);
   } catch (e) {
     console.error("Falha ao buscar CPFs pra ficha do time", e);
+    falhaCpf = true;
   }
-  abrirImpressao(`Ficha — ${team.nome}`, fichaTimeHtml(team, mapaCpf));
+  preencherJanelaImpressao(win, `Ficha — ${team.nome}`, fichaTimeHtml(team, mapaCpf, falhaCpf));
 }
 
 // ---------------------------------------------------------------------------
@@ -3255,12 +3277,7 @@ async function baixarFichaTime(team) {
 // direto no navegador, sem depender de nenhum serviço externo.
 // ---------------------------------------------------------------------------
 async function gerarFichaTimePdfBase64(team) {
-  let mapaCpf = {};
-  try {
-    mapaCpf = await buscarCpfsDoTime(team.id);
-  } catch (e) {
-    console.error("Falha ao buscar CPFs pra gerar o PDF", e);
-  }
+  const mapaCpf = await buscarCpfsDoTime(team.id);
   const jogadores = (Array.isArray(team.jogadores) ? team.jogadores : []).map((j) =>
     mapaCpf[j.id] ? { ...j, cpf: mapaCpf[j.id] } : j
   );
@@ -3385,18 +3402,21 @@ async function enviarEmailAprovacaoTime(team, emailDestino) {
 }
 
 async function baixarFichaTodosTimes(teams) {
+  const win = abrirJanelaImpressao();
   const partes = await Promise.all(
     teams.map(async (t) => {
       let mapaCpf = {};
+      let falhaCpf = false;
       try {
         mapaCpf = await buscarCpfsDoTime(t.id);
       } catch (e) {
         console.error("Falha ao buscar CPFs pra ficha do time", t.nome, e);
+        falhaCpf = true;
       }
-      return fichaTimeHtml(t, mapaCpf);
+      return fichaTimeHtml(t, mapaCpf, falhaCpf);
     })
   );
-  abrirImpressao("Fichas de todos os times", partes.join(""));
+  preencherJanelaImpressao(win, "Fichas de todos os times", partes.join(""));
 }
 
 function sumulaHtml(match, teams) {
