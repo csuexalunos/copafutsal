@@ -34,6 +34,7 @@ import {
   criarPerfil, buscarPerfil, listarPerfis, atualizarPerfil, souAdmin, listarAdmins,
   promoverParaAdmin, subirArquivo, urlAssinada, contarPessoasInscritas, buscarCpfsDaTurma,
   registrarAcesso, contarAcessos, esqueciSenha, definirNovaSenha, supabase,
+  buscarCpfsDoTime, salvarCpfJogador, salvarCpfsEmLote, excluirCpfsDoJogador,
 } from "./lib/supabase.js";
 
 // Link oficial pra finalizar a inscrição (anexar ficha em PDF e pagar),
@@ -1217,16 +1218,53 @@ function EscudoPicker({ value, onChange }) {
 // Edição de elenco reutilizável — usada tanto por quem já se inscreveu
 // (com o código do time) quanto pela organização (com a senha de admin)
 // ---------------------------------------------------------------------------
-function RosterEditor({ team, onSave }) {
+function RosterEditor({ team, onSave, autenticado = true }) {
   const [jogadores, setJogadores] = useState(team.jogadores || []);
   const [saved, setSaved] = useState(false);
+  const [avisoCpf, setAvisoCpf] = useState("");
+
+  useEffect(() => {
+    if (!autenticado) return;
+    let cancelado = false;
+    buscarCpfsDoTime(team.id)
+      .then((mapaCpf) => {
+        if (cancelado || Object.keys(mapaCpf).length === 0) return;
+        setJogadores((atuais) => atuais.map((j) => (mapaCpf[j.id] ? { ...j, cpf: mapaCpf[j.id] } : j)));
+      })
+      .catch((e) => console.error("Falha ao buscar CPFs do time", e));
+    return () => {
+      cancelado = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [team.id, autenticado]);
 
   const addJogador = (novo) => setJogadores([...jogadores, novo]);
   const updateJogador = (updated) => setJogadores(jogadores.map((j) => (j.id === updated.id ? updated : j)));
-  const removeJogador = (id) => setJogadores(jogadores.filter((j) => j.id !== id));
+  const removeJogador = (id) => {
+    setJogadores(jogadores.filter((j) => j.id !== id));
+    if (autenticado) {
+      excluirCpfsDoJogador([id]).catch((e) => console.error("Falha ao excluir CPF do jogador removido", e));
+    }
+  };
 
   const salvar = async () => {
-    await onSave({ ...team, jogadores });
+    // CPF nunca vai pro registro público do time — fica só na tabela
+    // protegida (cpfs_jogadores), separada.
+    const semCpf = jogadores.map(({ cpf, ...resto }) => resto);
+    await onSave({ ...team, jogadores: semCpf });
+    if (autenticado) {
+      try {
+        await salvarCpfsEmLote(
+          jogadores.filter((j) => j.cpf).map((j) => ({ team_id: team.id, jogador_id: j.id, cpf: j.cpf }))
+        );
+        setAvisoCpf("");
+      } catch (e) {
+        console.error("Falha ao salvar CPFs", e);
+        setAvisoCpf("O restante foi salvo, mas houve erro ao salvar o CPF.");
+      }
+    } else {
+      setAvisoCpf("CPF só pode ser salvo com login — peça a um organizador se precisar atualizar.");
+    }
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -1269,6 +1307,11 @@ function RosterEditor({ team, onSave }) {
         <span className="ml-3 text-sm" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
           Salvo!
         </span>
+      )}
+      {avisoCpf && (
+        <p className="text-xs mt-2" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+          {avisoCpf}
+        </p>
       )}
     </div>
   );
@@ -1326,7 +1369,7 @@ function EditarMeuTime({ teams, saveTeams }) {
         <div className="text-sm font-semibold mb-3" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>
           Editando: {time.nome}
         </div>
-        <RosterEditor team={time} onSave={salvarTime} />
+        <RosterEditor team={time} onSave={salvarTime} autenticado={false} />
       </div>
     );
   }
@@ -1475,6 +1518,27 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes }) {
   const [error, setError] = useState("");
   const [codigoGerado, setCodigoGerado] = useState("");
 
+  // Se a tela já abre com o time da própria pessoa carregado (turma fixa),
+  // busca os CPFs na tabela protegida e completa o formulário.
+  useEffect(() => {
+    const turmaAlvo = isAdmin ? "" : turmaFixa;
+    const timeAlvo = turmaAlvo ? teams.find((t) => t.nome === turmaAlvo) : null;
+    if (!timeAlvo) return;
+    buscarCpfsDoTime(timeAlvo.id)
+      .then((mapaCpf) => {
+        if (Object.keys(mapaCpf).length === 0) return;
+        setForm((atual) => {
+          if (atual.turmaSelecionada !== timeAlvo.nome) return atual;
+          return {
+            ...atual,
+            jogadores: atual.jogadores.map((j) => (mapaCpf[j.id] ? { ...j, cpf: mapaCpf[j.id] } : j)),
+          };
+        });
+      })
+      .catch((e) => console.error("Falha ao buscar CPFs do time", e));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const nomeTime = form.turmaSelecionada === "outro" ? form.nomeCustom.trim() : form.turmaSelecionada;
   const timeExistente = teams.find((t) => t.nome === nomeTime) || null;
 
@@ -1497,6 +1561,20 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes }) {
         jogadores: existente.jogadores || [],
         escudoUrl: existente.escudoUrl || "",
       });
+      // CPF do time já inscrito fica na tabela protegida (cpfs_jogadores),
+      // nunca dentro do registro público do time — busca e completa.
+      buscarCpfsDoTime(existente.id)
+        .then((mapaCpf) => {
+          if (Object.keys(mapaCpf).length === 0) return;
+          setForm((atual) => {
+            if (atual.turmaSelecionada !== valor) return atual;
+            return {
+              ...atual,
+              jogadores: atual.jogadores.map((j) => (mapaCpf[j.id] ? { ...j, cpf: mapaCpf[j.id] } : j)),
+            };
+          });
+        })
+        .catch((e) => console.error("Falha ao buscar CPFs do time", e));
       return;
     }
     atualizarCampo({
@@ -1563,32 +1641,48 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes }) {
     }
     setSaving(true);
     let codigo = null;
+    let idParaCpfs = null;
+    const jogadoresSemCpf = form.jogadores.map(({ cpf, ...resto }) => resto);
     await saveTeams((atuais) => {
       const lista = atuais || [];
       if (timeExistente) {
         const existenteReal = lista.find((t) => t.nome === nomeTime) || timeExistente;
+        idParaCpfs = existenteReal.id;
         const atualizado = {
           ...existenteReal,
           capitao: form.capitao.trim(),
           contato: form.contato.trim(),
-          jogadores: form.jogadores,
+          jogadores: jogadoresSemCpf,
           escudoUrl: form.escudoUrl,
         };
         return lista.map((t) => (t.id === atualizado.id ? atualizado : t));
       }
       codigo = gerarCodigoTime();
+      const novoId = `time_${Date.now()}`;
+      idParaCpfs = novoId;
       const novoTime = {
-        id: `time_${Date.now()}`,
+        id: novoId,
         nome: nomeTime,
         capitao: form.capitao.trim(),
         contato: form.contato.trim(),
-        jogadores: form.jogadores,
+        jogadores: jogadoresSemCpf,
         escudoUrl: form.escudoUrl,
         codigo,
         inscritoEm: new Date().toISOString(),
       };
       return [...lista, novoTime];
     });
+    // CPF nunca vai pro registro público do time — fica só na tabela
+    // protegida (cpfs_jogadores), separada.
+    if (idParaCpfs) {
+      try {
+        await salvarCpfsEmLote(
+          form.jogadores.filter((j) => j.cpf).map((j) => ({ team_id: idParaCpfs, jogador_id: j.id, cpf: j.cpf }))
+        );
+      } catch (err) {
+        console.error("Falha ao salvar CPFs", err);
+      }
+    }
     if (codigo) setCodigoGerado(codigo);
     setSaving(false);
     setSent(true);
@@ -3117,8 +3211,10 @@ function abrirImpressao(titulo, corpoHtml) {
   }, 400);
 }
 
-function fichaTimeHtml(team) {
-  const jogadores = Array.isArray(team.jogadores) ? team.jogadores : [];
+function fichaTimeHtml(team, mapaCpf) {
+  const jogadores = (Array.isArray(team.jogadores) ? team.jogadores : []).map((j) =>
+    mapaCpf && mapaCpf[j.id] ? { ...j, cpf: mapaCpf[j.id] } : j
+  );
   const valorUnitario = valorPorAtletaNaData(team.inscritoEm);
   const lote = loteNaData(team.inscritoEm);
   const total = jogadores.length * valorUnitario;
@@ -3143,8 +3239,14 @@ function fichaTimeHtml(team) {
     </div>`;
 }
 
-function baixarFichaTime(team) {
-  abrirImpressao(`Ficha — ${team.nome}`, fichaTimeHtml(team));
+async function baixarFichaTime(team) {
+  let mapaCpf = {};
+  try {
+    mapaCpf = await buscarCpfsDoTime(team.id);
+  } catch (e) {
+    console.error("Falha ao buscar CPFs pra ficha do time", e);
+  }
+  abrirImpressao(`Ficha — ${team.nome}`, fichaTimeHtml(team, mapaCpf));
 }
 
 // ---------------------------------------------------------------------------
@@ -3152,8 +3254,16 @@ function baixarFichaTime(team) {
 // usada só pra anexar no e-mail de aprovação da comissão, gerada com jsPDF
 // direto no navegador, sem depender de nenhum serviço externo.
 // ---------------------------------------------------------------------------
-function gerarFichaTimePdfBase64(team) {
-  const jogadores = Array.isArray(team.jogadores) ? team.jogadores : [];
+async function gerarFichaTimePdfBase64(team) {
+  let mapaCpf = {};
+  try {
+    mapaCpf = await buscarCpfsDoTime(team.id);
+  } catch (e) {
+    console.error("Falha ao buscar CPFs pra gerar o PDF", e);
+  }
+  const jogadores = (Array.isArray(team.jogadores) ? team.jogadores : []).map((j) =>
+    mapaCpf[j.id] ? { ...j, cpf: mapaCpf[j.id] } : j
+  );
   const valorUnitario = valorPorAtletaNaData(team.inscritoEm);
   const lote = loteNaData(team.inscritoEm);
   const total = jogadores.length * valorUnitario;
@@ -3243,7 +3353,7 @@ function gerarFichaTimePdfBase64(team) {
 // (variável de ambiente da função), configurada separadamente.
 // ---------------------------------------------------------------------------
 async function enviarEmailAprovacaoTime(team, emailDestino) {
-  const pdfBase64 = gerarFichaTimePdfBase64(team);
+  const pdfBase64 = await gerarFichaTimePdfBase64(team);
   const { data, error } = await supabase.functions.invoke("enviar-email-time", {
     body: {
       destinatarioEmail: emailDestino.trim(),
@@ -3274,9 +3384,19 @@ async function enviarEmailAprovacaoTime(team, emailDestino) {
   return data;
 }
 
-function baixarFichaTodosTimes(teams) {
-  const corpo = teams.map(fichaTimeHtml).join("");
-  abrirImpressao("Fichas de todos os times", corpo);
+async function baixarFichaTodosTimes(teams) {
+  const partes = await Promise.all(
+    teams.map(async (t) => {
+      let mapaCpf = {};
+      try {
+        mapaCpf = await buscarCpfsDoTime(t.id);
+      } catch (e) {
+        console.error("Falha ao buscar CPFs pra ficha do time", t.nome, e);
+      }
+      return fichaTimeHtml(t, mapaCpf);
+    })
+  );
+  abrirImpressao("Fichas de todos os times", partes.join(""));
 }
 
 function sumulaHtml(match, teams) {
@@ -3529,6 +3649,245 @@ function emailRepresentanteDoTime(team, perfis) {
     (p) => p.status === "aprovado" && (p.turma || "").trim() === (team.nome || "").trim() && p.email
   );
   return candidato ? candidato.email : "";
+}
+
+// ---------------------------------------------------------------------------
+// Importar CPFs de uma planilha (ferramenta de uso único) — casa cada linha
+// da planilha com o jogador correspondente (por turma + apelido/nome) e
+// salva na tabela protegida cpfs_jogadores, nunca no registro público do
+// time. Pode rodar de novo sem problema (upsert), então serve também pra
+// reimportar se aparecer gente nova.
+// ---------------------------------------------------------------------------
+function normalizarTexto(s) {
+  return (s || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+const CPFS_PARA_IMPORTAR = [
+  { turma: "2016", apelido: "Vitor", nome: "Vitor Martins Luz Mariano", cpf: "086.805.414-35" },
+  { turma: "2016", apelido: "César", nome: "Bruno César Macedo de Almeida", cpf: "108.655.524-44" },
+  { turma: "2016", apelido: "Caio", nome: "Caio Petterson Araújo Pessoa Rangel", cpf: "111.179.306-96" },
+  { turma: "2016", apelido: "Gordinho", nome: "Fellipe Matheus Acioli Nunes", cpf: "111.269.404-88" },
+  { turma: "2016", apelido: "Clemente", nome: "Mateus Clemente Tenorio Padilha", cpf: "003.546.841-67" },
+  { turma: "2016", apelido: "P.A", nome: "Paulo Augusto Nascimento de Alencar", cpf: "106.329.964-04" },
+  { turma: "2016", apelido: "Ponnes", nome: "João Victor Vieira Melo", cpf: "058.409.524-43" },
+  { turma: "2016", apelido: "Lucas Laykos", nome: "Lucas Rodrigues Pacífico Chagas", cpf: "088.524.464-86" },
+  { turma: "2016", apelido: "Yurgan", nome: "Yurgan Montini Corneta Sarmento", cpf: "114.748.094-05" },
+  { turma: "2016", apelido: "Dedé", nome: "Marcos André de Holanda Prudente Pessoa", cpf: "112.986.754-48" },
+  { turma: "2016", apelido: "Nego", nome: "Gabriel Leite Sarmento", cpf: "101.147.544-89" },
+  { turma: "2022.1", apelido: "Pedro Miguel", nome: "Pedro Miguel Silva Couto", cpf: "125.256.704-93" },
+  { turma: "2022.1", apelido: "Caik", nome: "Caik agra toledo", cpf: "072.869.144-21" },
+  { turma: "2022.1", apelido: "Marlon", nome: "Marlon vergetti Araújo", cpf: "121.812.594-29" },
+  { turma: "2022.1", apelido: "Lucca", nome: "Luciano lucca farias", cpf: "144.815.424-38" },
+  { turma: "2022.1", apelido: "Borela", nome: "Lucca borela toledo correia", cpf: "122.236.664-93" },
+  { turma: "2022.1", apelido: "Teixeira", nome: "Pedro Teixeira dos Santos soares", cpf: "115.971.954-30" },
+  { turma: "2022.1", apelido: "Bruno", nome: "Bruno Fernandes calheiros", cpf: "141.430.014-03" },
+  { turma: "2007/06", apelido: "Ze", nome: "JOSE LUCAS PACHECO RODRIGUES LIMA", cpf: "076.813.074-35" },
+  { turma: "2007/06", apelido: "Baratinha", nome: "SIDNEY DUARTE ARRUDA PIMENTEL", cpf: "077.314.494-32" },
+  { turma: "2007/06", apelido: "Caio", nome: "CAIO MAGALHÃES BATISTA", cpf: "048.719.894-88" },
+  { turma: "2007/06", apelido: "Rodolfo", nome: "RODOLFO SANTOS BEZERRA", cpf: "077.118.964-84" },
+  { turma: "2007/06", apelido: "Engels", nome: "ENGELS BARROS DE CASTRO", cpf: "047.846.804-03" },
+  { turma: "2007/06", apelido: "Gabriel (cachorrão)", nome: "GABRIEL DE FRANÇA RIBEIRO", cpf: "048.187.944-73" },
+  { turma: "2007/06", apelido: "Luan", nome: "LUAN FARACO GUIMARÃES", cpf: "077.071.734-90" },
+  { turma: "2007/06", apelido: "Leite", nome: "BRUNO LEITE SETTON", cpf: "077.179.574-26" },
+  { turma: "2007/06", apelido: "Breno", nome: "BRENO DA SILVEIRA PACHECO", cpf: "076.999.004-56" },
+  { turma: "2007/06", apelido: "Pedro", nome: "PEDRO GUILHERME FERREIRA TENÓRIO", cpf: "074.314.874-60" },
+  { turma: "2007/06", apelido: "Abilio", nome: "ABILIO JORGE TENORIO ANTUNES DE MELLO", cpf: "055.505.404-79" },
+  { turma: "2007/06", apelido: "Dudu", nome: "EDUARDO SANTOS C DE ALBUQUERQUE", cpf: "077.329.494-55" },
+  { turma: "2020", apelido: "Teixeira", nome: "Matheus Monteiro Pires Teixeira", cpf: "127.795.644-82" },
+  { turma: "2020", apelido: "Rodrigo", nome: "RODRIGO COELHO BRINGEL B. DE BRITO", cpf: "118.393.004-69" },
+  { turma: "2020", apelido: "Luan", nome: "LUAN HENRIQUE OLIVEIRA DO NASCIMENTO LOPES NETTER", cpf: "142.698.064-78" },
+  { turma: "2020", apelido: "Aragão", nome: "GABRIEL VERÇOSA ARAGÃO", cpf: "141.433.734-59" },
+  { turma: "2020", apelido: "Arthur", nome: "ARTHUR COELHO BRINGEL BEZERRA DE BRITO", cpf: "118.393.184-06" },
+  { turma: "2020", apelido: "Kevin", nome: "KEVIN MEDEIROS DE SOUZA", cpf: "111.566.614-20" },
+  { turma: "2020", apelido: "José", nome: "José Victor Gadelha Xavier Martins", cpf: "115.460.304-09" },
+  { turma: "2010", apelido: "Houly", nome: "Rodrigo Houly de Carvalho", cpf: "111.479.364-71" },
+  { turma: "2010", apelido: "Fernando", nome: "Fernando da Aldeia Brêda", cpf: "057.148.194-97" },
+  { turma: "2010", apelido: "Mago", nome: "João Pedro Guedes Araújo", cpf: "086.380.834-40" },
+  { turma: "2010", apelido: "Arthur", nome: "Arthur Magalhães de Lima Pereira", cpf: "087.848.794-83" },
+  { turma: "2010", apelido: "Feiden", nome: "Henry José Feiden Júnior", cpf: "086.171.734-16" },
+  { turma: "2010", apelido: "Lukete", nome: "Lucas de Vasconcelos Carvalho", cpf: "095.689.884-08" },
+  { turma: "2010", apelido: "Leo", nome: "Leonardo Tenório Monteiro", cpf: "095.427.184-03" },
+  { turma: "2010", apelido: "Lula", nome: "Luiz André Muniz Oliveira", cpf: "086.338.094-86" },
+  { turma: "2010", apelido: "Waldir", nome: "Waldir Normande Guido", cpf: "088.971.484-33" },
+  { turma: "2010", apelido: "Paulinho", nome: "Paulo Ernesto Firmiano e Silva", cpf: "101.027.464-35" },
+  { turma: "2010", apelido: "Fraga", nome: "Paulo Fernando Fraga de Castro Filho", cpf: "095.790.564-55" },
+  { turma: "2014", apelido: "Bicuddo", nome: "LUCAS ALVES VIEIRA DE SOUZA", cpf: "121.498.814-89" },
+  { turma: "2014", apelido: "Negão", nome: "MATEUS HENRIQUE DO NASCIMENTO ROCHA", cpf: "110.664.694-07" },
+  { turma: "2014", apelido: "Brunno", nome: "BRUNNO CORADIN ZIERO", cpf: "076.264.084-70" },
+  { turma: "2014", apelido: "Davi", nome: "DAVI FERNANDES BRANDÃO DE ALMEIDA", cpf: "105.379.494-02" },
+  { turma: "2014", apelido: "Joca", nome: "JOÃO AUGUSTO DE CASTRO SILVA FILHO", cpf: "084.766.204-70" },
+  { turma: "2014", apelido: "Cuiabá", nome: "VINICIUS MORAES CARDOSO", cpf: "120.983.254-28" },
+  { turma: "2014", apelido: "Iury", nome: "IURY SIMÕES DE FRANÇA ALMEIDA", cpf: "069.776.094-43" },
+  { turma: "2014", apelido: "Lebrão", nome: "RAPHAEL PEREIRA LEBRE", cpf: "055.284.444-62" },
+  { turma: "2014", apelido: "Lira", nome: "ARTHUR DE SOUSA LIRA", cpf: "106.889.154-85" },
+  { turma: "2014", apelido: "Léo", nome: "LEONARDO RAMOS PIMENTEL SANTANA", cpf: "085.056.934-69" },
+  { turma: "2001/02", apelido: "Mamãe", nome: "Cesário Da Silva Souza", cpf: "052.374.044-13" },
+  { turma: "2001/02", apelido: "Balão", nome: "Emerson Melo Mota Ataíde", cpf: "067.848.514-39" },
+  { turma: "2001/02", apelido: "Ricardinho", nome: "Ricardo Soares Cota", cpf: "053.567.934-30" },
+  { turma: "2001/02", apelido: "Diogo", nome: "Diogo Phillip Silva Gueiros", cpf: "051.654.174-92" },
+  { turma: "2001/02", apelido: "Gago", nome: "Lucas Pontes Duarte", cpf: "980.011.020-53" },
+  { turma: "2001/02", apelido: "Pauli Nho", nome: "Paulo Henrique de Oliveira Frimino", cpf: "051.695.114-93" },
+  { turma: "2001/02", apelido: "Bel", nome: "Bernard Bomfim Correia", cpf: "048.699.814-24" },
+  { turma: "2001/02", apelido: "Da Us Toque", nome: "Hugo Lyra Soriano", cpf: "056.044.264-58" },
+  { turma: "2001/02", apelido: "Castanha", nome: "Ycaro Farias Valença", cpf: "055.476.784-81" },
+  { turma: "2022.2", apelido: "Besouro", nome: "Sérgio Rodrigues da Rocha neto", cpf: "139.249.644-67" },
+  { turma: "2022.2", apelido: "Uchôa", nome: "Rodrigo Nolasco Candido Uchoa", cpf: "110.309.044-56" },
+  { turma: "2022.2", apelido: "Nougaro", nome: "Gabriel Bittencourt Nougaro", cpf: "083.657.974-70" },
+  { turma: "2022.2", apelido: "Danielzinho", nome: "Daniel Lucena Dos Anjos", cpf: "146.072.374-00" },
+  { turma: "2022.2", apelido: "Griz", nome: "Vinicius Almeida Griz", cpf: "141.973.794-55" },
+  { turma: "2022.2", apelido: "Heitor", nome: "Heitor Cesar Neves Sampaio", cpf: "128.832.654-88" },
+  { turma: "2022.2", apelido: "Ildo", nome: "Ildo Raphael Caldeira Vasconcelos", cpf: "070.585.264-43" },
+  { turma: "2022.2", apelido: "Juninho", nome: "Paulo Daniel Juazeiro arruda de Carvalho Júnior", cpf: "118.898.324-56" },
+  { turma: "2022.2", apelido: "Da Mota", nome: "Mateus da Mota Lins Queiroga", cpf: "712.181.594-05" },
+  { turma: "2015", apelido: "Daniel", nome: "Daniel Monteiro de Carvalho Filho", cpf: "110.175.964-09" },
+  { turma: "2015", apelido: "Renan", nome: "Renan Kayan Couto Silva", cpf: "069.824.864-35" },
+  { turma: "2015", apelido: "Sego", nome: "Diogo Pitombeira Braga", cpf: "115.961.084-36" },
+  { turma: "2015", apelido: "Schausse", nome: "Gustavo Schausse Salgado", cpf: "115.742.284-55" },
+  { turma: "2015", apelido: "Marquinhos", nome: "Marcos Antônio Hermes Leandro Junior", cpf: "088.065.884-35" },
+  { turma: "2003/04", apelido: "Cadu", nome: "Carlos Eduardo Neto Muniz Farias", cpf: "052.091.044-35" },
+  { turma: "2003/04", apelido: "Dennis", nome: "Danny Charles Oliveira de Almeida Ventura", cpf: "067.150.974-88" },
+  { turma: "2003/04", apelido: "Thales", nome: "Thales Anderson Bastos Soares", cpf: "013.846.384-07" },
+  { turma: "2003/04", apelido: "Gabriel", nome: "Gabriel Toledo Torres", cpf: "062.764.754-59" },
+  { turma: "2003/04", apelido: "D2", nome: "Diego Marcel Cavalcante de Vasconcelos", cpf: "074.921.844-41" },
+  { turma: "2003/04", apelido: "Brulu", nome: "Bruno Lucio de Oliveira", cpf: "013.762.394-18" },
+  { turma: "2003/04", apelido: "Sukebe", nome: "Fernando Nebson Falcão Tavares Junior", cpf: "067.698.064-36" },
+  { turma: "2003/04", apelido: "Tulio", nome: "Tulio José Bastos Soares", cpf: "013.846.394-89" },
+  { turma: "2019", apelido: "Raimundinho", nome: "RAIMUNDO LUKAS NOGUEIRA MELLO ALEXANDRE", cpf: "056.689.794-66" },
+  { turma: "2019", apelido: "Be", nome: "Bernardo Tenório Valente", cpf: "105.823.304-16" },
+  { turma: "2019", apelido: "Bale", nome: "JOÃO PHILLIP LIMA LINS", cpf: "142.576.384-78" },
+  { turma: "2019", apelido: "Choquito", nome: "Christian Guedes Souto do Nascimento", cpf: "110.149.834-01" },
+  { turma: "2019", apelido: "Gui Casado", nome: "Guilherme Do Amaral A Casado", cpf: "138.592.834-48" },
+  { turma: "2019", apelido: "Lucganso", nome: "LUCCA BEZERRA MOURA TORRES", cpf: "055.849.664-44" },
+  { turma: "2019", apelido: "Fumacinha", nome: "ARTUR LUCAS SOUSA GUEDES", cpf: "094.422.954-97" },
+  { turma: "2019", apelido: "Chumbo-", nome: "DIEGO ESTEVÃO DA COSTA", cpf: "014.242.934-13" },
+  { turma: "2021", apelido: "Pipi", nome: "felipe oliveira soares de lima", cpf: "098.739.754-03" },
+  { turma: "2021", apelido: "Leão", nome: "Pedro Vitor Rolemberg leão", cpf: "117.860.114-50" },
+  { turma: "2021", apelido: "Bassoa", nome: "juan henrique almeida bassoa", cpf: "147.604.204-79" },
+  { turma: "2021", apelido: "Coxinha", nome: "caio tenorio bentes", cpf: "109.285.054-64" },
+  { turma: "2021", apelido: "Gerônimo", nome: "marcos geronimo barbosa", cpf: "059.174.184-97" },
+  { turma: "2021", apelido: "Marcellus", nome: "pedro marcellus portella", cpf: "105.168.444-74" },
+  { turma: "2021", apelido: "Serginho", nome: "Sergio ricardo maciel filho", cpf: "080.214.889-13" },
+  { turma: "2018", apelido: "Pão", nome: "João Victor Vieira Melo", cpf: "058.409.524-43" },
+  { turma: "2018", apelido: "Valtinho", nome: "Valter Souza Cassella", cpf: "079.067.454-85" },
+  { turma: "2018", apelido: "Villar", nome: "Cleydson Villar Barbosa", cpf: "093.952.164-41" },
+  { turma: "2018", apelido: "Maia", nome: "Pedro Henrique dos Santos Maia", cpf: "130.920.714-33" },
+  { turma: "2018", apelido: "Bernardo", nome: "Bernardo Terto de lima", cpf: "048.971.894-97" },
+  { turma: "2018", apelido: "Fernando", nome: "Fernando Lessa Pereira de Melo", cpf: "111.596.824-61" },
+  { turma: "2018", apelido: "Gustavo", nome: "Gustavo P. de Miranda O. filho", cpf: "121.372.974-26" },
+  { turma: "2018", apelido: "Victor", nome: "João Victor Porciuncula", cpf: "081.902.134-24" },
+  { turma: "2012", apelido: "Thiago", nome: "Thiago Lins Ramires", cpf: "095.217.364-61" },
+  { turma: "2012", apelido: "Netinho", nome: "Jose Agnaldo de Souza Araujo Neto", cpf: "084.465.544-96" },
+  { turma: "2012", apelido: "Henrique", nome: "Henrique Vaz Ferreira Acioli", cpf: "102.960.524-69" },
+  { turma: "2012", apelido: "Fumaça", nome: "Vinicius Nunes Felino", cpf: "101.306.684-78" },
+  { turma: "2012", apelido: "Murilo", nome: "Murilo Correia Tenorio de Albuquerque", cpf: "057.245.334-56" },
+  { turma: "2012", apelido: "Iago", nome: "Iago Gomes Vacchiano", cpf: "111.622.664-22" },
+  { turma: "2012", apelido: "Ib", nome: "Ib da Aldeia Breda", cpf: "057.148.204-01" },
+  { turma: "2012", apelido: "Chico", nome: "Francisco Hélio Cavalcante Jatobá Neto", cpf: "117.637.824-41" },
+  { turma: "2012", apelido: "Neto", nome: "José Jairo Melo neto", cpf: "084.704.494-78" },
+  { turma: "2012", apelido: "Lelaeta", nome: "Rodrigo Vilela Cortes", cpf: "102.241.544-19" },
+  { turma: "2012", apelido: "Fabinho", nome: "Fabio Manoel Fragoso Bittencourt Araujo", cpf: "068.780.104-46" },
+  { turma: "2012", apelido: "Emano", nome: "Emmanoel Victor Esteves da Rocha", cpf: "101.437.454-50" },
+  { turma: "2012", apelido: "Sipa", nome: "João Carlos Nunes", cpf: "056.905.934-86" },
+];
+
+function ImportarCpfsPlanilha({ teams }) {
+  const [rodando, setRodando] = useState(false);
+  const [resultado, setResultado] = useState(null);
+
+  const importar = async () => {
+    setRodando(true);
+    setResultado(null);
+    const porTurma = {};
+    CPFS_PARA_IMPORTAR.forEach((linha) => {
+      const chave = normalizarTexto(linha.turma);
+      if (!porTurma[chave]) porTurma[chave] = [];
+      porTurma[chave].push(linha);
+    });
+
+    const linhasParaSalvar = [];
+    const naoEncontrados = [];
+
+    (teams || []).forEach((time) => {
+      const candidatos = porTurma[normalizarTexto(time.nome)] || [];
+      if (candidatos.length === 0) return;
+      (time.jogadores || []).forEach((jogador) => {
+        const apelidoNorm = normalizarTexto(jogador.apelido);
+        const nomeNorm = normalizarTexto(jogador.nome);
+        const achou = candidatos.find(
+          (c) => (apelidoNorm && normalizarTexto(c.apelido) === apelidoNorm) || (nomeNorm && normalizarTexto(c.nome) === nomeNorm)
+        );
+        if (achou) {
+          linhasParaSalvar.push({ team_id: time.id, jogador_id: jogador.id, cpf: achou.cpf });
+        } else {
+          naoEncontrados.push(`${time.nome} — ${jogador.nome || jogador.apelido || "(sem nome)"}`);
+        }
+      });
+    });
+
+    try {
+      await salvarCpfsEmLote(linhasParaSalvar);
+      setResultado({ salvos: linhasParaSalvar.length, naoEncontrados });
+    } catch (e) {
+      console.error("Falha ao importar CPFs em lote", e);
+      setResultado({ erro: e.message });
+    } finally {
+      setRodando(false);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl p-5 mt-8" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+      <h3 className="font-semibold mb-1" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+        Importar CPFs de uma planilha (uso único)
+      </h3>
+      <p className="text-xs mb-4" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+        Casa cada jogador já cadastrado (por turma + apelido ou nome) com a planilha que você
+        mandou e salva o CPF na tabela protegida — nunca no registro público do time. Pode
+        clicar de novo sem problema.
+      </p>
+      <button
+        type="button"
+        onClick={importar}
+        disabled={rodando}
+        className="px-4 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2 disabled:opacity-60"
+        style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}
+      >
+        {rodando ? <Loader2 size={14} className="animate-spin" /> : null}
+        {rodando ? "Importando..." : "Rodar importação"}
+      </button>
+
+      {resultado && resultado.erro && (
+        <p className="text-xs mt-3" style={{ color: "#EF4444", fontFamily: "'Inter', sans-serif" }}>
+          Erro: {resultado.erro}
+        </p>
+      )}
+      {resultado && !resultado.erro && (
+        <div className="mt-4 text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+          <p className="font-semibold mb-2" style={{ color: COLORS.ink }}>
+            {resultado.salvos} CPF(s) importado(s) com sucesso.
+          </p>
+          {resultado.naoEncontrados.length > 0 && (
+            <>
+              <p className="mb-1">
+                {resultado.naoEncontrados.length} jogador(es) cadastrado(s) no app não bateram com
+                nenhuma linha da planilha (confira nome/apelido ou complete manualmente em
+                "Gerenciar jogadores de um time"):
+              </p>
+              <ul className="list-disc pl-4 space-y-0.5 max-h-48 overflow-y-auto">
+                {resultado.naoEncontrados.map((linha, i) => (
+                  <li key={i}>{linha}</li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function AprovacaoComissao({ teams, saveTeams, perfis }) {
@@ -5799,6 +6158,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
       <GerenciarElencos teams={teams} saveTeams={saveTeams} />
       <DiagnosticoIrregularidades teams={teams} />
       <AprovacaoComissao teams={teams} saveTeams={saveTeams} perfis={perfis} />
+      <ImportarCpfsPlanilha teams={teams} />
       <PlanilhaInscricoes teams={teams} />
       <DocumentosOrganizacao teams={teams} matches={matches} />
 

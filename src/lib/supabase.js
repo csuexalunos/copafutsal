@@ -156,6 +156,52 @@ export async function buscarCpfsDaTurma(turma) {
   return mapa;
 }
 
+// ---------------------------------------------------------------------------
+// CPF dos jogadores da edição atual — guardado numa tabela separada e
+// protegida (cpfs_jogadores), NUNCA dentro do registro do time em
+// `app_data` (essa é lida publicamente por qualquer visitante do site,
+// sem login). Ligado ao time e ao jogador pelos IDs internos.
+// ---------------------------------------------------------------------------
+export async function buscarCpfsDoTime(teamId) {
+  const { data, error } = await supabase.from("cpfs_jogadores").select("jogador_id, cpf").eq("team_id", teamId);
+  if (error) throw error;
+  const mapa = {};
+  (data || []).forEach((row) => {
+    mapa[row.jogador_id] = row.cpf;
+  });
+  return mapa;
+}
+
+export async function salvarCpfJogador(teamId, jogadorId, cpf) {
+  if (!cpf) {
+    const { error } = await supabase
+      .from("cpfs_jogadores")
+      .delete()
+      .eq("team_id", teamId)
+      .eq("jogador_id", jogadorId);
+    if (error) throw error;
+    return;
+  }
+  const { error } = await supabase
+    .from("cpfs_jogadores")
+    .upsert({ team_id: teamId, jogador_id: jogadorId, cpf, atualizado_em: new Date().toISOString() });
+  if (error) throw error;
+}
+
+export async function salvarCpfsEmLote(linhas) {
+  // linhas: [{ team_id, jogador_id, cpf }]
+  if (!linhas || linhas.length === 0) return;
+  const comCarimbo = linhas.map((l) => ({ ...l, atualizado_em: new Date().toISOString() }));
+  const { error } = await supabase.from("cpfs_jogadores").upsert(comCarimbo);
+  if (error) throw error;
+}
+
+export async function excluirCpfsDoJogador(jogadorIds) {
+  if (!jogadorIds || jogadorIds.length === 0) return;
+  const { error } = await supabase.from("cpfs_jogadores").delete().in("jogador_id", jogadorIds);
+  if (error) throw error;
+}
+
 // Métricas simples de acesso ao app.
 export async function registrarAcesso() {
   const { error } = await supabase.rpc("incrementar_acesso");
