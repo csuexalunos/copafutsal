@@ -3840,6 +3840,31 @@ const CPFS_PARA_IMPORTAR = [
   { turma: "2012", apelido: "Fabinho", nome: "Fabio Manoel Fragoso Bittencourt Araujo", cpf: "068.780.104-46" },
   { turma: "2012", apelido: "Emano", nome: "Emmanoel Victor Esteves da Rocha", cpf: "101.437.454-50" },
   { turma: "2012", apelido: "Sipa", nome: "João Carlos Nunes", cpf: "056.905.934-86" },
+  // Adicionados a partir da ficha de inscrição original em PDF (a planilha
+  // tinha texto de período de estudo digitado por engano na coluna de CPF
+  // desses dois times).
+  { turma: "2009", apelido: "Bruninho", nome: "Bruno Ramires Baracho", cpf: "048.924.644-30" },
+  { turma: "2009", apelido: "Davizinho", nome: "Davi Falcão Bastos Beleza", cpf: "091.329.824-70" },
+  { turma: "2009", apelido: "Jonny", nome: "João Victor de Mesquita Mendonça", cpf: "086.214.134-69" },
+  { turma: "2009", apelido: "Maradona", nome: "Lucas Costa Russo", cpf: "090.953.004-12" },
+  { turma: "2009", apelido: "Vovô", nome: "Diego José Uchôa Quintela", cpf: "091.006.584-56" },
+  { turma: "2009", apelido: "Cabral", nome: "José Paulo Cabral da Silva Filho", cpf: "089.393.334-11" },
+  { turma: "2009", apelido: "Ronaldo", nome: "Ronaldo Victor Lemos Fontes Silva", cpf: "091.269.144-17" },
+  { turma: "2009", apelido: "Dyler", nome: "Dylermando Sávio Aguiar Cunha", cpf: "085.374.134-45" },
+  { turma: "2009", apelido: "Libas", nome: "Elias Carlos de Oliveira Filho", cpf: "091.399.054-03" },
+  { turma: "2009", apelido: "Yaggo", nome: "Yaggo de Melo Freitas", cpf: "069.030.744-65" },
+  { turma: "2013", apelido: "Lukinhas", nome: "Lucas Martins da Costa Pereira", cpf: "047.649.034-07" },
+  { turma: "2013", apelido: "João Bigode", nome: "João Carlos de Lima Sousa", cpf: "066.754.604-98" },
+  { turma: "2013", apelido: "Victor Jatoba", nome: "Victor César Lucena jatobá", cpf: "014.818.654-80" },
+  { turma: "2013", apelido: "Theo", nome: "Théo Costa Fortes SilveiraCavalcanti", cpf: "100.120.634-79" },
+  { turma: "2013", apelido: "Ph", nome: "Pedro Henrique Vieira Rosa de Omena", cpf: "091.807.484-30" },
+  { turma: "2013", apelido: "Galo", nome: "João Victor Magalhães Nunes Santos", cpf: "114.729.004-05" },
+  { turma: "2013", apelido: "Dede", nome: "André Vaz Ferreira acioli", cpf: "102.957.244-55" },
+  { turma: "2013", apelido: "Italo", nome: "Italo Matheus vieira cabral", cpf: "087.625.574-83" },
+  { turma: "2013", apelido: "Douglas", nome: "Douglas de Carvalho Matos Barros", cpf: "120.099.964-96" },
+  { turma: "2013", apelido: "Gustavo", nome: "Carlos Gustavo Ferreira Lima", cpf: "116.630.004-84" },
+  { turma: "2013", apelido: "Vitao", nome: "Victor Barbosa Martiniano Lins", cpf: "106.504.834-30" },
+  { turma: "2013", apelido: "Matteus", nome: "Matteus Lucas de Andrade Xavier", cpf: "121.721.944-76" },
 ];
 
 function ImportarCpfsPlanilha({ teams }) {
