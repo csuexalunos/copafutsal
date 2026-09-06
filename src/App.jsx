@@ -1003,11 +1003,19 @@ function PlayerRow({ player, onChange, onRemove, turmaTime, onSolicitarAvaliacao
   const titulo = player.apelido || player.nome || "Jogador sem nome";
   const regular = anoConclusaoRegular(player.anoConclusao, turmaTime);
   const irregular = regular === false && !player.excecaoAprovada;
+  const cpfFaltando = !player.cpf || !String(player.cpf).trim();
 
   return (
     <div
       className="rounded-xl overflow-hidden"
-      style={{ backgroundColor: COLORS.zebra, border: irregular ? `1.5px solid ${COLORS.accent}` : "1.5px solid transparent" }}
+      style={{
+        backgroundColor: COLORS.zebra,
+        border: irregular
+          ? `1.5px solid ${COLORS.accent}`
+          : cpfFaltando
+          ? "1.5px solid #EF4444"
+          : "1.5px solid transparent",
+      }}
     >
       <button
         type="button"
@@ -1024,10 +1032,15 @@ function PlayerRow({ player, onChange, onRemove, turmaTime, onSolicitarAvaliacao
           <div className="text-sm font-medium truncate flex items-center gap-1.5" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
             {titulo}
             {irregular && <AlertTriangle size={13} color={COLORS.accent} />}
+            {!irregular && cpfFaltando && <AlertTriangle size={13} color="#EF4444" />}
           </div>
           {irregular ? (
             <div className="text-xs truncate font-medium" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
               Ano de conclusão ({player.anoConclusao}) não bate com a turma {turmaTime} — Art. 9º
+            </div>
+          ) : cpfFaltando ? (
+            <div className="text-xs truncate font-semibold" style={{ color: "#EF4444", fontFamily: "'Inter', sans-serif" }}>
+              CPF obrigatório — falta preencher
             </div>
           ) : player.excecaoAprovada ? (
             <div className="text-xs truncate" style={{ color: "#16A34A", fontFamily: "'Inter', sans-serif" }}>
@@ -1247,7 +1260,15 @@ function RosterEditor({ team, onSave, autenticado = true }) {
     }
   };
 
+  const jogadoresSemCpf = jogadores.filter((j) => !j.cpf || !String(j.cpf).trim());
+
   const salvar = async () => {
+    if (autenticado && jogadoresSemCpf.length > 0) {
+      setAvisoCpf(
+        `Preencha o CPF de todos os jogadores antes de salvar — falta em ${jogadoresSemCpf.length} jogador(es) (marcado em vermelho abaixo).`
+      );
+      return;
+    }
     // CPF nunca vai pro registro público do time — fica só na tabela
     // protegida (cpfs_jogadores), separada.
     const semCpf = jogadores.map(({ cpf, ...resto }) => resto);
@@ -1637,6 +1658,13 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes }) {
     }
     if (form.jogadores.length === 0) {
       setError("Cadastre pelo menos um jogador — não é opcional.");
+      return;
+    }
+    const semCpf = form.jogadores.filter((j) => !j.cpf || !String(j.cpf).trim());
+    if (semCpf.length > 0) {
+      setError(
+        `Preencha o CPF de todos os jogadores antes de salvar — falta em ${semCpf.length} jogador(es), marcado(s) em vermelho na lista abaixo.`
+      );
       return;
     }
     setSaving(true);
