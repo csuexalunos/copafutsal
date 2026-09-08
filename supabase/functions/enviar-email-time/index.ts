@@ -108,7 +108,8 @@ Deno.serve(async (req) => {
     // 2) Lê os dados enviados pelo app — assunto e corpo já vêm prontos,
     //    o anexo em PDF é opcional (só o e-mail de aprovação usa).
     const body = await req.json();
-    const { destinatarioEmail, destinatarioNome, assunto, htmlContent, pdfBase64, pdfNomeArquivo } = body || {};
+    const { destinatarioEmail, destinatarioNome, assunto, htmlContent, textContent, pdfBase64, pdfNomeArquivo } =
+      body || {};
 
     if (!destinatarioEmail || !assunto || !htmlContent) {
       console.error("[enviar-email-time] Corpo da requisição incompleto:", {
@@ -126,6 +127,9 @@ Deno.serve(async (req) => {
       subject: assunto,
       htmlContent,
     };
+    if (textContent) {
+      payload.textContent = textContent;
+    }
     if (pdfBase64) {
       payload.attachment = [{ content: pdfBase64, name: pdfNomeArquivo || "anexo.pdf" }];
     }

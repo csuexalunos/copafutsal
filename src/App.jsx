@@ -3448,6 +3448,26 @@ async function chamarEnvioDeEmail(corpo) {
 }
 
 // ---------------------------------------------------------------------------
+// Envolve o conteúdo do e-mail num documento HTML completo (em vez de só
+// um <div> solto) — alguns clientes de e-mail e filtros de spam tratam
+// fragmentos sem <!doctype>/<html>/<body> de forma inconsistente, às
+// vezes descartando o corpo e deixando só o anexo. Isso deixa o e-mail
+// mais robusto em qualquer lugar que ele for aberto.
+// ---------------------------------------------------------------------------
+function envelopeHtmlEmail(corpoInterno) {
+  return `<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  </head>
+  <body style="margin:0; padding:0; background-color:#F4F6FB;">
+    ${corpoInterno}
+  </body>
+</html>`;
+}
+
+// ---------------------------------------------------------------------------
 // Teste genérico do envio de e-mail — não depende de time ou
 // representante nenhum, só confirma que o caminho inteiro (app → Edge
 // Function → Brevo) está funcionando.
@@ -3458,8 +3478,8 @@ async function enviarEmailTesteGenerico() {
     destinatarioEmail: EMAIL_TESTE_ORGANIZACAO,
     destinatarioNome: "Organização",
     assunto: `Teste de envio — Copa CSU (${agora})`,
-    htmlContent: `
-      <div style="font-family: Arial, Helvetica, sans-serif; color: #12203D; max-width: 560px; margin: 0 auto;">
+    htmlContent: envelopeHtmlEmail(`
+      <div style="font-family: Arial, Helvetica, sans-serif; color: #12203D; max-width: 560px; margin: 0 auto; padding: 24px 16px;">
         <h2 style="color: #12203D;">Teste de envio de e-mail ✅</h2>
         <p>Esse e-mail confirma que o caminho completo está funcionando: o app conseguiu
         chamar a função do Supabase, que conseguiu falar com o Brevo, que mandou esse
@@ -3467,7 +3487,12 @@ async function enviarEmailTesteGenerico() {
         <p style="font-size: 13px; color: #667085;">Disparado em ${agora}.</p>
         <p>Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula</p>
       </div>
-    `,
+    `),
+    textContent:
+      `Teste de envio de e-mail\n\n` +
+      `Esse e-mail confirma que o caminho completo está funcionando: o app conseguiu chamar a função do Supabase, que conseguiu falar com o Brevo, que mandou esse e-mail até aqui.\n\n` +
+      `Disparado em ${agora}.\n\n` +
+      `Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula`,
   });
 }
 
@@ -3475,8 +3500,8 @@ async function enviarEmailAprovacaoTime(team, emailDestino) {
   const pdfBase64 = await gerarFichaTimePdfBase64(team);
   const destinatarioNome = team.capitao || team.nome;
   const assunto = `Time ${team.nome} aprovado — finalize sua inscrição na Copa CSU`;
-  const htmlContent = `
-    <div style="font-family: Arial, Helvetica, sans-serif; color: #12203D; max-width: 560px; margin: 0 auto;">
+  const htmlContent = envelopeHtmlEmail(`
+    <div style="font-family: Arial, Helvetica, sans-serif; color: #12203D; max-width: 560px; margin: 0 auto; padding: 24px 16px;">
       <h2 style="color: #12203D;">Seu time foi avaliado e aprovado! 🎉</h2>
       <p>Olá${destinatarioNome ? ", " + destinatarioNome : ""}!</p>
       <p>
@@ -3506,12 +3531,22 @@ async function enviarEmailAprovacaoTime(team, emailDestino) {
       <p>Qualquer dúvida, fale com a organização.</p>
       <p>Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula</p>
     </div>
-  `;
+  `);
+  const textContent =
+    `Seu time foi avaliado e aprovado!\n\n` +
+    `Olá${destinatarioNome ? ", " + destinatarioNome : ""}!\n\n` +
+    `O time ${team.nome} foi avaliado pela comissão organizadora da Copa de Ex-Alunos de Futsal do Colégio Santa Úrsula e está aprovado.\n\n` +
+    `Em anexo você encontra a ficha do time em PDF, com a lista de jogadores aprovada pela comissão.\n\n` +
+    `Pra finalizar a inscrição: acesse o link abaixo, anexe o PDF (em anexo neste e-mail) e realize o pagamento.\n` +
+    `${LINK_FINALIZACAO_INSCRICAO}\n\n` +
+    `Qualquer dúvida, fale com a organização.\n\n` +
+    `Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula`;
   return chamarEnvioDeEmail({
     destinatarioEmail: emailDestino.trim(),
     destinatarioNome,
     assunto,
     htmlContent,
+    textContent,
     pdfBase64,
     pdfNomeArquivo: `ficha-${team.nome}.pdf`.replace(/[^a-zA-Z0-9._-]/g, "_"),
   });
@@ -3530,8 +3565,8 @@ function textoLoteAtual() {
 async function enviarLembreteInscricao(destinatarioEmail, destinatarioNome, turma) {
   const { nome: loteNome, valor: loteValor, fimFormatado } = textoLoteAtual();
   const assunto = `Não esqueça: inscrição da turma ${turma} na Copa CSU — ${loteNome} termina em breve`;
-  const htmlContent = `
-    <div style="font-family: Arial, Helvetica, sans-serif; color: #12203D; max-width: 560px; margin: 0 auto;">
+  const htmlContent = envelopeHtmlEmail(`
+    <div style="font-family: Arial, Helvetica, sans-serif; color: #12203D; max-width: 560px; margin: 0 auto; padding: 24px 16px;">
       <h2 style="color: #12203D;">Falta pouco pro prazo do ${loteNome}! ⏰</h2>
       <p>Olá${destinatarioNome ? ", " + destinatarioNome : ""}!</p>
       <p>
@@ -3556,12 +3591,21 @@ async function enviarLembreteInscricao(destinatarioEmail, destinatarioNome, turm
       <p>Qualquer dúvida, fale com a organização.</p>
       <p>Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula</p>
     </div>
-  `;
+  `);
+  const textContent =
+    `Falta pouco pro prazo do ${loteNome}!\n\n` +
+    `Olá${destinatarioNome ? ", " + destinatarioNome : ""}!\n\n` +
+    `Vimos que a turma ${turma} ainda não finalizou a inscrição na Copa de Ex-Alunos de Futsal do Colégio Santa Úrsula.\n\n` +
+    `O ${loteNome} (${formatarReais(loteValor)} por atleta) termina em ${fimFormatado}. Depois dessa data o valor da inscrição sobe pro próximo lote.\n\n` +
+    `Inscreva seu time agora: ${LINK_SITE_INSCRICAO}\n\n` +
+    `Qualquer dúvida, fale com a organização.\n\n` +
+    `Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula`;
   return chamarEnvioDeEmail({
     destinatarioEmail: destinatarioEmail.trim(),
     destinatarioNome,
     assunto,
     htmlContent,
+    textContent,
   });
 }
 
