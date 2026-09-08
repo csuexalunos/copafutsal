@@ -3306,11 +3306,32 @@ async function baixarFichaTime(team) {
 }
 
 // ---------------------------------------------------------------------------
+// Busca a versão mais atual de um time direto do banco — usada antes de
+// gerar qualquer PDF/e-mail, porque o time carregado na tela pode estar
+// alguns segundos desatualizado (ex: outra aba removeu um jogador
+// irregular ou editou o elenco, e essa tela só atualiza no próximo poll).
+// Se a busca falhar por qualquer motivo, usa o que já tinha na tela.
+// ---------------------------------------------------------------------------
+async function buscarTimeAtualizado(team) {
+  try {
+    const todos = await readKey("copasu:teams");
+    if (Array.isArray(todos)) {
+      const atualizado = todos.find((t) => t.id === team.id);
+      if (atualizado) return atualizado;
+    }
+  } catch (e) {
+    console.error("Falha ao buscar dados atualizados do time", e);
+  }
+  return team;
+}
+
+// ---------------------------------------------------------------------------
 // Ficha do time em PDF de verdade (não é a janela de impressão acima) —
 // usada só pra anexar no e-mail de aprovação da comissão, gerada com jsPDF
 // direto no navegador, sem depender de nenhum serviço externo.
 // ---------------------------------------------------------------------------
-async function gerarFichaTimePdfBase64(team) {
+async function gerarFichaTimePdfBase64(teamOriginal) {
+  const team = await buscarTimeAtualizado(teamOriginal);
   const mapaCpf = await buscarCpfsDoTime(team.id);
   const jogadores = (Array.isArray(team.jogadores) ? team.jogadores : []).map((j) =>
     mapaCpf[j.id] ? { ...j, cpf: mapaCpf[j.id] } : j
