@@ -40,6 +40,8 @@ import {
 // Link oficial pra finalizar a inscrição (anexar ficha em PDF e pagar),
 // depois que o time é aprovado pela comissão.
 const LINK_FINALIZACAO_INSCRICAO = "https://ursula.com.br/jogos-ex-alunos-2026/";
+// Link do próprio site pra fazer a inscrição do time (aba "Inscrição").
+const LINK_SITE_INSCRICAO = "https://csuexalunos.github.io/copafutsal/";
 
 // ---------------------------------------------------------------------------
 // Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula — 8ª Edição
@@ -3392,23 +3394,14 @@ async function gerarFichaTimePdfBase64(team) {
 }
 
 // ---------------------------------------------------------------------------
-// Envio do e-mail de aprovação — chama a Edge Function do Supabase
-// ("enviar-email-time"), que é quem de fato fala com a API do Brevo.
-// O app nunca guarda nem expõe a chave do Brevo — ela fica só no servidor
-// (variável de ambiente da função), configurada separadamente.
+// Chamada genérica da Edge Function do Supabase ("enviar-email-time"), que
+// é quem de fato fala com a API do Brevo. O app nunca guarda nem expõe a
+// chave do Brevo — ela fica só no servidor (variável de ambiente da
+// função), configurada separadamente. Usada por qualquer tela de admin
+// que precise mandar e-mail (aprovação de time, lembrete de inscrição...).
 // ---------------------------------------------------------------------------
-async function enviarEmailAprovacaoTime(team, emailDestino) {
-  const pdfBase64 = await gerarFichaTimePdfBase64(team);
-  const { data, error } = await supabase.functions.invoke("enviar-email-time", {
-    body: {
-      destinatarioEmail: emailDestino.trim(),
-      destinatarioNome: team.capitao || team.nome,
-      timeNome: team.nome,
-      linkFinalizacao: LINK_FINALIZACAO_INSCRICAO,
-      pdfBase64,
-      pdfNomeArquivo: `ficha-${team.nome}.pdf`.replace(/[^a-zA-Z0-9._-]/g, "_"),
-    },
-  });
+async function chamarEnvioDeEmail(corpo) {
+  const { data, error } = await supabase.functions.invoke("enviar-email-time", { body: corpo });
   if (error) {
     // O erro padrão do supabase-js só diz "non-2xx status code" — a
     // mensagem de verdade (a que a função devolveu) fica dentro de
@@ -3416,9 +3409,9 @@ async function enviarEmailAprovacaoTime(team, emailDestino) {
     // pra mostrar o motivo real na tela.
     if (error.context && typeof error.context.json === "function") {
       try {
-        const corpo = await error.context.clone().json();
-        if (corpo && corpo.error) {
-          throw new Error(corpo.error);
+        const corpoErro = await error.context.clone().json();
+        if (corpoErro && corpoErro.error) {
+          throw new Error(corpoErro.error);
         }
       } catch (e) {
         // se não der pra ler o corpo, cai no erro genérico mesmo
@@ -3427,6 +3420,100 @@ async function enviarEmailAprovacaoTime(team, emailDestino) {
     throw error;
   }
   return data;
+}
+
+async function enviarEmailAprovacaoTime(team, emailDestino) {
+  const pdfBase64 = await gerarFichaTimePdfBase64(team);
+  const destinatarioNome = team.capitao || team.nome;
+  const assunto = `Time ${team.nome} aprovado — finalize sua inscrição na Copa CSU`;
+  const htmlContent = `
+    <div style="font-family: Arial, Helvetica, sans-serif; color: #12203D; max-width: 560px; margin: 0 auto;">
+      <h2 style="color: #12203D;">Seu time foi avaliado e aprovado! 🎉</h2>
+      <p>Olá${destinatarioNome ? ", " + destinatarioNome : ""}!</p>
+      <p>
+        O time <strong>${team.nome}</strong> foi avaliado pela comissão organizadora da
+        Copa de Ex-Alunos de Futsal do Colégio Santa Úrsula e está <strong>aprovado</strong>.
+      </p>
+      <p>
+        Em anexo você encontra a <strong>ficha do time em PDF</strong>, com a lista de
+        jogadores aprovada pela comissão.
+      </p>
+      <p>Pra finalizar a inscrição, siga estes passos:</p>
+      <ol>
+        <li>Acesse o link abaixo;</li>
+        <li>Anexe o PDF da ficha do time (em anexo neste e-mail);</li>
+        <li>Realize o pagamento da inscrição.</li>
+      </ol>
+      <p style="text-align: center; margin: 28px 0;">
+        <a href="${LINK_FINALIZACAO_INSCRICAO}"
+           style="background-color: #F97316; color: #FFFFFF; text-decoration: none; font-weight: bold; padding: 12px 24px; border-radius: 8px; display: inline-block;">
+          Finalizar inscrição e pagar
+        </a>
+      </p>
+      <p style="font-size: 13px; color: #667085;">
+        Se o botão não funcionar, copie e cole este link no navegador:<br />
+        <a href="${LINK_FINALIZACAO_INSCRICAO}">${LINK_FINALIZACAO_INSCRICAO}</a>
+      </p>
+      <p>Qualquer dúvida, fale com a organização.</p>
+      <p>Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula</p>
+    </div>
+  `;
+  return chamarEnvioDeEmail({
+    destinatarioEmail: emailDestino.trim(),
+    destinatarioNome,
+    assunto,
+    htmlContent,
+    pdfBase64,
+    pdfNomeArquivo: `ficha-${team.nome}.pdf`.replace(/[^a-zA-Z0-9._-]/g, "_"),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// E-mail de lembrete de inscrição — pra representante que ainda não
+// inscreveu o time, avisando do prazo do lote atual.
+// ---------------------------------------------------------------------------
+function textoLoteAtual() {
+  const lote = encontrarLote();
+  const fimFormatado = lote.fim.toLocaleDateString("pt-BR", { day: "2-digit", month: "long" });
+  return { nome: lote.nome, valor: lote.valor, fimFormatado };
+}
+
+async function enviarLembreteInscricao(destinatarioEmail, destinatarioNome, turma) {
+  const { nome: loteNome, valor: loteValor, fimFormatado } = textoLoteAtual();
+  const assunto = `Não esqueça: inscrição da turma ${turma} na Copa CSU — ${loteNome} termina em breve`;
+  const htmlContent = `
+    <div style="font-family: Arial, Helvetica, sans-serif; color: #12203D; max-width: 560px; margin: 0 auto;">
+      <h2 style="color: #12203D;">Falta pouco pro prazo do ${loteNome}! ⏰</h2>
+      <p>Olá${destinatarioNome ? ", " + destinatarioNome : ""}!</p>
+      <p>
+        Vimos que a turma <strong>${turma}</strong> ainda não finalizou a inscrição na Copa de
+        Ex-Alunos de Futsal do Colégio Santa Úrsula.
+      </p>
+      <p>
+        O <strong>${loteNome}</strong> (${formatarReais(loteValor)} por atleta) termina em
+        <strong>${fimFormatado}</strong>. Depois dessa data o valor da inscrição sobe pro
+        próximo lote.
+      </p>
+      <p style="text-align: center; margin: 28px 0;">
+        <a href="${LINK_SITE_INSCRICAO}"
+           style="background-color: #F97316; color: #FFFFFF; text-decoration: none; font-weight: bold; padding: 12px 24px; border-radius: 8px; display: inline-block;">
+          Inscrever meu time agora
+        </a>
+      </p>
+      <p style="font-size: 13px; color: #667085;">
+        Se o botão não funcionar, copie e cole este link no navegador:<br />
+        <a href="${LINK_SITE_INSCRICAO}">${LINK_SITE_INSCRICAO}</a>
+      </p>
+      <p>Qualquer dúvida, fale com a organização.</p>
+      <p>Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula</p>
+    </div>
+  `;
+  return chamarEnvioDeEmail({
+    destinatarioEmail: destinatarioEmail.trim(),
+    destinatarioNome,
+    assunto,
+    htmlContent,
+  });
 }
 
 async function baixarFichaTodosTimes(teams) {
@@ -3962,6 +4049,114 @@ function ImportarCpfsPlanilha({ teams }) {
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Lembrete de inscrição — pra representantes de turma já aprovados que
+// ainda não inscreveram o time, avisando do prazo do lote atual antes que
+// o valor suba pro próximo.
+// ---------------------------------------------------------------------------
+function LembreteInscricao({ teams, perfis }) {
+  const [enviando, setEnviando] = useState({});
+  const [resultado, setResultado] = useState({});
+  const [enviandoTodos, setEnviandoTodos] = useState(false);
+
+  const turmasComTime = new Set((teams || []).map((t) => t.nome));
+
+  const pendentes = useMemo(() => {
+    return (perfis || []).filter(
+      (p) => p.status === "aprovado" && p.turma && p.email && !turmasComTime.has(p.turma)
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [perfis, teams]);
+
+  const enviarPara = async (p) => {
+    setEnviando((s) => ({ ...s, [p.id]: true }));
+    try {
+      await enviarLembreteInscricao(p.email, p.nome, p.turma);
+      setResultado((s) => ({ ...s, [p.id]: { ok: true, em: new Date().toISOString() } }));
+    } catch (e) {
+      console.error("Falha ao enviar lembrete de inscrição", e);
+      setResultado((s) => ({ ...s, [p.id]: { ok: false, erro: e.message } }));
+    } finally {
+      setEnviando((s) => ({ ...s, [p.id]: false }));
+    }
+  };
+
+  const enviarParaTodos = async () => {
+    setEnviandoTodos(true);
+    for (const p of pendentes) {
+      if (resultado[p.id]?.ok) continue; // já enviado nessa sessão, pula
+      // eslint-disable-next-line no-await-in-loop
+      await enviarPara(p);
+    }
+    setEnviandoTodos(false);
+  };
+
+  if (pendentes.length === 0) return null;
+
+  const { nome: loteNome, fimFormatado } = textoLoteAtual();
+
+  return (
+    <div className="rounded-2xl p-5 mt-8" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+      <h3 className="font-semibold mb-1 flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+        <Mail size={18} color={COLORS.ink} /> Lembrete de inscrição ({pendentes.length})
+      </h3>
+      <p className="text-xs mb-4" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+        Representantes já aprovados cuja turma ainda não inscreveu um time. O e-mail avisa que
+        o {loteNome} termina em {fimFormatado} e traz o link pra inscrever.
+      </p>
+      <button
+        type="button"
+        onClick={enviarParaTodos}
+        disabled={enviandoTodos}
+        className="mb-4 px-4 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2 disabled:opacity-60"
+        style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}
+      >
+        {enviandoTodos ? <Loader2 size={14} className="animate-spin" /> : <Mail size={14} />}
+        {enviandoTodos ? "Enviando..." : `Enviar lembrete pra todos (${pendentes.length})`}
+      </button>
+      <div className="space-y-2">
+        {pendentes.map((p) => (
+          <div
+            key={p.id}
+            className="rounded-xl p-3 flex flex-wrap items-center gap-2"
+            style={{ backgroundColor: COLORS.zebra, border: `1px solid ${COLORS.border}` }}
+          >
+            <div className="mr-auto">
+              <div className="text-sm font-semibold" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+                Turma {p.turma}
+              </div>
+              <div className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                {p.nome || "—"} · {p.email}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => enviarPara(p)}
+              disabled={!!enviando[p.id]}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-60"
+              style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+            >
+              {enviando[p.id] ? <Loader2 size={12} className="animate-spin" /> : <Mail size={12} />}
+              {resultado[p.id]?.ok ? "Reenviar" : "Enviar lembrete"}
+            </button>
+            {resultado[p.id]?.ok && (
+              <span className="text-xs w-full" style={{ color: "#16A34A", fontFamily: "'Inter', sans-serif" }}>
+                Enviado {new Date(resultado[p.id].em).toLocaleTimeString("pt-BR")}
+              </span>
+            )}
+            {resultado[p.id] && !resultado[p.id].ok && (
+              <span className="text-xs w-full" style={{ color: "#EF4444", fontFamily: "'Inter', sans-serif" }}>
+                Erro: {resultado[p.id].erro}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 
 function AprovacaoComissao({ teams, saveTeams, perfis }) {
   const [emailPorTime, setEmailPorTime] = useState({});
@@ -6309,6 +6504,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
       <GerenciarElencos teams={teams} saveTeams={saveTeams} />
       <DiagnosticoIrregularidades teams={teams} aprovarExcecao={aprovarExcecao} manterIrregularidade={manterIrregularidade} />
       <AprovacaoComissao teams={teams} saveTeams={saveTeams} perfis={perfis} />
+      <LembreteInscricao teams={teams} perfis={perfis} />
       <ImportarCpfsPlanilha teams={teams} />
       <PlanilhaInscricoes teams={teams} />
       <DocumentosOrganizacao teams={teams} matches={matches} />

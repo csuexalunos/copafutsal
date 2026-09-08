@@ -1,9 +1,11 @@
 // Edge Function: enviar-email-time
 // -----------------------------------------------------------------------
-// Recebe os dados de um time aprovado pela comissão (nome, e-mail de
-// destino, PDF da ficha em base64 e o link de finalização) e manda o
-// e-mail de verdade através da API do Brevo. Roda no servidor (Deno),
-// então a chave de API do Brevo nunca aparece no site público.
+// Envia e-mails administrativos (aprovação de time com ficha em PDF,
+// lembrete de inscrição, etc.) através da API do Brevo. Roda no servidor
+// (Deno), então a chave de API do Brevo nunca aparece no site público.
+// O assunto e o corpo do e-mail vêm prontos do app (cada tela de admin
+// monta o texto que precisa) — esta função só valida quem está chamando
+// e faz o envio de verdade.
 //
 // Só quem estiver logado como ADMIN no app consegue chamar essa função —
 // isso é checado aqui dentro, consultando a tabela `admins` com a chave
@@ -103,54 +105,30 @@ Deno.serve(async (req) => {
       return respostaJson({ error: "Só administradores podem enviar esse e-mail." }, 403);
     }
 
-    // 2) Lê os dados enviados pelo app.
+    // 2) Lê os dados enviados pelo app — assunto e corpo já vêm prontos,
+    //    o anexo em PDF é opcional (só o e-mail de aprovação usa).
     const body = await req.json();
-    const { destinatarioEmail, destinatarioNome, timeNome, linkFinalizacao, pdfBase64, pdfNomeArquivo } = body || {};
+    const { destinatarioEmail, destinatarioNome, assunto, htmlContent, pdfBase64, pdfNomeArquivo } = body || {};
 
-    if (!destinatarioEmail || !timeNome || !pdfBase64 || !linkFinalizacao) {
+    if (!destinatarioEmail || !assunto || !htmlContent) {
       console.error("[enviar-email-time] Corpo da requisição incompleto:", {
         temEmail: !!destinatarioEmail,
-        temTimeNome: !!timeNome,
-        temPdf: !!pdfBase64,
-        temLink: !!linkFinalizacao,
+        temAssunto: !!assunto,
+        temHtml: !!htmlContent,
       });
-      return respostaJson({ error: "Faltam dados obrigatórios (e-mail, nome do time, PDF ou link)." }, 400);
+      return respostaJson({ error: "Faltam dados obrigatórios (e-mail, assunto ou conteúdo)." }, 400);
     }
 
-    // 3) Monta e envia o e-mail via API do Brevo (Transactional Email API).
-    const assunto = `Time ${timeNome} aprovado — finalize sua inscrição na Copa CSU`;
-    const htmlContent = `
-      <div style="font-family: Arial, Helvetica, sans-serif; color: #12203D; max-width: 560px; margin: 0 auto;">
-        <h2 style="color: #12203D;">Seu time foi avaliado e aprovado! 🎉</h2>
-        <p>Olá${destinatarioNome ? ", " + destinatarioNome : ""}!</p>
-        <p>
-          O time <strong>${timeNome}</strong> foi avaliado pela comissão organizadora da
-          Copa de Ex-Alunos de Futsal do Colégio Santa Úrsula e está <strong>aprovado</strong>.
-        </p>
-        <p>
-          Em anexo você encontra a <strong>ficha do time em PDF</strong>, com a lista de
-          jogadores aprovada pela comissão.
-        </p>
-        <p>Pra finalizar a inscrição, siga estes passos:</p>
-        <ol>
-          <li>Acesse o link abaixo;</li>
-          <li>Anexe o PDF da ficha do time (em anexo neste e-mail);</li>
-          <li>Realize o pagamento da inscrição.</li>
-        </ol>
-        <p style="text-align: center; margin: 28px 0;">
-          <a href="${linkFinalizacao}"
-             style="background-color: #F97316; color: #FFFFFF; text-decoration: none; font-weight: bold; padding: 12px 24px; border-radius: 8px; display: inline-block;">
-            Finalizar inscrição e pagar
-          </a>
-        </p>
-        <p style="font-size: 13px; color: #667085;">
-          Se o botão não funcionar, copie e cole este link no navegador:<br />
-          <a href="${linkFinalizacao}">${linkFinalizacao}</a>
-        </p>
-        <p>Qualquer dúvida, fale com a organização.</p>
-        <p>Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula</p>
-      </div>
-    `;
+    // 3) Envia via API do Brevo (Transactional Email API).
+    const payload: Record<string, unknown> = {
+      sender: { email: REMETENTE_EMAIL, name: REMETENTE_NOME },
+      to: [{ email: destinatarioEmail, name: destinatarioNome || destinatarioEmail }],
+      subject: assunto,
+      htmlContent,
+    };
+    if (pdfBase64) {
+      payload.attachment = [{ content: pdfBase64, name: pdfNomeArquivo || "anexo.pdf" }];
+    }
 
     const resp = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
@@ -159,18 +137,7 @@ Deno.serve(async (req) => {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      body: JSON.stringify({
-        sender: { email: REMETENTE_EMAIL, name: REMETENTE_NOME },
-        to: [{ email: destinatarioEmail, name: destinatarioNome || timeNome }],
-        subject: assunto,
-        htmlContent,
-        attachment: [
-          {
-            content: pdfBase64,
-            name: pdfNomeArquivo || `ficha-${timeNome}.pdf`,
-          },
-        ],
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (!resp.ok) {
