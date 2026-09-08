@@ -4112,7 +4112,7 @@ function diagnosticarTime(team) {
   return problemas;
 }
 
-function DiagnosticoIrregularidades({ teams }) {
+function DiagnosticoIrregularidades({ teams, aprovarExcecao, manterIrregularidade }) {
   const times = teams.map((t) => ({ time: t, problemas: diagnosticarTime(t) })).filter((x) => x.problemas.length > 0);
 
   if (times.length === 0) return null;
@@ -4126,24 +4126,62 @@ function DiagnosticoIrregularidades({ teams }) {
         <AlertTriangle size={18} color={COLORS.accent} /> Diagnóstico de irregularidades ({times.length})
       </h3>
       <p className="text-xs mb-4" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-        Checagem automática com base no Regulamento Oficial dos Jogos Ex-Alunos. Confirma com o
-        time antes de qualquer punição — Art. 9º dá direito de esclarecimento.
+        Checagem automática com base no Regulamento Oficial dos Jogos Ex-Alunos. Não precisa
+        esperar o representante pedir revisão — pode aprovar exceção ou manter a irregularidade
+        direto daqui. Confirma com o time antes de qualquer punição — Art. 9º dá direito de
+        esclarecimento.
       </p>
       <div className="space-y-3">
-        {times.map(({ time, problemas }) => (
-          <div key={time.id} className="rounded-lg p-3" style={{ backgroundColor: COLORS.zebra }}>
-            <div className="text-sm font-semibold mb-1" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
-              {time.nome}
+        {times.map(({ time, problemas }) => {
+          const irregulares = (time.jogadores || []).filter(
+            (j) => !j.excecaoAprovada && anoConclusaoRegular(j.anoConclusao, time.nome) === false
+          );
+          return (
+            <div key={time.id} className="rounded-lg p-3" style={{ backgroundColor: COLORS.zebra }}>
+              <div className="text-sm font-semibold mb-1" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+                {time.nome}
+              </div>
+              <ul className="space-y-0.5">
+                {problemas.map((p, i) => (
+                  <li key={i} className="text-xs" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
+                    • {p}
+                  </li>
+                ))}
+              </ul>
+              {irregulares.length > 0 && (
+                <div className="mt-2.5 space-y-2">
+                  {irregulares.map((j) => (
+                    <div
+                      key={j.id}
+                      className="flex flex-wrap items-center gap-2 px-2.5 py-2 rounded-lg"
+                      style={{ backgroundColor: COLORS.card }}
+                    >
+                      <span className="text-xs font-medium mr-auto" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+                        {j.apelido || j.nome || "Jogador"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => aprovarExcecao({ id: null, timeNome: time.nome, jogadorId: j.id })}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+                        style={{ backgroundColor: "#16A34A", color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+                      >
+                        Aprovar exceção
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => manterIrregularidade({ id: null, timeNome: time.nome, jogadorId: j.id })}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+                        style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+                      >
+                        Manter irregularidade
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-            <ul className="space-y-0.5">
-              {problemas.map((p, i) => (
-                <li key={i} className="text-xs" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
-                  • {p}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -4575,6 +4613,13 @@ function sugerirNumGrupos(totalTimes) {
   return Math.max(1, Math.round(totalTimes / 4));
 }
 
+// Colocação do time na última edição, em texto curto pra mostrar do lado
+// do nome (ex: "3º"). null se o time não disputou a última edição.
+function colocacaoUltimaEdicao(nomeTime) {
+  const pos = RANKING_ULTIMA_EDICAO.indexOf(nomeTime);
+  return pos === -1 ? null : `${pos + 1}º`;
+}
+
 function sortearGrupos(potes, numGrupos) {
   const nomesGrupo = Array.from({ length: numGrupos }, (_, i) => String.fromCharCode(65 + i)); // A, B, C...
   const grupos = {};
@@ -4927,6 +4972,15 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao }) 
                   <li key={t.id} className="flex items-center gap-1.5 text-xs" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
                     {ESCUDOS_TIMES[t.nome] && <img src={ESCUDOS_TIMES[t.nome]} alt="" className="w-4 h-4 object-contain shrink-0" />}
                     <span className="truncate flex-1">{t.nome}</span>
+                    {colocacaoUltimaEdicao(t.nome) && (
+                      <span
+                        className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold"
+                        style={{ backgroundColor: COLORS.zebra, color: COLORS.slate }}
+                        title="Colocação na última edição"
+                      >
+                        {colocacaoUltimaEdicao(t.nome)}
+                      </span>
+                    )}
                     {souSuperAdmin && (
                       <select
                         value={i}
@@ -4976,7 +5030,16 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao }) 
                   {times.map((t) => (
                     <li key={t.id} className="flex items-center gap-2 text-sm" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
                       {ESCUDOS_TIMES[t.nome] && <img src={ESCUDOS_TIMES[t.nome]} alt="" className="w-5 h-5 object-contain shrink-0" />}
-                      {t.nome}
+                      <span className="flex-1 truncate">{t.nome}</span>
+                      {colocacaoUltimaEdicao(t.nome) && (
+                        <span
+                          className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold"
+                          style={{ backgroundColor: COLORS.zebra, color: COLORS.slate }}
+                          title="Colocação na última edição"
+                        >
+                          {colocacaoUltimaEdicao(t.nome)}
+                        </span>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -6229,7 +6292,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
       })()}
 
       <GerenciarElencos teams={teams} saveTeams={saveTeams} />
-      <DiagnosticoIrregularidades teams={teams} />
+      <DiagnosticoIrregularidades teams={teams} aprovarExcecao={aprovarExcecao} manterIrregularidade={manterIrregularidade} />
       <AprovacaoComissao teams={teams} saveTeams={saveTeams} perfis={perfis} />
       <ImportarCpfsPlanilha teams={teams} />
       <PlanilhaInscricoes teams={teams} />
