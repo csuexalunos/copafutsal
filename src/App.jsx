@@ -4899,6 +4899,15 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao }) 
       const idx = atribuicoes[t.id] ?? 0;
       lista[idx].push(t);
     });
+    // Dentro de cada pote, ordena pela colocação da última edição — quem
+    // não disputou (ou é time novo) fica por último.
+    lista.forEach((pote) => {
+      pote.sort((a, b) => {
+        const posA = RANKING_ULTIMA_EDICAO.indexOf(a.nome);
+        const posB = RANKING_ULTIMA_EDICAO.indexOf(b.nome);
+        return (posA === -1 ? Infinity : posA) - (posB === -1 ? Infinity : posB);
+      });
+    });
     return lista;
   }, [teams, atribuicoes, numPotes]);
 
@@ -5027,7 +5036,13 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao }) 
                   Grupo {nome}
                 </div>
                 <ul className="space-y-1.5">
-                  {times.map((t) => (
+                  {[...times]
+                    .sort((a, b) => {
+                      const posA = RANKING_ULTIMA_EDICAO.indexOf(a.nome);
+                      const posB = RANKING_ULTIMA_EDICAO.indexOf(b.nome);
+                      return (posA === -1 ? Infinity : posA) - (posB === -1 ? Infinity : posB);
+                    })
+                    .map((t) => (
                     <li key={t.id} className="flex items-center gap-2 text-sm" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
                       {ESCUDOS_TIMES[t.nome] && <img src={ESCUDOS_TIMES[t.nome]} alt="" className="w-5 h-5 object-contain shrink-0" />}
                       <span className="flex-1 truncate">{t.nome}</span>
