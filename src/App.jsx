@@ -42,6 +42,10 @@ import {
 const LINK_FINALIZACAO_INSCRICAO = "https://ursula.com.br/jogos-ex-alunos-2026/";
 // Link do próprio site pra fazer a inscrição do time (aba "Inscrição").
 const LINK_SITE_INSCRICAO = "https://csuexalunos.github.io/copafutsal/";
+// E-mail da organização — usado como destino padrão sempre que a
+// Organização testa um novo tipo de e-mail antes de mandar pra alguém de
+// verdade.
+const EMAIL_TESTE_ORGANIZACAO = "csuexalunos@gmail.com";
 
 // ---------------------------------------------------------------------------
 // Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula — 8ª Edição
@@ -4069,14 +4073,22 @@ function LembreteInscricao({ teams, perfis }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [perfis, teams]);
 
-  const enviarPara = async (p) => {
+  const enviarPara = async (p, opcoes = {}) => {
+    const teste = !!opcoes.teste;
+    const email = teste ? EMAIL_TESTE_ORGANIZACAO : p.email;
     setEnviando((s) => ({ ...s, [p.id]: true }));
     try {
-      await enviarLembreteInscricao(p.email, p.nome, p.turma);
-      setResultado((s) => ({ ...s, [p.id]: { ok: true, em: new Date().toISOString() } }));
+      await enviarLembreteInscricao(email, p.nome, p.turma);
+      if (!teste) {
+        setResultado((s) => ({ ...s, [p.id]: { ok: true, em: new Date().toISOString() } }));
+      }
     } catch (e) {
       console.error("Falha ao enviar lembrete de inscrição", e);
-      setResultado((s) => ({ ...s, [p.id]: { ok: false, erro: e.message } }));
+      if (!teste) {
+        setResultado((s) => ({ ...s, [p.id]: { ok: false, erro: e.message } }));
+      } else {
+        alert("Erro no teste: " + e.message);
+      }
     } finally {
       setEnviando((s) => ({ ...s, [p.id]: false }));
     }
@@ -4140,6 +4152,16 @@ function LembreteInscricao({ teams, perfis }) {
               {enviando[p.id] ? <Loader2 size={12} className="animate-spin" /> : <Mail size={12} />}
               {resultado[p.id]?.ok ? "Reenviar" : "Enviar lembrete"}
             </button>
+            <button
+              type="button"
+              onClick={() => enviarPara(p, { teste: true })}
+              disabled={!!enviando[p.id]}
+              title={`Manda esse e-mail pra ${EMAIL_TESTE_ORGANIZACAO} em vez do representante`}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-60"
+              style={{ border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+            >
+              Testar
+            </button>
             {resultado[p.id]?.ok && (
               <span className="text-xs w-full" style={{ color: "#16A34A", fontFamily: "'Inter', sans-serif" }}>
                 Enviado {new Date(resultado[p.id].em).toLocaleTimeString("pt-BR")}
@@ -4174,9 +4196,10 @@ function AprovacaoComissao({ teams, saveTeams, perfis }) {
     );
   };
 
-  const enviar = async (team) => {
-    const email = emailAtual(team).trim();
-    if (!email) {
+  const enviar = async (team, opcoes = {}) => {
+    const teste = !!opcoes.teste;
+    const email = teste ? EMAIL_TESTE_ORGANIZACAO : emailAtual(team).trim();
+    if (!teste && !email) {
       setErro((s) => ({ ...s, [team.id]: "Informe o e-mail antes de enviar." }));
       return;
     }
@@ -4184,14 +4207,16 @@ function AprovacaoComissao({ teams, saveTeams, perfis }) {
     setEnviando((s) => ({ ...s, [team.id]: true }));
     try {
       await enviarEmailAprovacaoTime(team, email);
-      await saveTeams((atuais) =>
-        (atuais || []).map((t) =>
-          t.id === team.id ? { ...t, emailComissao: email, emailEnviadoEm: new Date().toISOString() } : t
-        )
-      );
+      if (!teste) {
+        await saveTeams((atuais) =>
+          (atuais || []).map((t) =>
+            t.id === team.id ? { ...t, emailComissao: email, emailEnviadoEm: new Date().toISOString() } : t
+          )
+        );
+      }
     } catch (e) {
       console.error("Falha ao enviar e-mail de aprovação", e);
-      setErro((s) => ({ ...s, [team.id]: "Erro ao enviar: " + e.message }));
+      setErro((s) => ({ ...s, [team.id]: (teste ? "Erro no teste: " : "Erro ao enviar: ") + e.message }));
     } finally {
       setEnviando((s) => ({ ...s, [team.id]: false }));
     }
@@ -4262,6 +4287,16 @@ function AprovacaoComissao({ teams, saveTeams, perfis }) {
                     >
                       {enviando[t.id] ? <Loader2 size={13} className="animate-spin" /> : <Mail size={13} />}
                       {t.emailEnviadoEm ? "Reenviar e-mail" : "Enviar e-mail"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => enviar(t, { teste: true })}
+                      disabled={!!enviando[t.id]}
+                      title={`Manda esse e-mail pra ${EMAIL_TESTE_ORGANIZACAO} em vez do representante`}
+                      className="px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-60 shrink-0"
+                      style={{ border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+                    >
+                      Testar
                     </button>
                   </div>
                   {emailSugerido && (
