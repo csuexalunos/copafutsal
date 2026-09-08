@@ -3426,6 +3426,30 @@ async function chamarEnvioDeEmail(corpo) {
   return data;
 }
 
+// ---------------------------------------------------------------------------
+// Teste genérico do envio de e-mail — não depende de time ou
+// representante nenhum, só confirma que o caminho inteiro (app → Edge
+// Function → Brevo) está funcionando.
+// ---------------------------------------------------------------------------
+async function enviarEmailTesteGenerico() {
+  const agora = new Date().toLocaleString("pt-BR");
+  return chamarEnvioDeEmail({
+    destinatarioEmail: EMAIL_TESTE_ORGANIZACAO,
+    destinatarioNome: "Organização",
+    assunto: `Teste de envio — Copa CSU (${agora})`,
+    htmlContent: `
+      <div style="font-family: Arial, Helvetica, sans-serif; color: #12203D; max-width: 560px; margin: 0 auto;">
+        <h2 style="color: #12203D;">Teste de envio de e-mail ✅</h2>
+        <p>Esse e-mail confirma que o caminho completo está funcionando: o app conseguiu
+        chamar a função do Supabase, que conseguiu falar com o Brevo, que mandou esse
+        e-mail até aqui.</p>
+        <p style="font-size: 13px; color: #667085;">Disparado em ${agora}.</p>
+        <p>Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula</p>
+      </div>
+    `,
+  });
+}
+
 async function enviarEmailAprovacaoTime(team, emailDestino) {
   const pdfBase64 = await gerarFichaTimePdfBase64(team);
   const destinatarioNome = team.capitao || team.nome;
@@ -4059,6 +4083,63 @@ function ImportarCpfsPlanilha({ teams }) {
 // ainda não inscreveram o time, avisando do prazo do lote atual antes que
 // o valor suba pro próximo.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Testar envio de e-mail — botão simples, independente de qualquer time
+// ou representante, só pra confirmar que o caminho todo (app → Edge
+// Function → Brevo) está de pé antes de usar as ferramentas de verdade.
+// ---------------------------------------------------------------------------
+function TestarEnvioEmail() {
+  const [enviando, setEnviando] = useState(false);
+  const [resultado, setResultado] = useState(null);
+
+  const testar = async () => {
+    setEnviando(true);
+    setResultado(null);
+    try {
+      await enviarEmailTesteGenerico();
+      setResultado({ ok: true });
+    } catch (e) {
+      console.error("Falha no teste de envio de e-mail", e);
+      setResultado({ ok: false, erro: e.message });
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl p-5 mt-8" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+      <h3 className="font-semibold mb-1 flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+        <Mail size={18} color={COLORS.ink} /> Testar envio de e-mail
+      </h3>
+      <p className="text-xs mb-4" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+        Manda um e-mail de teste pra {EMAIL_TESTE_ORGANIZACAO} pra confirmar que o envio está
+        funcionando, sem precisar de nenhum time ou representante cadastrado.
+      </p>
+      <button
+        type="button"
+        onClick={testar}
+        disabled={enviando}
+        className="px-4 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2 disabled:opacity-60"
+        style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}
+      >
+        {enviando ? <Loader2 size={14} className="animate-spin" /> : <Mail size={14} />}
+        {enviando ? "Enviando..." : "Enviar e-mail de teste"}
+      </button>
+      {resultado && resultado.ok && (
+        <p className="text-xs mt-3" style={{ color: "#16A34A", fontFamily: "'Inter', sans-serif" }}>
+          Enviado! Confere a caixa de entrada (e o spam) de {EMAIL_TESTE_ORGANIZACAO} em
+          alguns segundos. Se não chegar, olha em Transactional → Logs no painel do Brevo.
+        </p>
+      )}
+      {resultado && !resultado.ok && (
+        <p className="text-xs mt-3" style={{ color: "#EF4444", fontFamily: "'Inter', sans-serif" }}>
+          Erro: {resultado.erro}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function LembreteInscricao({ teams, perfis }) {
   const [enviando, setEnviando] = useState({});
   const [resultado, setResultado] = useState({});
@@ -5741,64 +5822,6 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   const [emailNovoAdmin, setEmailNovoAdmin] = useState("");
   const [promovendo, setPromovendo] = useState(false);
 
-  const [criandoTeste, setCriandoTeste] = useState(false);
-  const temDadosTeste = teams.some((t) => t.teste) || matches.some((m) => m.teste);
-
-  const criarAmbienteTeste = async () => {
-    if (
-      !confirm(
-        'Isso cria 8 times fictícios (marcados como TESTE) — o resto do fluxo (Sorteio, gerar tabela, lançar placar) você faz igual seria numa competição de verdade. Continuar?'
-      )
-    )
-      return;
-    setCriandoTeste(true);
-    try {
-      const agora = Date.now();
-      const timesTeste = Array.from({ length: 8 }, (_, i) => {
-        const n = i + 1;
-        const jogadores = Array.from({ length: 8 }, (_, j) => ({
-          id: `jteste_${agora}_${n}_${j}`,
-          numero: String(j + 1),
-          apelido: `Jog. ${j + 1}`,
-          nome: `Jogador Teste ${n}-${j + 1}`,
-          periodo: "",
-          anoConclusao: "",
-          cpf: "",
-          nascimento: "",
-          posicao: "",
-        }));
-        return {
-          id: `time_teste_${agora}_${n}`,
-          nome: `Teste ${n}`,
-          capitao: `Capitão Teste ${n}`,
-          contato: "(00) 00000-0000",
-          jogadores,
-          escudoUrl: "",
-          codigo: gerarCodigoTime(),
-          inscritoEm: new Date().toISOString(),
-          teste: true,
-        };
-      });
-
-      // Busca a lista de times DIRETO do banco (não confia no que já está
-      // carregado na tela) — evita salvar por cima uma lista desatualizada
-      // e apagar time de verdade sem querer.
-      await saveTeams((atuais) => [...(atuais || []), ...timesTeste]);
-      alert('8 times de teste criados. Agora segue o fluxo normal: vai em Sorteio, sorteia os grupos, gera a tabela, e depois lança os jogos na Organização.');
-    } catch (e) {
-      console.error("Falha ao criar ambiente de teste", e);
-      alert("Deu erro ao criar o ambiente de teste: " + e.message);
-    } finally {
-      setCriandoTeste(false);
-    }
-  };
-
-  const revogarTeste = async () => {
-    if (!confirm("Isso remove TODOS os times e jogos marcados como teste (não mexe em nada real). Continuar?")) return;
-    await saveTeams((atuais) => (atuais || []).filter((t) => !t.teste));
-    await saveMatches((atuais) => (atuais || []).filter((m) => !m.teste));
-  };
-
   const promoverDireto = async (e) => {
     e.preventDefault();
     const alvo = perfis.find((p) => (p.email || "").trim().toLowerCase() === emailNovoAdmin.trim().toLowerCase());
@@ -6022,42 +6045,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
         </div>
       </div>
 
-      <div
-        className="rounded-2xl p-5 mb-8"
-        style={{ backgroundColor: "#3A1E00", border: `1.5px dashed ${COLORS.gold}` }}
-      >
-        <h3 className="font-semibold mb-1 flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.gold }}>
-          <AlertTriangle size={16} color={COLORS.gold} /> Ambiente de teste
-        </h3>
-        <p className="text-xs mb-3" style={{ color: COLORS.ice, fontFamily: "'Inter', sans-serif" }}>
-          Cria 8 times fictícios com jogadores, marcados como TESTE. Daí é só seguir o fluxo
-          normal, do começo: Sorteio → gerar tabela → lançar os jogos — igual seria de verdade.
-          Aparece pra quem estiver no app na hora (é o banco de verdade), então revoga quando
-          terminar.
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={criarAmbienteTeste}
-            disabled={criandoTeste}
-            className="px-4 py-2 rounded-xl text-sm font-semibold inline-flex items-center gap-1.5 disabled:opacity-60"
-            style={{ backgroundColor: COLORS.gold, color: "#3A1E00", fontFamily: "'Inter', sans-serif" }}
-          >
-            {criandoTeste && <Loader2 size={14} className="animate-spin" />}
-            Criar ambiente de teste completo
-          </button>
-          {temDadosTeste && (
-            <button
-              type="button"
-              onClick={revogarTeste}
-              className="px-4 py-2 rounded-xl text-sm font-semibold"
-              style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
-            >
-              Revogar teste
-            </button>
-          )}
-        </div>
-      </div>
+      <TestarEnvioEmail />
 
       <div
         className="rounded-2xl p-5 mb-8"
