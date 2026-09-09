@@ -2754,7 +2754,12 @@ function Comunidade({ posts, savePosts }) {
             value={ano}
             onChange={(e) => setAno(e.target.value)}
             className="px-2 py-1 rounded-lg text-xs inline-block align-middle"
-            style={{ border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+            style={{
+              backgroundColor: COLORS.card,
+              border: `1.5px solid ${COLORS.border}`,
+              color: COLORS.ink,
+              fontFamily: "'Inter', sans-serif",
+            }}
           >
             {EDICOES_DISPONIVEIS.map((a) => (
               <option key={a} value={a}>
@@ -3050,14 +3055,24 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
           value={match.golsA ?? ""}
           onChange={(e) => patch({ golsA: e.target.value === "" ? null : Number(e.target.value) })}
           className="w-11 px-1 py-1 rounded text-center text-sm"
-          style={{ border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'JetBrains Mono', monospace" }}
+          style={{
+            backgroundColor: COLORS.card,
+            border: `1px solid ${COLORS.border}`,
+            color: COLORS.ink,
+            fontFamily: "'JetBrains Mono', monospace",
+          }}
         />
         <input
           type="number"
           value={match.golsB ?? ""}
           onChange={(e) => patch({ golsB: e.target.value === "" ? null : Number(e.target.value) })}
           className="w-11 px-1 py-1 rounded text-center text-sm"
-          style={{ border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'JetBrains Mono', monospace" }}
+          style={{
+            backgroundColor: COLORS.card,
+            border: `1px solid ${COLORS.border}`,
+            color: COLORS.ink,
+            fontFamily: "'JetBrains Mono', monospace",
+          }}
         />
         {onRemove && (
           <button onClick={onRemove} aria-label="Remover jogo">
@@ -3080,7 +3095,12 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
                 value={match.timeA || ""}
                 onChange={(e) => patch({ timeA: e.target.value })}
                 className="px-2 py-1.5 rounded-lg text-xs"
-                style={{ border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+                style={{
+                  backgroundColor: COLORS.zebra,
+                  border: `1px solid ${COLORS.border}`,
+                  color: COLORS.ink,
+                  fontFamily: "'Inter', sans-serif",
+                }}
               >
                 <option value="">Time A</option>
                 {teams.map((t) => (
@@ -3096,7 +3116,12 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
                 value={match.timeB || ""}
                 onChange={(e) => patch({ timeB: e.target.value })}
                 className="px-2 py-1.5 rounded-lg text-xs"
-                style={{ border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+                style={{
+                  backgroundColor: COLORS.zebra,
+                  border: `1px solid ${COLORS.border}`,
+                  color: COLORS.ink,
+                  fontFamily: "'Inter', sans-serif",
+                }}
               >
                 <option value="">Time B</option>
                 {teams.map((t) => (
@@ -3110,7 +3135,12 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
                 value={isoParaDatetimeLocal(match.horario)}
                 onChange={(e) => patch({ horario: datetimeLocalParaIso(e.target.value) })}
                 className="px-2 py-1.5 rounded-lg text-xs"
-                style={{ border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+                style={{
+                  backgroundColor: COLORS.zebra,
+                  border: `1px solid ${COLORS.border}`,
+                  color: COLORS.ink,
+                  fontFamily: "'Inter', sans-serif",
+                }}
               />
             </div>
           )}
@@ -4224,7 +4254,12 @@ function LinhaEditavelHallDaFama({ item, campos, onChange, onRemover }) {
           onChange={(e) => onChange({ ...item, [c.key]: e.target.value })}
           placeholder={c.label}
           className="px-2 py-1.5 rounded-lg text-xs flex-1 min-w-[6rem]"
-          style={{ border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+          style={{
+            backgroundColor: COLORS.zebra,
+            border: `1px solid ${COLORS.border}`,
+            color: COLORS.ink,
+            fontFamily: "'Inter', sans-serif",
+          }}
         />
       ))}
       <button type="button" onClick={onRemover} aria-label="Remover" className="shrink-0 p-1.5">
