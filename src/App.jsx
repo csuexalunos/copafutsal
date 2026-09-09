@@ -27,6 +27,8 @@ import {
   Loader2,
   ArrowRight,
   Mail,
+  BarChart3,
+  ChevronLeft,
 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import {
@@ -6009,6 +6011,59 @@ function LoginGate({ onLogin }) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Painel da Organização, dividido em grupos (em vez de uma aba corrida
+// só) — cada grupo abre numa tela própria, com botão de voltar pro hub.
+// ---------------------------------------------------------------------------
+const GRUPOS_ORGANIZACAO = [
+  { chave: "comunicacao", titulo: "Comunicação", subtitulo: "E-mails de aprovação e lembrete", icone: Mail },
+  { chave: "pessoas", titulo: "Pessoas e acesso", subtitulo: "Inscritos, representantes, avaliações", icone: Users },
+  { chave: "times", titulo: "Times e elencos", subtitulo: "Elencos, irregularidades, CPFs, planilha", icone: ShieldCheck },
+  { chave: "jogos", titulo: "Jogos", subtitulo: "Transmissão, mata-mata, tabela", icone: Swords },
+  { chave: "documentos", titulo: "Documentos", subtitulo: "Fichas e súmulas pra imprimir", icone: Download },
+  { chave: "conteudo", titulo: "Conteúdo do site", subtitulo: "Hall da Fama (super admin)", icone: Trophy, soSuperAdmin: true },
+  { chave: "sistema", titulo: "Sistema", subtitulo: "Métricas de acesso ao app", icone: BarChart3 },
+];
+
+function HubOrganizacao({ souSuperAdmin, onAbrir }) {
+  const grupos = GRUPOS_ORGANIZACAO.filter((g) => !g.soSuperAdmin || souSuperAdmin);
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+      {grupos.map((g, i) => {
+        const Icone = g.icone;
+        return (
+          <button
+            key={g.chave}
+            type="button"
+            onClick={() => onAbrir(g.chave)}
+            className="text-left rounded-2xl p-5 transition-colors"
+            style={{
+              backgroundColor: COLORS.card,
+              borderTop: `3px solid ${i % 2 === 0 ? COLORS.accent : "#16A34A"}`,
+              border: `1px solid ${COLORS.border}`,
+              borderTopWidth: "3px",
+              borderTopColor: i % 2 === 0 ? COLORS.accent : "#16A34A",
+            }}
+          >
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center mb-3"
+              style={{ backgroundColor: COLORS.chipSoft }}
+            >
+              <Icone size={20} color={COLORS.ink} />
+            </div>
+            <div className="font-bold text-base mb-0.5" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+              {g.titulo}
+            </div>
+            <div className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+              {g.subtitulo}
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, saveAdminRequests, sessao, config, saveConfig, avaliacoes, saveAvaliacoes }) {
   const souAdminLogado = sessao && sessao.tipo === "admin";
   const souSuperAdmin = souAdminLogado && sessao.superAdmin;
@@ -6017,6 +6072,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   const [listaAdmins, setListaAdmins] = useState([]);
   const [carregandoPainel, setCarregandoPainel] = useState(true);
   const [buscaInscritos, setBuscaInscritos] = useState("");
+  const [secaoAtiva, setSecaoAtiva] = useState(null);
   const [verRecusadosInscritos, setVerRecusadosInscritos] = useState(false);
   const [verPendentesAntigos, setVerPendentesAntigos] = useState(false);
   const [acessos, setAcessos] = useState(null);
@@ -6342,16 +6398,39 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <SectionLabel eyebrow="Painel" title="Organização" />
+        <div className="flex items-center gap-3">
+          {secaoAtiva && (
+            <button
+              type="button"
+              onClick={() => setSecaoAtiva(null)}
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg"
+              style={{ backgroundColor: COLORS.chipSoft, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+            >
+              <ChevronLeft size={14} /> Voltar
+            </button>
+          )}
+          <SectionLabel
+            eyebrow="Painel"
+            title={secaoAtiva ? GRUPOS_ORGANIZACAO.find((g) => g.chave === secaoAtiva)?.titulo || "Organização" : "Organização"}
+          />
+        </div>
         <div className="flex items-center gap-1.5 text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
           <Unlock size={14} /> liberado
         </div>
       </div>
 
-      <TestarEnvioEmail />
+      {!secaoAtiva && <HubOrganizacao souSuperAdmin={souSuperAdmin} onAbrir={setSecaoAtiva} />}
 
-      {souSuperAdmin && <EditorHallDaFama config={config} saveConfig={saveConfig} />}
+      {secaoAtiva === "comunicacao" && (
+        <>
+          <TestarEnvioEmail />
+        </>
+      )}
 
+      {souSuperAdmin && secaoAtiva === "conteudo" && <EditorHallDaFama config={config} saveConfig={saveConfig} />}
+
+      {secaoAtiva === "pessoas" && (
+      <>
       <div
         className="rounded-2xl p-5 mb-8"
         style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
@@ -6735,6 +6814,8 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
           </ul>
         </div>
       )}
+      </>
+      )}
 
       {ultimaSenhaGerada && (
         <div
@@ -6762,6 +6843,8 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
         </div>
       )}
 
+      {secaoAtiva === "jogos" && (
+      <>
       <div className="max-w-xl">
         <div className="rounded-2xl p-5 mb-8" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
           <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
@@ -6906,15 +6989,28 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
           </div>
         ) : null;
       })()}
+      </>
+      )}
 
-      <GerenciarElencos teams={teams} saveTeams={saveTeams} />
-      <DiagnosticoIrregularidades teams={teams} aprovarExcecao={aprovarExcecao} manterIrregularidade={manterIrregularidade} />
-      <AprovacaoComissao teams={teams} saveTeams={saveTeams} perfis={perfis} />
-      <LembreteInscricao teams={teams} perfis={perfis} />
-      <ImportarCpfsPlanilha teams={teams} />
-      <PlanilhaInscricoes teams={teams} />
-      <DocumentosOrganizacao teams={teams} matches={matches} />
+      {secaoAtiva === "times" && (
+        <>
+          <GerenciarElencos teams={teams} saveTeams={saveTeams} />
+          <DiagnosticoIrregularidades teams={teams} aprovarExcecao={aprovarExcecao} manterIrregularidade={manterIrregularidade} />
+          <ImportarCpfsPlanilha teams={teams} />
+          <PlanilhaInscricoes teams={teams} />
+        </>
+      )}
 
+      {secaoAtiva === "comunicacao" && (
+        <>
+          <AprovacaoComissao teams={teams} saveTeams={saveTeams} perfis={perfis} />
+          <LembreteInscricao teams={teams} perfis={perfis} />
+        </>
+      )}
+
+      {secaoAtiva === "documentos" && <DocumentosOrganizacao teams={teams} matches={matches} />}
+
+      {secaoAtiva === "times" && (
       <div
         className="rounded-2xl p-5 mt-8"
         style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
@@ -6949,7 +7045,9 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
           </div>
         )}
       </div>
+      )}
 
+      {secaoAtiva === "sistema" && (
       <div
         className="rounded-2xl p-5 mt-8"
         style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
@@ -6964,6 +7062,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
           {acessos === null ? "—" : acessos.toLocaleString("pt-BR")}
         </div>
       </div>
+      )}
     </div>
   );
 }
