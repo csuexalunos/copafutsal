@@ -2527,12 +2527,13 @@ function RecordRow({ label, entries, highlight }) {
   );
 }
 
-function HallDaFama() {
+function HallDaFama({ config }) {
+  const dados = (config && config.hallDaFama) || HALL_DA_FAMA;
   const contagem = {};
-  HALL_DA_FAMA.campeoes.forEach((c) => {
+  dados.campeoes.forEach((c) => {
     contagem[c.turma] = (contagem[c.turma] || 0) + 1;
   });
-  const campeoesComMarca = HALL_DA_FAMA.campeoes.map((c) => ({
+  const campeoesComMarca = dados.campeoes.map((c) => ({
     nome: c.turma + (contagem[c.turma] > 1 ? " ★" : ""),
     ano: c.edicao,
   }));
@@ -2560,20 +2561,20 @@ function HallDaFama() {
       </p>
 
       <div className="grid sm:grid-cols-2 gap-x-10 gap-y-5 mt-2 pt-5" style={{ borderTop: `1px solid ${COLORS.border}` }}>
-        <RecordRow label="Melhor jogador" entries={HALL_DA_FAMA.melhorJogador} />
-        <RecordRow label="Artilheiro" entries={HALL_DA_FAMA.artilheiro} />
-        <RecordRow label="Melhor goleiro" entries={HALL_DA_FAMA.melhorGoleiro} />
-        <RecordRow label="Gol mais bonito" entries={HALL_DA_FAMA.golMaisBonito} />
+        <RecordRow label="Melhor jogador" entries={dados.melhorJogador} />
+        <RecordRow label="Artilheiro" entries={dados.artilheiro} />
+        <RecordRow label="Melhor goleiro" entries={dados.melhorGoleiro} />
+        <RecordRow label="Gol mais bonito" entries={dados.golMaisBonito} />
       </div>
     </div>
   );
 }
 
-function Galeria() {
+function Galeria({ config }) {
   return (
     <div>
       <SectionLabel eyebrow="Memória" title="Galeria das edições" />
-      <HallDaFama />
+      <HallDaFama config={config} />
     </div>
   );
 }
@@ -2955,7 +2956,7 @@ function calcularSuspensos(matches) {
     .filter((t) => t.motivos.length > 0);
 }
 
-function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, podeDescer }) {
+function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, podeDescer, souSuperAdmin }) {
   const [expanded, setExpanded] = useState(false);
   const [eventForm, setEventForm] = useState({ tipo: "gol", jogador: "", timeId: "" });
 
@@ -3065,6 +3066,52 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
 
       {expanded && (
         <div className="px-3 pb-3 space-y-3">
+          {souSuperAdmin && (
+            <div
+              className="rounded-lg p-2.5 flex flex-wrap items-center gap-2"
+              style={{ backgroundColor: COLORS.card, border: `1px dashed ${COLORS.gold}` }}
+            >
+              <span className="text-xs font-semibold shrink-0" style={{ color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}>
+                Super admin:
+              </span>
+              <select
+                value={match.timeA || ""}
+                onChange={(e) => patch({ timeA: e.target.value })}
+                className="px-2 py-1.5 rounded-lg text-xs"
+                style={{ border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+              >
+                <option value="">Time A</option>
+                {teams.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.nome}
+                  </option>
+                ))}
+              </select>
+              <span className="text-xs" style={{ color: COLORS.slate }}>
+                x
+              </span>
+              <select
+                value={match.timeB || ""}
+                onChange={(e) => patch({ timeB: e.target.value })}
+                className="px-2 py-1.5 rounded-lg text-xs"
+                style={{ border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+              >
+                <option value="">Time B</option>
+                {teams.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.nome}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="datetime-local"
+                value={isoParaDatetimeLocal(match.horario)}
+                onChange={(e) => patch({ horario: datetimeLocalParaIso(e.target.value) })}
+                className="px-2 py-1.5 rounded-lg text-xs"
+                style={{ border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+              />
+            </div>
+          )}
           <div className="flex flex-wrap gap-2">
             {match.status === "agendado" && (
               <button
@@ -4157,6 +4204,177 @@ function ImportarCpfsPlanilha({ teams }) {
 // ou representante, só pra confirmar que o caminho todo (app → Edge
 // Function → Brevo) está de pé antes de usar as ferramentas de verdade.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Editor do Hall da Fama — só pro super admin. Deixa editar/adicionar/
+// remover campeões, melhor jogador, artilheiro, melhor goleiro e gol mais
+// bonito de qualquer edição, sem precisar pedir ajuda pra mexer no código.
+// Guarda em config.hallDaFama; enquanto não editado, o site mostra os
+// dados originais (a constante HALL_DA_FAMA).
+// ---------------------------------------------------------------------------
+function LinhaEditavelHallDaFama({ item, campos, onChange, onRemover }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 rounded-lg p-2" style={{ backgroundColor: COLORS.card }}>
+      {campos.map((c) => (
+        <input
+          key={c.key}
+          type="text"
+          value={item[c.key] ?? ""}
+          onChange={(e) => onChange({ ...item, [c.key]: e.target.value })}
+          placeholder={c.label}
+          className="px-2 py-1.5 rounded-lg text-xs flex-1 min-w-[6rem]"
+          style={{ border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+        />
+      ))}
+      <button type="button" onClick={onRemover} aria-label="Remover" className="shrink-0 p-1.5">
+        <X size={14} color="#EF4444" />
+      </button>
+    </div>
+  );
+}
+
+function SecaoEditavelHallDaFama({ titulo, campos, itens, onChange }) {
+  const adicionar = () => {
+    const vazio = {};
+    campos.forEach((c) => (vazio[c.key] = ""));
+    onChange([...itens, vazio]);
+  };
+  const atualizar = (i, novo) => onChange(itens.map((it, idx) => (idx === i ? novo : it)));
+  const remover = (i) => onChange(itens.filter((_, idx) => idx !== i));
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-xs font-semibold" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+          {titulo}
+        </span>
+        <button
+          type="button"
+          onClick={adicionar}
+          className="text-xs font-semibold inline-flex items-center gap-1"
+          style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}
+        >
+          <Plus size={12} /> Adicionar
+        </button>
+      </div>
+      <div className="space-y-1.5">
+        {itens.map((item, i) => (
+          <LinhaEditavelHallDaFama
+            key={i}
+            item={item}
+            campos={campos}
+            onChange={(novo) => atualizar(i, novo)}
+            onRemover={() => remover(i)}
+          />
+        ))}
+        {itens.length === 0 && (
+          <p className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Nenhum registro ainda.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function EditorHallDaFama({ config, saveConfig }) {
+  const [dados, setDados] = useState((config && config.hallDaFama) || HALL_DA_FAMA);
+  const [salvando, setSalvando] = useState(false);
+  const [salvo, setSalvo] = useState(false);
+
+  const atualizarSecao = (chave, novaLista) => setDados({ ...dados, [chave]: novaLista });
+
+  const salvar = async () => {
+    setSalvando(true);
+    try {
+      await saveConfig((atual) => ({ ...atual, hallDaFama: dados }));
+      setSalvo(true);
+      setTimeout(() => setSalvo(false), 2000);
+    } catch (e) {
+      console.error("Falha ao salvar Hall da Fama", e);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl p-5 mt-8" style={{ backgroundColor: COLORS.card, border: `1.5px dashed ${COLORS.gold}` }}>
+      <h3 className="font-semibold mb-1 flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.gold }}>
+        <Trophy size={16} color={COLORS.gold} /> Editar Hall da Fama (super admin)
+      </h3>
+      <p className="text-xs mb-4" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+        Muda direto aqui — sem precisar editar código. Aparece assim na aba Galeria pra qualquer
+        visitante do site.
+      </p>
+      <div className="space-y-5">
+        <SecaoEditavelHallDaFama
+          titulo="Campeões por edição"
+          campos={[
+            { key: "edicao", label: "Edição (ex: 2025)" },
+            { key: "turma", label: "Turma campeã" },
+          ]}
+          itens={dados.campeoes}
+          onChange={(v) => atualizarSecao("campeoes", v)}
+        />
+        <SecaoEditavelHallDaFama
+          titulo="Melhor jogador"
+          campos={[
+            { key: "ano", label: "Ano" },
+            { key: "nome", label: "Nome/apelido" },
+            { key: "turma", label: "Turma" },
+          ]}
+          itens={dados.melhorJogador}
+          onChange={(v) => atualizarSecao("melhorJogador", v)}
+        />
+        <SecaoEditavelHallDaFama
+          titulo="Artilheiro"
+          campos={[
+            { key: "ano", label: "Ano" },
+            { key: "nome", label: "Nome/apelido" },
+            { key: "turma", label: "Turma" },
+          ]}
+          itens={dados.artilheiro}
+          onChange={(v) => atualizarSecao("artilheiro", v)}
+        />
+        <SecaoEditavelHallDaFama
+          titulo="Melhor goleiro"
+          campos={[
+            { key: "ano", label: "Ano" },
+            { key: "nome", label: "Nome/apelido" },
+            { key: "turma", label: "Turma" },
+          ]}
+          itens={dados.melhorGoleiro}
+          onChange={(v) => atualizarSecao("melhorGoleiro", v)}
+        />
+        <SecaoEditavelHallDaFama
+          titulo="Gol mais bonito"
+          campos={[
+            { key: "ano", label: "Ano" },
+            { key: "nome", label: "Nome/apelido" },
+            { key: "turma", label: "Turma" },
+          ]}
+          itens={dados.golMaisBonito}
+          onChange={(v) => atualizarSecao("golMaisBonito", v)}
+        />
+      </div>
+      <button
+        type="button"
+        onClick={salvar}
+        disabled={salvando}
+        className="mt-5 px-4 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2 disabled:opacity-60"
+        style={{ backgroundColor: COLORS.gold, color: "#3A1E00", fontFamily: "'Inter', sans-serif" }}
+      >
+        {salvando && <Loader2 size={14} className="animate-spin" />}
+        Salvar Hall da Fama
+      </button>
+      {salvo && (
+        <span className="ml-3 text-sm" style={{ color: "#16A34A", fontFamily: "'Inter', sans-serif" }}>
+          Salvo!
+        </span>
+      )}
+    </div>
+  );
+}
+
 function TestarEnvioEmail() {
   const [enviando, setEnviando] = useState(false);
   const [resultado, setResultado] = useState(null);
@@ -5115,6 +5333,19 @@ function formatarHorarioJogo(iso) {
   return `${dias[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1} · ${hh}:${mm}`;
 }
 
+// Converte o horário (ISO) pro formato que o <input type="datetime-local">
+// espera (hora local, sem fuso), e o caminho de volta.
+function isoParaDatetimeLocal(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function datetimeLocalParaIso(valor) {
+  if (!valor) return null;
+  return new Date(valor).toISOString();
+}
+
 // ---------------------------------------------------------------------------
 // Mata-mata automático — classificação geral (todos os grupos juntos),
 // avanço de fase sozinho a partir dos resultados. Nada disso é lançado à
@@ -5787,6 +6018,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   const [carregandoPainel, setCarregandoPainel] = useState(true);
   const [buscaInscritos, setBuscaInscritos] = useState("");
   const [verRecusadosInscritos, setVerRecusadosInscritos] = useState(false);
+  const [verPendentesAntigos, setVerPendentesAntigos] = useState(false);
   const [acessos, setAcessos] = useState(null);
 
   useEffect(() => {
@@ -6118,6 +6350,8 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
 
       <TestarEnvioEmail />
 
+      {souSuperAdmin && <EditorHallDaFama config={config} saveConfig={saveConfig} />}
+
       <div
         className="rounded-2xl p-5 mb-8"
         style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
@@ -6229,9 +6463,17 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
               (p.turma || "").toLowerCase().includes(termo);
 
             const filtrados = perfis.filter((p) => p.status !== "aprovado" && combina(p));
-            const pendentes = filtrados
+            const pendentesTodos = filtrados
               .filter((p) => p.status !== "recusado")
               .sort((a, b) => new Date(b.criado_em || 0) - new Date(a.criado_em || 0));
+            // Agrupa por idade do cadastro (não pelo selinho "Novo", que
+            // já vira "visto" poucos segundos depois de abrir a página) —
+            // assim quem se inscreveu há mais tempo fica escondido, mesmo
+            // que ainda esteja pendente, e não enche a tela.
+            const SETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
+            const recente = (p) => !p.criado_em || Date.now() - new Date(p.criado_em).getTime() <= SETE_DIAS_MS;
+            const pendentesNovos = pendentesTodos.filter(recente);
+            const pendentesAntigos = pendentesTodos.filter((p) => !recente(p));
             const recusados = filtrados
               .filter((p) => p.status === "recusado")
               .sort((a, b) => new Date(b.criado_em || 0) - new Date(a.criado_em || 0));
@@ -6317,12 +6559,30 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
 
             return (
               <>
-                {pendentes.length === 0 ? (
+                {pendentesNovos.length === 0 && pendentesAntigos.length === 0 ? (
                   <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
                     Nenhum inscrito pendente {termo ? "com essa busca" : "no momento"}.
                   </p>
+                ) : pendentesNovos.length === 0 ? (
+                  <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                    Nenhum inscrito recente {termo ? "com essa busca" : ""} — veja os antigos abaixo.
+                  </p>
                 ) : (
-                  <ul className="space-y-2">{pendentes.map(linhaPerfil)}</ul>
+                  <ul className="space-y-2">{pendentesNovos.map(linhaPerfil)}</ul>
+                )}
+
+                {pendentesAntigos.length > 0 && (
+                  <div className="mt-3">
+                    <button
+                      type="button"
+                      onClick={() => setVerPendentesAntigos((v) => !v)}
+                      className="text-xs font-semibold"
+                      style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+                    >
+                      {verPendentesAntigos ? "Esconder" : "Ver"} pendentes antigos (mais de 7 dias) ({pendentesAntigos.length})
+                    </button>
+                    {verPendentesAntigos && <ul className="space-y-2 mt-2">{pendentesAntigos.map(linhaPerfil)}</ul>}
+                  </div>
                 )}
 
                 {recusados.length > 0 && (
@@ -6611,6 +6871,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
                 onMover={(dir) => moverJogo(m.id, dir)}
                 podeSubir={i > 0}
                 podeDescer={i < matches.length - 1}
+                souSuperAdmin={souSuperAdmin}
               />
             ))}
           </div>
@@ -6956,7 +7217,7 @@ export default function App() {
             )}
             {tab === "classificacao" && <Classificacao matches={matches} teams={teams} />}
             {tab === "comunidade" && <Comunidade posts={posts} savePosts={savePosts} />}
-            {tab === "galeria" && <Galeria />}
+            {tab === "galeria" && <Galeria config={config} />}
             {tab === "organizacao" && (
               <Organizacao
                 teams={teams}
