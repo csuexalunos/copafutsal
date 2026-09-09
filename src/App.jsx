@@ -5785,6 +5785,8 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   const [perfis, setPerfis] = useState([]);
   const [listaAdmins, setListaAdmins] = useState([]);
   const [carregandoPainel, setCarregandoPainel] = useState(true);
+  const [buscaInscritos, setBuscaInscritos] = useState("");
+  const [verRecusadosInscritos, setVerRecusadosInscritos] = useState(false);
   const [acessos, setAcessos] = useState(null);
 
   useEffect(() => {
@@ -6196,6 +6198,19 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
           Quem se cadastrou mas ainda não é representante. Tornar representante libera a aba de
           Inscrição, travada na turma escolhida.
         </p>
+        <input
+          type="text"
+          value={buscaInscritos}
+          onChange={(e) => setBuscaInscritos(e.target.value)}
+          placeholder="Buscar por nome, e-mail ou ano de estudo (turma)"
+          className="w-full px-3 py-2 rounded-lg text-sm mb-3"
+          style={{
+            backgroundColor: COLORS.zebra,
+            border: `1px solid ${COLORS.border}`,
+            color: COLORS.ink,
+            fontFamily: "'Inter', sans-serif",
+          }}
+        />
         {carregandoPainel ? (
           <div className="flex items-center gap-2 text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
             <Loader2 size={14} className="animate-spin" /> Carregando...
@@ -6205,42 +6220,54 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
             Ninguém nessa situação no momento.
           </p>
         ) : (
-          <ul className="space-y-2">
-            {perfis
-              .filter((p) => p.status !== "aprovado")
-              .sort((a, b) => new Date(b.criado_em || 0) - new Date(a.criado_em || 0))
-              .map((p) => {
-                const ehNovo = !p.visualizado;
-                return (
-                  <li
-                    key={p.id}
-                    className="flex flex-col sm:flex-row sm:items-center gap-2 text-sm px-3 py-2.5 rounded-lg"
-                    style={{
-                      backgroundColor: COLORS.zebra,
-                      color: COLORS.ink,
-                      fontFamily: "'Inter', sans-serif",
-                      border: ehNovo ? `1.5px solid ${COLORS.accent}` : "1.5px solid transparent",
-                    }}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium break-words flex items-center gap-1.5">
-                        {p.nome}
-                        {ehNovo && (
-                          <span
-                            className="text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide"
-                            style={{ backgroundColor: COLORS.accent, color: "#FFFFFF" }}
-                          >
-                            Novo
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs break-words" style={{ color: COLORS.slate }}>
-                        {p.tipo === "jogador" ? "jogador" : "torcedor"} · turma{" "}
-                        <strong>{p.turma || turmaEdicao[p.id] || "não definida"}</strong> · {p.email} ·{" "}
-                        {p.status === "recusado" ? "recusado" : "pendente"}
-                        {p.criado_em && ` · cadastrado em ${new Date(p.criado_em).toLocaleDateString("pt-BR")}`}
-                      </div>
+          (() => {
+            const termo = buscaInscritos.trim().toLowerCase();
+            const combina = (p) =>
+              !termo ||
+              (p.nome || "").toLowerCase().includes(termo) ||
+              (p.email || "").toLowerCase().includes(termo) ||
+              (p.turma || "").toLowerCase().includes(termo);
+
+            const filtrados = perfis.filter((p) => p.status !== "aprovado" && combina(p));
+            const pendentes = filtrados
+              .filter((p) => p.status !== "recusado")
+              .sort((a, b) => new Date(b.criado_em || 0) - new Date(a.criado_em || 0));
+            const recusados = filtrados
+              .filter((p) => p.status === "recusado")
+              .sort((a, b) => new Date(b.criado_em || 0) - new Date(a.criado_em || 0));
+
+            const linhaPerfil = (p) => {
+              const ehNovo = !p.visualizado;
+              return (
+                <li
+                  key={p.id}
+                  className="flex flex-col sm:flex-row sm:items-center gap-2 text-sm px-3 py-2.5 rounded-lg"
+                  style={{
+                    backgroundColor: COLORS.zebra,
+                    color: COLORS.ink,
+                    fontFamily: "'Inter', sans-serif",
+                    border: ehNovo ? `1.5px solid ${COLORS.accent}` : "1.5px solid transparent",
+                  }}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium break-words flex items-center gap-1.5">
+                      {p.nome}
+                      {ehNovo && (
+                        <span
+                          className="text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide"
+                          style={{ backgroundColor: COLORS.accent, color: "#FFFFFF" }}
+                        >
+                          Novo
+                        </span>
+                      )}
                     </div>
+                    <div className="text-xs break-words" style={{ color: COLORS.slate }}>
+                      {p.tipo === "jogador" ? "jogador" : "torcedor"} · turma{" "}
+                      <strong>{p.turma || turmaEdicao[p.id] || "não definida"}</strong> · {p.email} ·{" "}
+                      {p.status === "recusado" ? "recusado" : "pendente"}
+                      {p.criado_em && ` · cadastrado em ${new Date(p.criado_em).toLocaleDateString("pt-BR")}`}
+                    </div>
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     {novoTimeModo[p.id] ? (
                       <input
@@ -6285,9 +6312,35 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
                     </button>
                   </div>
                 </li>
-                );
-              })}
-          </ul>
+              );
+            };
+
+            return (
+              <>
+                {pendentes.length === 0 ? (
+                  <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                    Nenhum inscrito pendente {termo ? "com essa busca" : "no momento"}.
+                  </p>
+                ) : (
+                  <ul className="space-y-2">{pendentes.map(linhaPerfil)}</ul>
+                )}
+
+                {recusados.length > 0 && (
+                  <div className="mt-3">
+                    <button
+                      type="button"
+                      onClick={() => setVerRecusadosInscritos((v) => !v)}
+                      className="text-xs font-semibold"
+                      style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+                    >
+                      {verRecusadosInscritos ? "Esconder" : "Ver"} recusados ({recusados.length})
+                    </button>
+                    {verRecusadosInscritos && <ul className="space-y-2 mt-2">{recusados.map(linhaPerfil)}</ul>}
+                  </div>
+                )}
+              </>
+            );
+          })()
         )}
       </div>
 
