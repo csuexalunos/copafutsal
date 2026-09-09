@@ -3676,6 +3676,7 @@ function PlanilhaInscricoes({ teams }) {
       return { ...t, nJogadores: n, lote: loteNaData(t.inscritoEm), valorUnitario, valor: n * valorUnitario };
     });
   const totalGeral = linhas.reduce((acc, t) => acc + t.valor, 0);
+  const totalAtletas = linhas.reduce((acc, t) => acc + t.nJogadores, 0);
 
   const baixarPlanilha = () => {
     const linhasHtml = linhas
@@ -3700,7 +3701,7 @@ function PlanilhaInscricoes({ teams }) {
           <tbody>${linhasHtml}</tbody>
         </table>
         <div class="meta" style="margin-top:16px; font-size:15px;">
-          <strong>Total geral: ${escapeHtml(formatarReais(totalGeral))}</strong>
+          <strong>Total de atletas: ${totalAtletas}</strong> · <strong>Total geral: ${escapeHtml(formatarReais(totalGeral))}</strong>
         </div>
       </div>`;
     abrirImpressao("Planilha de inscrições", corpo);
@@ -3724,8 +3725,8 @@ function PlanilhaInscricoes({ teams }) {
         )}
       </div>
       <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-        Por ordem de inscrição · valor por atleta conforme o lote (Art. 8º):{" "}
-        {LOTES_INSCRICAO.map((l) => `${l.nome} ${formatarReais(l.valor)}`).join(" · ")}
+        {linhas.length} time(s) · {totalAtletas} atleta(s) no total · valor por atleta conforme o
+        lote (Art. 8º): {LOTES_INSCRICAO.map((l) => `${l.nome} ${formatarReais(l.valor)}`).join(" · ")}
       </p>
       {linhas.length === 0 ? (
         <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
@@ -3779,8 +3780,11 @@ function PlanilhaInscricoes({ teams }) {
             </tbody>
             <tfoot>
               <tr style={{ borderTop: `2px solid ${COLORS.ink}` }}>
-                <td className="py-2 pr-3 font-semibold" style={{ color: COLORS.ink }} colSpan={4}>
+                <td className="py-2 pr-3 font-semibold" style={{ color: COLORS.ink }} colSpan={3}>
                   Total geral
+                </td>
+                <td className="py-2 pr-3 text-center font-bold" style={{ fontFamily: "'JetBrains Mono', monospace", color: COLORS.ink }}>
+                  {totalAtletas}
                 </td>
                 <td className="py-2 text-right font-bold" style={{ fontFamily: "'JetBrains Mono', monospace", color: COLORS.ink }}>
                   {formatarReais(totalGeral)}
