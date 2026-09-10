@@ -3552,22 +3552,25 @@ function fichaTimeHtml(team, mapaCpf, falhaCpf) {
   const valorUnitario = valorPorAtletaNaData(team.inscritoEm);
   const lote = loteNaData(team.inscritoEm);
   const total = jogadores.length * valorUnitario;
+  const naoCadastrados = jogadores.filter((j) => !jogadorPreCadastrado(j, team.nome));
   return `
     <div class="secao">
       <h1>Seleção de ${escapeHtml(team.nome)}</h1>
       <div class="meta">Capitão: ${escapeHtml(team.capitao || "—")} · Contato: ${escapeHtml(team.contato || "—")} · ${jogadores.length} jogador(es)</div>
       ${falhaCpf ? `<div class="meta" style="color:#c0392b; font-weight:bold;">⚠ Não foi possível carregar os CPFs (erro ao consultar o banco). Tente de novo ou confira se está logado.</div>` : ""}
+      ${naoCadastrados.length > 0 ? `<div class="meta" style="color:#c0392b; font-weight:bold;">⚠ ${naoCadastrados.length} jogador(es) marcado(s) com * não estão no cadastro histórico da turma — o colégio precisa confirmar se estudaram lá.</div>` : ""}
       <table>
         <thead><tr><th>Nº</th><th>Nome completo</th><th>CPF</th><th>Período de estudo</th><th>Ano de conclusão</th></tr></thead>
         <tbody>
           ${jogadores
             .map(
               (j) =>
-                `<tr><td>${escapeHtml(j.numero || "—")}</td><td>${escapeHtml(j.nome || "—")}</td><td>${escapeHtml(j.cpf || "—")}</td><td>${escapeHtml(j.periodo || "—")}</td><td>${escapeHtml(j.anoConclusao || "—")}</td></tr>`
+                `<tr${jogadorPreCadastrado(j, team.nome) ? "" : ' style="background:#fdecea;"'}><td>${escapeHtml(j.numero || "—")}</td><td>${escapeHtml(j.nome || "—")}${jogadorPreCadastrado(j, team.nome) ? "" : " *"}</td><td>${escapeHtml(j.cpf || "—")}</td><td>${escapeHtml(j.periodo || "—")}</td><td>${escapeHtml(j.anoConclusao || "—")}</td></tr>`
             )
             .join("")}
         </tbody>
       </table>
+      ${naoCadastrados.length > 0 ? `<div class="meta" style="margin-top:6px;">* Não consta no cadastro histórico da turma — confirmar matrícula.</div>` : ""}
       <div class="meta" style="margin-top:16px; font-size:14px;">
         <strong>Valor da inscrição (${escapeHtml(lote)}):</strong> ${jogadores.length} atleta(s) × ${escapeHtml(formatarReais(valorUnitario))} = <strong>${escapeHtml(formatarReais(total))}</strong>
       </div>
@@ -3621,6 +3624,7 @@ async function gerarFichaTimePdfBase64(teamOriginal) {
   const valorUnitario = valorPorAtletaNaData(team.inscritoEm);
   const lote = loteNaData(team.inscritoEm);
   const total = jogadores.length * valorUnitario;
+  const naoCadastrados = jogadores.filter((j) => !jogadorPreCadastrado(j, team.nome));
 
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const marginX = 40;
@@ -3639,7 +3643,22 @@ async function gerarFichaTimePdfBase64(teamOriginal) {
     marginX,
     y
   );
-  y += 22;
+  y += 18;
+
+  if (naoCadastrados.length > 0) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(192, 57, 43);
+    doc.text(
+      `⚠ ${naoCadastrados.length} jogador(es) marcado(s) com * não estão no cadastro histórico da turma — o colégio precisa confirmar se estudaram lá.`,
+      marginX,
+      y,
+      { maxWidth: larguraUtil }
+    );
+    doc.setTextColor(0, 0, 0);
+    y += 18;
+  }
+  y += 4;
 
   const cols = [
     { label: "Nº", w: 28 },
@@ -3673,14 +3692,34 @@ async function gerarFichaTimePdfBase64(teamOriginal) {
       y = 50;
       desenharCabecalho();
     }
+    const suspeito = !jogadorPreCadastrado(j, team.nome);
     let x = marginX;
-    const vals = [j.numero || "—", j.nome || "—", j.cpf || "—", j.periodo || "—", j.anoConclusao || "—"];
+    const vals = [
+      j.numero || "—",
+      (j.nome || "—") + (suspeito ? " *" : ""),
+      j.cpf || "—",
+      j.periodo || "—",
+      j.anoConclusao || "—",
+    ];
+    if (suspeito) doc.setTextColor(192, 57, 43);
     vals.forEach((v, i) => {
       doc.text(String(v), x, y, { maxWidth: cols[i].w - 4 });
       x += cols[i].w;
     });
+    if (suspeito) doc.setTextColor(0, 0, 0);
     y += 17;
   });
+
+  if (naoCadastrados.length > 0) {
+    if (y > 770) {
+      doc.addPage();
+      y = 50;
+    }
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(8);
+    doc.text("* Não consta no cadastro histórico da turma — confirmar matrícula.", marginX, y);
+    y += 14;
+  }
 
   y += 16;
   if (y > 770) {
@@ -4274,6 +4313,38 @@ function normalizarTexto(s) {
     .replace(/[\u0300-\u036f]/g, "")
     .trim()
     .toLowerCase();
+}
+
+// Nomes/apelidos que já existem no cadastro histórico daquela turma —
+// usado pra sinalizar na ficha quando o representante adicionou alguém
+// que não está nessa lista (pra o colégio checar se a pessoa estudou lá
+// mesmo).
+function nomesHistoricosDaTurma(turma) {
+  const set = new Set();
+  const detalhado = ELENCOS_2025[turma];
+  if (detalhado) {
+    detalhado.forEach((j) => {
+      if (j.apelido) set.add(normalizarTexto(j.apelido));
+      if (j.nome) set.add(normalizarTexto(j.nome));
+    });
+    return set;
+  }
+  const simples = ROSTERS_2025[turma];
+  if (simples) {
+    simples.forEach((nome) => set.add(normalizarTexto(nome)));
+  }
+  return set;
+}
+
+// true = jogador já estava na lista histórica (ou a turma não tem lista
+// histórica pra comparar, nesse caso não dá pra dizer que é suspeito).
+// false = foi adicionado pelo representante, sem bater com o cadastro.
+function jogadorPreCadastrado(jogador, turma) {
+  const historicos = nomesHistoricosDaTurma(turma);
+  if (historicos.size === 0) return true;
+  const apelidoNorm = normalizarTexto(jogador.apelido);
+  const nomeNorm = normalizarTexto(jogador.nome);
+  return (apelidoNorm && historicos.has(apelidoNorm)) || (nomeNorm && historicos.has(nomeNorm));
 }
 
 const CPFS_PARA_IMPORTAR = [
