@@ -1140,71 +1140,138 @@ function PlayerRow({ player, onChange, onRemove, turmaTime, onSolicitarAvaliacao
       )}
 
       {expanded && (
-        <div className="px-3 pb-3 grid grid-cols-2 gap-2" onClick={(e) => e.stopPropagation()}>
-          <input
-            type="text"
-            placeholder="Número"
-            value={player.numero}
-            onChange={(e) => onChange({ ...player, numero: e.target.value })}
-            className="px-2.5 py-1.5 rounded-lg text-sm col-span-1"
-            style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
-          />
-          <input
-            type="text"
-            placeholder="Posição"
-            value={player.posicao}
-            onChange={(e) => onChange({ ...player, posicao: e.target.value })}
-            className="px-2.5 py-1.5 rounded-lg text-sm col-span-1"
-            style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
-          />
-          <input
-            type="text"
-            placeholder="Apelido"
-            value={player.apelido || ""}
-            onChange={(e) => onChange({ ...player, apelido: e.target.value })}
-            className="px-2.5 py-1.5 rounded-lg text-sm col-span-2"
-            style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
-          />
-          <input
-            type="text"
-            placeholder="Nome completo"
-            value={player.nome}
-            onChange={(e) => onChange({ ...player, nome: e.target.value })}
-            className="px-2.5 py-1.5 rounded-lg text-sm col-span-2"
-            style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
-          />
-          <input
-            type="text"
-            placeholder="Período de estudo (ex: 2003-2009)"
-            value={player.periodo || ""}
-            onChange={(e) => onChange({ ...player, periodo: e.target.value })}
-            className="px-2.5 py-1.5 rounded-lg text-sm col-span-2"
-            style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
-          />
-          <input
-            type="text"
-            placeholder="Ano de conclusão"
-            value={player.anoConclusao || ""}
-            onChange={(e) => onChange({ ...player, anoConclusao: e.target.value })}
-            className="px-2.5 py-1.5 rounded-lg text-sm col-span-2"
-            style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
-          />
-          <input
-            type="text"
-            placeholder="CPF"
-            value={player.cpf || ""}
-            onChange={(e) => onChange({ ...player, cpf: e.target.value })}
-            className="px-2.5 py-1.5 rounded-lg text-sm col-span-1"
-            style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
-          />
-          <input
-            type="date"
-            placeholder="Data de nascimento"
-            value={player.nascimento || ""}
-            onChange={(e) => onChange({ ...player, nascimento: e.target.value })}
-            className="px-2.5 py-1.5 rounded-lg text-sm col-span-1"
-            style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
-          />
+        <div className="px-3 pb-3 space-y-3" onClick={(e) => e.stopPropagation()}>
+          <div>
+            <label
+              className="block text-xs font-semibold uppercase tracking-wide mb-1"
+              style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+            >
+              Nome completo
+            </label>
+            <input
+              type="text"
+              placeholder="Nome e sobrenome do atleta"
+              value={player.nome}
+              onChange={(e) => onChange({ ...player, nome: e.target.value })}
+              className="w-full px-2.5 py-2 rounded-lg text-sm"
+              style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+            />
+          </div>
+          <div>
+            <label
+              className="block text-xs font-semibold uppercase tracking-wide mb-1"
+              style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+            >
+              Apelido
+            </label>
+            <input
+              type="text"
+              placeholder="Como vai ser chamado nas transmissões"
+              value={player.apelido || ""}
+              onChange={(e) => onChange({ ...player, apelido: e.target.value })}
+              className="w-full px-2.5 py-2 rounded-lg text-sm"
+              style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+            />
+          </div>
+          <div>
+            <label
+              className="block text-xs font-semibold uppercase tracking-wide mb-1"
+              style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+            >
+              Número da camisa
+            </label>
+            <input
+              type="text"
+              placeholder="Ex: 10"
+              value={player.numero}
+              onChange={(e) => onChange({ ...player, numero: e.target.value })}
+              className="w-full px-2.5 py-2 rounded-lg text-sm"
+              style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+            />
+          </div>
+          <div>
+            <label
+              className="block text-xs font-semibold uppercase tracking-wide mb-1"
+              style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+            >
+              Posição
+            </label>
+            <select
+              value={player.posicao || ""}
+              onChange={(e) => onChange({ ...player, posicao: e.target.value })}
+              className="w-full px-2.5 py-2 rounded-lg text-sm"
+              style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+            >
+              <option value="">Selecione</option>
+              <option value="Goleiro">Goleiro</option>
+              <option value="Fixo">Fixo</option>
+              <option value="Ala">Ala</option>
+              <option value="Pivô">Pivô</option>
+            </select>
+          </div>
+          <div>
+            <label
+              className="block text-xs font-semibold uppercase tracking-wide mb-1"
+              style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+            >
+              CPF
+            </label>
+            <input
+              type="text"
+              placeholder="000.000.000-00"
+              value={player.cpf || ""}
+              onChange={(e) => onChange({ ...player, cpf: e.target.value })}
+              className="w-full px-2.5 py-2 rounded-lg text-sm"
+              style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+            />
+          </div>
+          <div>
+            <label
+              className="block text-xs font-semibold uppercase tracking-wide mb-1"
+              style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+            >
+              Data de nascimento
+            </label>
+            <input
+              type="date"
+              value={player.nascimento || ""}
+              onChange={(e) => onChange({ ...player, nascimento: e.target.value })}
+              className="w-full px-2.5 py-2 rounded-lg text-sm"
+              style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+            />
+          </div>
+          <div>
+            <label
+              className="block text-xs font-semibold uppercase tracking-wide mb-1"
+              style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+            >
+              Período de estudo
+            </label>
+            <input
+              type="text"
+              placeholder="Ex: 2003-2009"
+              value={player.periodo || ""}
+              onChange={(e) => onChange({ ...player, periodo: e.target.value })}
+              className="w-full px-2.5 py-2 rounded-lg text-sm"
+              style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+            />
+          </div>
+          <div>
+            <label
+              className="block text-xs font-semibold uppercase tracking-wide mb-1"
+              style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+            >
+              Ano de conclusão
+            </label>
+            <input
+              type="text"
+              placeholder="Ex: 2009"
+              value={player.anoConclusao || ""}
+              onChange={(e) => onChange({ ...player, anoConclusao: e.target.value })}
+              className="w-full px-2.5 py-2 rounded-lg text-sm"
+              style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+            />
+          </div>
         </div>
       )}
     </div>
@@ -1420,7 +1487,7 @@ function EditarMeuTime({ teams, saveTeams }) {
   };
 
   const salvarTime = async (atualizado) => {
-    await saveTeams(teams.map((t) => (t.id === atualizado.id ? atualizado : t)));
+    await saveTeams((atuais) => (atuais || []).map((t) => (t.id === atualizado.id ? atualizado : t)));
   };
 
   if (!open) {
@@ -1494,7 +1561,16 @@ function EditarMeuTime({ teams, saveTeams }) {
 // exige apelido, número, nome completo, período, ano de conclusão, CPF e
 // data de nascimento, igual pede o regulamento.
 function AddPlayerForm({ onAdd }) {
-  const vazio = { apelido: "", numero: "", nome: "", periodo: "", anoConclusao: "", cpf: "", nascimento: "" };
+  const vazio = {
+    nome: "",
+    apelido: "",
+    numero: "",
+    posicao: "",
+    cpf: "",
+    nascimento: "",
+    periodo: "",
+    anoConclusao: "",
+  };
   const [novo, setNovo] = useState(vazio);
   const [erro, setErro] = useState("");
 
@@ -1507,33 +1583,62 @@ function AddPlayerForm({ onAdd }) {
       return;
     }
     setErro("");
-    onAdd({ id: `j_${Date.now()}`, posicao: "", ...novo });
+    onAdd({ id: `j_${Date.now()}`, ...novo });
     setNovo(vazio);
   };
 
   const campos = [
-    { key: "apelido", label: "Apelido *", placeholder: "Ex: Bruninho" },
+    { key: "nome", label: "Nome completo *", placeholder: "Nome e sobrenome do atleta" },
+    { key: "apelido", label: "Apelido *", placeholder: "Como vai ser chamado nas transmissões" },
     { key: "numero", label: "Número da camisa *", placeholder: "Ex: 10" },
-    { key: "nome", label: "Nome completo *", placeholder: "Nome e sobrenome", span: true },
-    { key: "periodo", label: "Período de estudo *", placeholder: "Ex: 2003-2009" },
-    { key: "anoConclusao", label: "Ano de conclusão *", placeholder: "Ex: 2009" },
+    {
+      key: "posicao",
+      label: "Posição *",
+      type: "select",
+      opcoes: ["Goleiro", "Fixo", "Ala", "Pivô"],
+    },
     { key: "cpf", label: "CPF *", placeholder: "000.000.000-00" },
     { key: "nascimento", label: "Data de nascimento *", placeholder: "", type: "date" },
+    { key: "periodo", label: "Período de estudo *", placeholder: "Ex: 2003-2009" },
+    { key: "anoConclusao", label: "Ano de conclusão *", placeholder: "Ex: 2009" },
   ];
 
   return (
     <div className="rounded-xl p-3 mb-3" style={{ backgroundColor: COLORS.card, border: `1.5px solid ${COLORS.border}` }}>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="space-y-3">
         {campos.map((f) => (
-          <input
-            key={f.key}
-            type={f.type || "text"}
-            placeholder={f.placeholder}
-            value={novo[f.key]}
-            onChange={(e) => campo(f.key, e.target.value)}
-            className={`px-2.5 py-1.5 rounded-lg text-sm ${f.span ? "col-span-2" : ""}`}
-            style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
-          />
+          <div key={f.key}>
+            <label
+              className="block text-xs font-semibold uppercase tracking-wide mb-1"
+              style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+            >
+              {f.label}
+            </label>
+            {f.type === "select" ? (
+              <select
+                value={novo[f.key]}
+                onChange={(e) => campo(f.key, e.target.value)}
+                className="w-full px-2.5 py-2 rounded-lg text-sm"
+                style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+              >
+                <option value="">Selecione</option>
+                {f.opcoes.map((op) => (
+                  <option key={op} value={op}>
+                    {op}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type={f.type || "text"}
+                placeholder={f.placeholder}
+                value={novo[f.key]}
+                onChange={(e) => campo(f.key, e.target.value)}
+                className="w-full px-2.5 py-2 rounded-lg text-sm"
+                style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+              />
+            )}
+          </div>
         ))}
       </div>
       {erro && (
@@ -1544,7 +1649,7 @@ function AddPlayerForm({ onAdd }) {
       <button
         type="button"
         onClick={adicionar}
-        className="mt-2 px-4 py-2 rounded-lg text-sm font-semibold"
+        className="mt-3 px-4 py-2 rounded-lg text-sm font-semibold"
         style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
       >
         Adicionar jogador
