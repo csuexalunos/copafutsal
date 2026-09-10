@@ -6385,6 +6385,18 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   const [carregandoPainel, setCarregandoPainel] = useState(true);
   const [buscaInscritos, setBuscaInscritos] = useState("");
   const [secaoAtiva, setSecaoAtiva] = useState(null);
+
+  // Marca "visto" os times novos ~4s depois de abrir o grupo "Times e
+  // elencos" — mesmo padrão usado pros inscritos novos. Guarda a data em
+  // config (compartilhado), já que times não têm um campo individual de
+  // "visualizado" como os perfis têm.
+  useEffect(() => {
+    if (secaoAtiva !== "times") return;
+    const t = setTimeout(() => {
+      saveConfig((atual) => ({ ...(atual || {}), ultimaVisualizacaoTimes: new Date().toISOString() }));
+    }, 4000);
+    return () => clearTimeout(t);
+  }, [secaoAtiva]);
   const [verRecusadosInscritos, setVerRecusadosInscritos] = useState(false);
   const [verPendentesAntigos, setVerPendentesAntigos] = useState(false);
   const [acessos, setAcessos] = useState(null);
@@ -6738,8 +6750,14 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
           badges={{
             pessoas:
               perfis.filter((p) => p.status === "pendente" && !p.visualizado).length +
-              avaliacoes.filter((a) => a.status === "pendente").length +
               (souSuperAdmin ? adminRequests.filter((r) => r.status === "pendente").length : 0),
+            times:
+              avaliacoes.filter((a) => a.status === "pendente").length +
+              teams.filter(
+                (t) =>
+                  t.inscritoEm &&
+                  (!config?.ultimaVisualizacaoTimes || new Date(t.inscritoEm) > new Date(config.ultimaVisualizacaoTimes))
+              ).length,
           }}
         />
       )}
@@ -7006,58 +7024,6 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
         )}
       </div>
 
-      {avaliacoes.filter((a) => a.status === "pendente").length > 0 && (
-        <div
-          className="rounded-2xl p-5 mb-8"
-          style={{ backgroundColor: COLORS.card, border: `1.5px solid ${COLORS.accent}` }}
-        >
-          <h3 className="font-semibold mb-1 flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
-            <AlertTriangle size={16} color={COLORS.accent} /> Casos pra avaliação da comissão ({avaliacoes.filter((a) => a.status === "pendente").length})
-          </h3>
-          <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-            O representante pediu revisão de um jogador marcado como irregular — Art. 9º dá
-            direito a esse esclarecimento antes de qualquer punição. "Aprovar exceção" libera o
-            jogador; "Manter irregularidade" <strong>remove ele do time</strong> (o representante
-            pode corrigir e adicionar de novo depois).
-          </p>
-          <ul className="space-y-2">
-            {avaliacoes
-              .filter((a) => a.status === "pendente")
-              .map((a) => (
-                <li
-                  key={a.id}
-                  className="flex flex-col gap-2 text-sm px-3 py-2.5 rounded-lg"
-                  style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
-                >
-                  <div className="break-words">
-                    <div className="font-medium">{a.jogadorApelido || a.jogadorNome || "Jogador"}</div>
-                    <div className="text-xs" style={{ color: COLORS.slate }}>
-                      Time {a.timeNome} · ano de conclusão {a.anoConclusao || "—"} não bate com a turma
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => aprovarExcecao(a)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold"
-                      style={{ backgroundColor: "#16A34A", color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
-                    >
-                      Aprovar exceção
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => manterIrregularidade(a)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold"
-                      style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
-                    >
-                      Manter irregularidade
-                    </button>
-                  </div>
-                </li>
-              ))}
-          </ul>
-        </div>
-      )}
 
       {souSuperAdmin && (
         <div
@@ -7319,6 +7285,59 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
         <>
           <GerenciarElencos teams={teams} saveTeams={saveTeams} />
           <DiagnosticoIrregularidades teams={teams} aprovarExcecao={aprovarExcecao} manterIrregularidade={manterIrregularidade} />
+
+          {avaliacoes.filter((a) => a.status === "pendente").length > 0 && (
+            <div
+              className="rounded-2xl p-5 mb-8"
+              style={{ backgroundColor: COLORS.card, border: `1.5px solid ${COLORS.accent}` }}
+            >
+              <h3 className="font-semibold mb-1 flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+                <AlertTriangle size={16} color={COLORS.accent} /> Casos pra avaliação da comissão ({avaliacoes.filter((a) => a.status === "pendente").length})
+              </h3>
+              <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                O representante pediu revisão de um jogador marcado como irregular — Art. 9º dá
+                direito a esse esclarecimento antes de qualquer punição. "Aprovar exceção" libera o
+                jogador; "Manter irregularidade" <strong>remove ele do time</strong> (o representante
+                pode corrigir e adicionar de novo depois).
+              </p>
+              <ul className="space-y-2">
+                {avaliacoes
+                  .filter((a) => a.status === "pendente")
+                  .map((a) => (
+                    <li
+                      key={a.id}
+                      className="flex flex-col gap-2 text-sm px-3 py-2.5 rounded-lg"
+                      style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+                    >
+                      <div className="break-words">
+                        <div className="font-medium">{a.jogadorApelido || a.jogadorNome || "Jogador"}</div>
+                        <div className="text-xs" style={{ color: COLORS.slate }}>
+                          Time {a.timeNome} · ano de conclusão {a.anoConclusao || "—"} não bate com a turma
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => aprovarExcecao(a)}
+                          className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+                          style={{ backgroundColor: "#16A34A", color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+                        >
+                          Aprovar exceção
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => manterIrregularidade(a)}
+                          className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+                          style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+                        >
+                          Manter irregularidade
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          )}
           <ImportarCpfsPlanilha teams={teams} />
           <PlanilhaInscricoes teams={teams} />
         </>
@@ -7592,7 +7611,11 @@ export default function App() {
             const active = tab === t.id;
             const pendenciasOrganizacao =
               t.id === "organizacao"
-                ? avaliacoes.filter((a) => a.status === "pendente").length +
+                ? teams.filter(
+                    (tm) =>
+                      tm.inscritoEm &&
+                      (!config?.ultimaVisualizacaoTimes || new Date(tm.inscritoEm) > new Date(config.ultimaVisualizacaoTimes))
+                  ).length +
                   (sessao && sessao.tipo === "admin" && sessao.superAdmin
                     ? adminRequests.filter((r) => r.status === "pendente").length
                     : 0)
