@@ -549,21 +549,32 @@ function linkWhatsapp(numero, mensagem) {
 }
 
 // Mensagem padrão de confirmação de inscrição/pagamento via WhatsApp —
-// usada tanto no botão que aparece pro representante depois de salvar a
-// inscrição quanto nos e-mails de aprovação e lembrete de pagamento.
-function mensagemConfirmacaoPagamento(nomeTime, quantidadeAtletas) {
+// usada nos e-mails de aprovação e lembrete de pagamento. Varia conforme
+// a forma de pagamento escolhida na inscrição: no Pix já manda a chave;
+// no cartão de crédito, pede a geração do link de pagamento.
+function mensagemConfirmacaoPagamento(nomeTime, quantidadeAtletas, formaPagamento) {
   const valorUnitario = valorPorAtletaNaData(new Date());
   const nomeLote = loteNaData(new Date());
   const total = quantidadeAtletas * valorUnitario;
+
+  if (formaPagamento === "credito") {
+    return (
+      `Olá! Sou o representante do time ${nomeTime} na Copa de Ex-Alunos de Futsal do Colégio Santa Úrsula.\n\n` +
+      `- Time: ${nomeTime}\n` +
+      `- Atletas: ${quantidadeAtletas}\n` +
+      `- Valor: ${formatarReais(total)} (${nomeLote})\n` +
+      `- Forma de pagamento: Cartão de crédito\n\n` +
+      `Segue em anexo a ficha do time em PDF. Solicito a geração do link de pagamento da taxa de inscrição.`
+    );
+  }
+
   return (
     `Olá! Sou o representante do time ${nomeTime} na Copa de Ex-Alunos de Futsal do Colégio Santa Úrsula.\n\n` +
-    `Resumo:\n` +
     `- Time: ${nomeTime}\n` +
     `- Atletas: ${quantidadeAtletas}\n` +
     `- Valor: ${formatarReais(total)} (${nomeLote})\n` +
     `- Forma de pagamento: Pix\n` +
-    `- Chave Pix: ${PIX_CHAVE_TEXTO}. Se for Pix, o pagamento deve ser realizado após a inscrição, em um único Pix ref. ao time.\n\n` +
-    `Vou enviar aqui a ficha do time em PDF e o comprovante do pagamento.`
+    `- Chave Pix: ${PIX_CHAVE_TEXTO}. Pagamento em um único Pix referente ao time.`
   );
 }
 
@@ -1565,6 +1576,7 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes }) {
         contato: timeAlvo.contato || "",
         jogadores: timeAlvo.jogadores || [],
         escudoUrl: timeAlvo.escudoUrl || "",
+        formaPagamento: timeAlvo.formaPagamento || "",
       };
     }
     if (turmaAlvo) {
@@ -1575,9 +1587,10 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes }) {
         contato: "",
         jogadores: jogadoresDaTurma(turmaAlvo),
         escudoUrl: ESCUDOS_TIMES[turmaAlvo] || "",
+        formaPagamento: "",
       };
     }
-    return { turmaSelecionada: "", nomeCustom: "", capitao: "", contato: "", jogadores: [], escudoUrl: "" };
+    return { turmaSelecionada: "", nomeCustom: "", capitao: "", contato: "", jogadores: [], escudoUrl: "", formaPagamento: "" };
   };
 
   const [form, setForm] = useState(montarEstadoInicial);
@@ -1629,6 +1642,7 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes }) {
         contato: existente.contato || "",
         jogadores: existente.jogadores || [],
         escudoUrl: existente.escudoUrl || "",
+        formaPagamento: existente.formaPagamento || "",
       });
       // CPF do time já inscrito fica na tabela protegida (cpfs_jogadores),
       // nunca dentro do registro público do time — busca e completa.
@@ -1704,6 +1718,10 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes }) {
       setError("Preencha seus dados, escolha a turma e o contato.");
       return;
     }
+    if (!form.formaPagamento) {
+      setError("Escolha a forma de pagamento (Pix ou cartão de crédito).");
+      return;
+    }
     if (form.jogadores.length === 0) {
       setError("Cadastre pelo menos um jogador — não é opcional.");
       return;
@@ -1730,6 +1748,7 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes }) {
           contato: form.contato.trim(),
           jogadores: jogadoresSemCpf,
           escudoUrl: form.escudoUrl,
+          formaPagamento: form.formaPagamento,
         };
         return lista.map((t) => (t.id === atualizado.id ? atualizado : t));
       }
@@ -1743,6 +1762,7 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes }) {
         contato: form.contato.trim(),
         jogadores: jogadoresSemCpf,
         escudoUrl: form.escudoUrl,
+        formaPagamento: form.formaPagamento,
         codigo,
         inscritoEm: new Date().toISOString(),
       };
@@ -1884,6 +1904,36 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes }) {
               className="w-full px-4 py-2.5 rounded-xl outline-none text-sm"
               style={{ backgroundColor: COLORS.card, border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
             />
+          </div>
+
+          <div>
+            <label
+              className="block text-xs font-semibold uppercase tracking-wide mb-1.5"
+              style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+            >
+              Forma de pagamento
+            </label>
+            <div className="flex gap-2">
+              {[
+                { valor: "pix", rotulo: "Pix" },
+                { valor: "credito", rotulo: "Cartão de crédito" },
+              ].map((opcao) => (
+                <button
+                  key={opcao.valor}
+                  type="button"
+                  onClick={() => atualizarCampo({ formaPagamento: opcao.valor })}
+                  className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold"
+                  style={{
+                    backgroundColor: form.formaPagamento === opcao.valor ? COLORS.accent : COLORS.card,
+                    color: form.formaPagamento === opcao.valor ? "#FFFFFF" : COLORS.ink,
+                    border: `1.5px solid ${form.formaPagamento === opcao.valor ? COLORS.accent : COLORS.border}`,
+                    fontFamily: "'Inter', sans-serif",
+                  }}
+                >
+                  {opcao.rotulo}
+                </button>
+              ))}
+            </div>
           </div>
 
           {isAdmin ? (
@@ -2041,24 +2091,16 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes }) {
               )}
             </div>
           )}
-          {sent &&
-            (() => {
-              const link = linkWhatsapp(
-                WHATSAPP_CONFIRMACAO_PAGAMENTO,
-                mensagemConfirmacaoPagamento(nomeTime, form.jogadores.length)
-              );
-              return (
-                <a
-                  href={link}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-2 px-4 py-3 rounded-xl text-sm font-semibold inline-flex items-center gap-2"
-                  style={{ backgroundColor: "#25D366", color: "#052E16", fontFamily: "'Inter', sans-serif" }}
-                >
-                  <MessageCircle size={16} /> Confirmar inscrição no WhatsApp (enviar PDF + comprovante)
-                </a>
-              );
-            })()}
+          {sent && (
+            <div
+              className="text-sm px-4 py-3 rounded-xl mt-2"
+              style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+            >
+              Sua inscrição precisa ser aprovada pela comissão antes do pagamento. Aguarde o
+              e-mail de aprovação — ele vai trazer o link/instrução pra pagar. Se não achar na
+              caixa de entrada, confira a pasta de spam/lixo eletrônico.
+            </div>
+          )}
         </form>
 
         <div className="sm:col-span-2">
@@ -3637,13 +3679,31 @@ async function enviarEmailTesteGenerico() {
   });
 }
 
+// Passos de pagamento pro e-mail — mudam conforme a forma escolhida na
+// inscrição (Pix já manda a chave; cartão de crédito pede o link).
+function passosPagamento(formaPagamento) {
+  if (formaPagamento === "credito") {
+    return [
+      "Clique no botão abaixo pra abrir o WhatsApp da organização;",
+      "Envie por lá o PDF da ficha do time (em anexo neste e-mail) e solicite a geração do link de pagamento da taxa de inscrição;",
+      "Pague usando o link que a organização enviar.",
+    ];
+  }
+  return [
+    `Realize o pagamento via Pix — chave: ${PIX_CHAVE_TEXTO}. Um único Pix referente ao time;`,
+    "Clique no botão abaixo pra abrir o WhatsApp da organização;",
+    "Envie por lá o PDF da ficha do time (em anexo neste e-mail) e o comprovante do pagamento.",
+  ];
+}
+
 async function enviarEmailAprovacaoTime(team, emailDestino) {
   const pdfBase64 = await gerarFichaTimePdfBase64(team);
   const destinatarioNome = team.capitao || team.nome;
   const assunto = `Time ${team.nome} aprovado — confirme sua inscrição na Copa CSU`;
   const qtdAtletas = (team.jogadores || []).length;
-  const mensagemWpp = mensagemConfirmacaoPagamento(team.nome, qtdAtletas);
+  const mensagemWpp = mensagemConfirmacaoPagamento(team.nome, qtdAtletas, team.formaPagamento);
   const linkWpp = linkWhatsapp(WHATSAPP_CONFIRMACAO_PAGAMENTO, mensagemWpp);
+  const passos = passosPagamento(team.formaPagamento);
   const htmlContent = envelopeHtmlEmail(`
     <div style="font-family: Arial, Helvetica, sans-serif; color: #12203D; max-width: 560px; margin: 0 auto; padding: 24px 16px;">
       <h2 style="color: #12203D;">Seu time foi avaliado e aprovado! 🎉</h2>
@@ -3658,9 +3718,7 @@ async function enviarEmailAprovacaoTime(team, emailDestino) {
       </p>
       <p>Pra finalizar a inscrição, siga estes passos:</p>
       <ol>
-        <li>Realize o pagamento via Pix — chave: <strong>${PIX_CHAVE_TEXTO}</strong>. O pagamento deve ser feito em um único Pix referente ao time, depois da inscrição;</li>
-        <li>Clique no botão abaixo pra abrir o WhatsApp da organização;</li>
-        <li>Envie por lá o PDF da ficha do time (em anexo neste e-mail) e o comprovante do pagamento.</li>
+        ${passos.map((p) => `<li>${p}</li>`).join("\n        ")}
       </ol>
       <p style="text-align: center; margin: 28px 0;">
         <a href="${linkWpp}"
@@ -3681,7 +3739,9 @@ async function enviarEmailAprovacaoTime(team, emailDestino) {
     `Olá${destinatarioNome ? ", " + destinatarioNome : ""}!\n\n` +
     `O time ${team.nome} foi avaliado pela comissão organizadora da Copa de Ex-Alunos de Futsal do Colégio Santa Úrsula e está aprovado.\n\n` +
     `Em anexo você encontra a ficha do time em PDF, com a lista de jogadores aprovada pela comissão.\n\n` +
-    `Pra finalizar: pague via Pix (chave: ${PIX_CHAVE_TEXTO}, em um único Pix referente ao time, depois da inscrição) e mande o PDF + comprovante pelo WhatsApp da organização:\n` +
+    `Pra finalizar:\n` +
+    passos.map((p, i) => `${i + 1}. ${p}`).join("\n") +
+    `\n\nAbra o WhatsApp da organização por aqui:\n` +
     `${linkWpp}\n\n` +
     `Qualquer dúvida, fale com a organização.\n\n` +
     `Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula
@@ -3708,8 +3768,9 @@ async function enviarLembretePagamentoTime(team, emailDestino) {
   const destinatarioNome = team.capitao || team.nome;
   const assunto = `Falta o pagamento: inscrição do time ${team.nome} na Copa CSU`;
   const qtdAtletas = (team.jogadores || []).length;
-  const mensagemWpp = mensagemConfirmacaoPagamento(team.nome, qtdAtletas);
+  const mensagemWpp = mensagemConfirmacaoPagamento(team.nome, qtdAtletas, team.formaPagamento);
   const linkWpp = linkWhatsapp(WHATSAPP_CONFIRMACAO_PAGAMENTO, mensagemWpp);
+  const passos = passosPagamento(team.formaPagamento);
   const htmlContent = envelopeHtmlEmail(`
     <div style="font-family: Arial, Helvetica, sans-serif; color: #12203D; max-width: 560px; margin: 0 auto; padding: 24px 16px;">
       <h2 style="color: #12203D;">Falta só o pagamento pra fechar sua inscrição! 💳</h2>
@@ -3724,9 +3785,7 @@ async function enviarLembretePagamentoTime(team, emailDestino) {
       </p>
       <p>Pra finalizar, é só:</p>
       <ol>
-        <li>Realizar o pagamento via Pix — chave: <strong>${PIX_CHAVE_TEXTO}</strong>. Um único Pix referente ao time;</li>
-        <li>Clicar no botão abaixo pra abrir o WhatsApp da organização;</li>
-        <li>Enviar por lá o PDF da ficha do time (em anexo neste e-mail) e o comprovante do pagamento.</li>
+        ${passos.map((p) => `<li>${p}</li>`).join("\n        ")}
       </ol>
       <p style="text-align: center; margin: 28px 0;">
         <a href="${linkWpp}"
@@ -3747,7 +3806,9 @@ async function enviarLembretePagamentoTime(team, emailDestino) {
     `Olá${destinatarioNome ? ", " + destinatarioNome : ""}!\n\n` +
     `O time ${team.nome} já foi aprovado pela comissão, mas ainda não identificamos o pagamento da inscrição.\n\n` +
     `Em anexo está a ficha do time em PDF de novo, caso precise.\n\n` +
-    `Pra finalizar: pague via Pix (chave: ${PIX_CHAVE_TEXTO}, em um único Pix referente ao time) e mande o PDF + comprovante pelo WhatsApp da organização:\n` +
+    `Pra finalizar:\n` +
+    passos.map((p, i) => `${i + 1}. ${p}`).join("\n") +
+    `\n\nAbra o WhatsApp da organização por aqui:\n` +
     `${linkWpp}\n\n` +
     `Qualquer dúvida, fale com a organização.\n\n` +
     `Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula
