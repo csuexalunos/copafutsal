@@ -3647,6 +3647,67 @@ async function enviarEmailAprovacaoTime(team, emailDestino) {
 }
 
 // ---------------------------------------------------------------------------
+// E-mail de lembrete de pagamento — pro time já aprovado que ainda não
+// finalizou o pagamento. Mesma ficha em PDF e mesmo link do e-mail de
+// aprovação, só muda o tom (foco em "falta pagar", não "você foi aprovado").
+// ---------------------------------------------------------------------------
+async function enviarLembretePagamentoTime(team, emailDestino) {
+  const pdfBase64 = await gerarFichaTimePdfBase64(team);
+  const destinatarioNome = team.capitao || team.nome;
+  const assunto = `Falta o pagamento: inscrição do time ${team.nome} na Copa CSU`;
+  const htmlContent = envelopeHtmlEmail(`
+    <div style="font-family: Arial, Helvetica, sans-serif; color: #12203D; max-width: 560px; margin: 0 auto; padding: 24px 16px;">
+      <h2 style="color: #12203D;">Falta só o pagamento pra fechar sua inscrição! 💳</h2>
+      <p>Olá${destinatarioNome ? ", " + destinatarioNome : ""}!</p>
+      <p>
+        O time <strong>${team.nome}</strong> já foi aprovado pela comissão da Copa de
+        Ex-Alunos de Futsal do Colégio Santa Úrsula, mas ainda não identificamos o
+        pagamento da inscrição.
+      </p>
+      <p>
+        Em anexo está a <strong>ficha do time em PDF</strong> de novo, caso precise.
+      </p>
+      <p>Pra finalizar, é só:</p>
+      <ol>
+        <li>Acessar o link abaixo;</li>
+        <li>Anexar o PDF da ficha do time (em anexo neste e-mail), se pedir;</li>
+        <li>Realizar o pagamento da inscrição.</li>
+      </ol>
+      <p style="text-align: center; margin: 28px 0;">
+        <a href="${LINK_FINALIZACAO_INSCRICAO}"
+           style="background-color: #F97316; color: #FFFFFF; text-decoration: none; font-weight: bold; padding: 12px 24px; border-radius: 8px; display: inline-block;">
+          Finalizar pagamento
+        </a>
+      </p>
+      <p style="font-size: 13px; color: #667085;">
+        Se o botão não funcionar, copie e cole este link no navegador:<br />
+        <a href="${LINK_FINALIZACAO_INSCRICAO}">${LINK_FINALIZACAO_INSCRICAO}</a>
+      </p>
+      <p>Qualquer dúvida, fale com a organização.</p>
+      <p>Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula</p>
+    </div>
+  `);
+  const textContent =
+    `Falta só o pagamento pra fechar sua inscrição!\n\n` +
+    `Olá${destinatarioNome ? ", " + destinatarioNome : ""}!\n\n` +
+    `O time ${team.nome} já foi aprovado pela comissão, mas ainda não identificamos o pagamento da inscrição.\n\n` +
+    `Em anexo está a ficha do time em PDF de novo, caso precise.\n\n` +
+    `Pra finalizar: acesse o link abaixo, anexe o PDF (em anexo neste e-mail) se pedir, e realize o pagamento.\n` +
+    `${LINK_FINALIZACAO_INSCRICAO}\n\n` +
+    `Qualquer dúvida, fale com a organização.\n\n` +
+    `Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula`;
+  return chamarEnvioDeEmail({
+    destinatarioEmail: emailDestino.trim(),
+    destinatarioNome,
+    assunto,
+    htmlContent,
+    textContent,
+    pdfBase64,
+    pdfNomeArquivo: `ficha-${team.nome}.pdf`.replace(/[^a-zA-Z0-9._-]/g, "_"),
+  });
+}
+
+// ---------------------------------------------------------------------------
 // E-mail de lembrete de inscrição — pra representante que ainda não
 // inscreveu o time, avisando do prazo do lote atual.
 // ---------------------------------------------------------------------------
@@ -4604,6 +4665,8 @@ function AprovacaoComissao({ teams, saveTeams, perfis }) {
   const [emailPorTime, setEmailPorTime] = useState({});
   const [enviando, setEnviando] = useState({});
   const [erro, setErro] = useState({});
+  const [enviandoPag, setEnviandoPag] = useState({});
+  const [erroPag, setErroPag] = useState({});
 
   const emailAtual = (team) => {
     if (emailPorTime[team.id] !== undefined) return emailPorTime[team.id];
@@ -4639,6 +4702,32 @@ function AprovacaoComissao({ teams, saveTeams, perfis }) {
       setErro((s) => ({ ...s, [team.id]: (teste ? "Erro no teste: " : "Erro ao enviar: ") + e.message }));
     } finally {
       setEnviando((s) => ({ ...s, [team.id]: false }));
+    }
+  };
+
+  const enviarPagamento = async (team, opcoes = {}) => {
+    const teste = !!opcoes.teste;
+    const email = teste ? EMAIL_TESTE_ORGANIZACAO : emailAtual(team).trim();
+    if (!teste && !email) {
+      setErroPag((s) => ({ ...s, [team.id]: "Informe o e-mail antes de enviar." }));
+      return;
+    }
+    setErroPag((s) => ({ ...s, [team.id]: "" }));
+    setEnviandoPag((s) => ({ ...s, [team.id]: true }));
+    try {
+      await enviarLembretePagamentoTime(team, email);
+      if (!teste) {
+        await saveTeams((atuais) =>
+          (atuais || []).map((t) =>
+            t.id === team.id ? { ...t, emailComissao: email, pagamentoLembradoEm: new Date().toISOString() } : t
+          )
+        );
+      }
+    } catch (e) {
+      console.error("Falha ao enviar lembrete de pagamento", e);
+      setErroPag((s) => ({ ...s, [team.id]: (teste ? "Erro no teste: " : "Erro ao enviar: ") + e.message }));
+    } finally {
+      setEnviandoPag((s) => ({ ...s, [team.id]: false }));
     }
   };
 
@@ -4732,6 +4821,40 @@ function AprovacaoComissao({ teams, saveTeams, perfis }) {
                   {t.emailEnviadoEm && !erro[t.id] && (
                     <p className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
                       Último envio: {new Date(t.emailEnviadoEm).toLocaleString("pt-BR")} para {t.emailComissao}
+                    </p>
+                  )}
+
+                  <div className="flex items-center gap-2 flex-wrap pt-1" style={{ borderTop: `1px dashed ${COLORS.border}` }}>
+                    <button
+                      type="button"
+                      onClick={() => enviarPagamento(t)}
+                      disabled={!!enviandoPag[t.id]}
+                      className="px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-60 shrink-0"
+                      style={{ backgroundColor: "#F97316", color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+                    >
+                      {enviandoPag[t.id] ? <Loader2 size={13} className="animate-spin" /> : <Mail size={13} />}
+                      {t.pagamentoLembradoEm ? "Reenviar lembrete de pagamento" : "Lembrar pagamento"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => enviarPagamento(t, { teste: true })}
+                      disabled={!!enviandoPag[t.id]}
+                      title={`Manda esse e-mail pra ${EMAIL_TESTE_ORGANIZACAO} em vez do representante`}
+                      className="px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-60 shrink-0"
+                      style={{ border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+                    >
+                      Testar
+                    </button>
+                  </div>
+                  {erroPag[t.id] && (
+                    <p className="text-xs" style={{ color: "#EF4444", fontFamily: "'Inter', sans-serif" }}>
+                      {erroPag[t.id]}
+                    </p>
+                  )}
+                  {t.pagamentoLembradoEm && !erroPag[t.id] && (
+                    <p className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                      Último lembrete de pagamento: {new Date(t.pagamentoLembradoEm).toLocaleString("pt-BR")} para{" "}
+                      {t.emailComissao}
                     </p>
                   )}
                 </>
