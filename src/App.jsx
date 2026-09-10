@@ -4955,18 +4955,12 @@ function LembreteInscricao({ teams, perfis }) {
 }
 
 
-function AprovacaoComissao({ teams, saveTeams, perfis }) {
-  const [emailPorTime, setEmailPorTime] = useState({});
-  const [enviando, setEnviando] = useState({});
-  const [erro, setErro] = useState({});
-  const [enviandoPag, setEnviandoPag] = useState({});
-  const [erroPag, setErroPag] = useState({});
-
-  const emailAtual = (team) => {
-    if (emailPorTime[team.id] !== undefined) return emailPorTime[team.id];
-    return team.emailComissao || emailRepresentanteDoTime(team, perfis) || "";
-  };
-
+// ---------------------------------------------------------------------------
+// Status do time — aprovação da comissão e confirmação de pagamento.
+// Fica em "Times e elencos". O envio de e-mail (que usa esses status pra
+// decidir quem ainda precisa ser avisado) fica separado, em "Comunicação".
+// ---------------------------------------------------------------------------
+function StatusAprovacaoPagamento({ teams, saveTeams }) {
   const alternarAprovado = async (team) => {
     await saveTeams((atuais) =>
       (atuais || []).map((t) => (t.id === team.id ? { ...t, aprovadoComissao: !t.aprovadoComissao } : t))
@@ -4981,6 +4975,84 @@ function AprovacaoComissao({ teams, saveTeams, perfis }) {
           : t
       )
     );
+  };
+
+  return (
+    <div className="rounded-2xl p-5 mt-8" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+      <h3 className="font-semibold mb-1 flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+        <ShieldCheck size={18} color={COLORS.ink} /> Aprovação da comissão e pagamento
+      </h3>
+      <p className="text-xs mb-4" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+        Marque o time como aprovado depois que a comissão revisar o cadastro, e marque
+        "Pagamento confirmado" quando identificar o Pix/comprovante ou o link pago. O e-mail de
+        aviso pra cada time fica na aba Comunicação.
+      </p>
+
+      {teams.length > 0 && (
+        <div className="flex gap-4 mb-4 text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+          <span>
+            <strong style={{ color: "#16A34A" }}>{teams.filter((t) => t.pago).length}</strong> pago(s)
+          </span>
+          <span>
+            <strong style={{ color: COLORS.accent }}>
+              {teams.filter((t) => t.aprovadoComissao && !t.pago).length}
+            </strong>{" "}
+            aprovado(s) aguardando pagamento
+          </span>
+        </div>
+      )}
+
+      {teams.length === 0 ? (
+        <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+          Nenhum time inscrito ainda.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {teams.map((t) => (
+            <div
+              key={t.id}
+              className="rounded-xl p-3 flex items-center justify-between gap-3 flex-wrap"
+              style={{ backgroundColor: COLORS.zebra, border: `1px solid ${COLORS.border}` }}
+            >
+              <span className="font-semibold text-sm" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+                {t.nome}
+              </span>
+              <div className="flex items-center gap-3 flex-wrap">
+                <label
+                  className="flex items-center gap-2 text-xs cursor-pointer select-none"
+                  style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+                >
+                  <input type="checkbox" checked={!!t.aprovadoComissao} onChange={() => alternarAprovado(t)} />
+                  Aprovado pela comissão
+                </label>
+                {t.aprovadoComissao && (
+                  <label
+                    className="flex items-center gap-2 text-xs cursor-pointer select-none font-semibold"
+                    style={{ color: t.pago ? "#16A34A" : COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+                  >
+                    <input type="checkbox" checked={!!t.pago} onChange={() => alternarPago(t)} />
+                    {t.pago ? `Pago em ${new Date(t.pagoEm).toLocaleDateString("pt-BR")}` : "Pagamento confirmado"}
+                  </label>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AprovacaoComissao({ teams, saveTeams, perfis }) {
+  const [emailPorTime, setEmailPorTime] = useState({});
+  const [enviando, setEnviando] = useState({});
+  const [erro, setErro] = useState({});
+  const [enviandoPag, setEnviandoPag] = useState({});
+  const [erroPag, setErroPag] = useState({});
+
+  const emailAtual = (team) => {
+    if (emailPorTime[team.id] !== undefined) return emailPorTime[team.id];
+    return team.emailComissao || emailRepresentanteDoTime(team, perfis) || "";
   };
 
   const enviar = async (team, opcoes = {}) => {
@@ -5035,39 +5107,29 @@ function AprovacaoComissao({ teams, saveTeams, perfis }) {
     }
   };
 
+  // Só entra aqui quem ainda tem etapa pendente: time aprovado que ainda
+  // não pagou. Quem já pagou não precisa mais de e-mail nenhum.
+  const timesComPendencia = teams.filter((t) => t.aprovadoComissao && !t.pago);
+
   return (
     <div className="rounded-2xl p-5 mt-8" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
       <h3 className="font-semibold mb-1 flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
-        <Mail size={18} color={COLORS.ink} /> Aprovação da comissão, pagamento e envio de e-mail
+        <Mail size={18} color={COLORS.ink} /> E-mail de aprovação e pagamento
       </h3>
       <p className="text-xs mb-4" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-        Marque o time como aprovado depois que a comissão revisar o cadastro, e marque
-        "Pagamento confirmado" quando identificar o Pix/comprovante ou o link pago. O e-mail já
-        vem preenchido com o e-mail que o representante usou pra se cadastrar — confira antes de
-        enviar. Leva a ficha do time em PDF e as instruções de pagamento.
+        Só aparecem aqui os times já aprovados que ainda não pagaram — aprove e confirme
+        pagamento em "Times e elencos". O e-mail já vem preenchido com o e-mail que o
+        representante usou pra se cadastrar — confira antes de enviar. Leva a ficha do time em
+        PDF e as instruções de pagamento.
       </p>
 
-      {teams.length > 0 && (
-        <div className="flex gap-4 mb-4 text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-          <span>
-            <strong style={{ color: "#16A34A" }}>{teams.filter((t) => t.pago).length}</strong> pago(s)
-          </span>
-          <span>
-            <strong style={{ color: COLORS.accent }}>
-              {teams.filter((t) => t.aprovadoComissao && !t.pago).length}
-            </strong>{" "}
-            aprovado(s) aguardando pagamento
-          </span>
-        </div>
-      )}
-
-      {teams.length === 0 ? (
+      {timesComPendencia.length === 0 ? (
         <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-          Nenhum time inscrito ainda.
+          Nenhum time pendente no momento — ou ninguém foi aprovado ainda, ou todo mundo já pagou.
         </p>
       ) : (
         <div className="space-y-3">
-          {teams.map((t) => {
+          {timesComPendencia.map((t) => {
             const emailSugerido =
               emailPorTime[t.id] === undefined && !t.emailComissao && !!emailRepresentanteDoTime(t, perfis);
             return (
@@ -5076,127 +5138,93 @@ function AprovacaoComissao({ teams, saveTeams, perfis }) {
               className="rounded-xl p-3.5 flex flex-col gap-2.5"
               style={{ backgroundColor: COLORS.zebra, border: `1px solid ${COLORS.border}` }}
             >
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                <span className="font-semibold text-sm" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
-                  {t.nome}
-                </span>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <label
-                    className="flex items-center gap-2 text-xs cursor-pointer select-none"
-                    style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
-                  >
-                    <input type="checkbox" checked={!!t.aprovadoComissao} onChange={() => alternarAprovado(t)} />
-                    Aprovado pela comissão
-                  </label>
-                  {t.aprovadoComissao && (
-                    <label
-                      className="flex items-center gap-2 text-xs cursor-pointer select-none font-semibold"
-                      style={{ color: t.pago ? "#16A34A" : COLORS.slate, fontFamily: "'Inter', sans-serif" }}
-                    >
-                      <input type="checkbox" checked={!!t.pago} onChange={() => alternarPago(t)} />
-                      {t.pago
-                        ? `Pago em ${new Date(t.pagoEm).toLocaleDateString("pt-BR")}`
-                        : "Pagamento confirmado"}
-                    </label>
-                  )}
-                </div>
+              <span className="font-semibold text-sm" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+                {t.nome}
+              </span>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <input
+                  type="email"
+                  placeholder="e-mail do representante do time"
+                  value={emailAtual(t)}
+                  onChange={(e) => setEmailPorTime((s) => ({ ...s, [t.id]: e.target.value }))}
+                  className="flex-1 min-w-[220px] px-3 py-2 rounded-lg text-sm"
+                  style={{
+                    backgroundColor: COLORS.card,
+                    border: `1px solid ${COLORS.border}`,
+                    color: COLORS.ink,
+                    fontFamily: "'Inter', sans-serif",
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => enviar(t)}
+                  disabled={!!enviando[t.id]}
+                  className="px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-60 shrink-0"
+                  style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+                >
+                  {enviando[t.id] ? <Loader2 size={13} className="animate-spin" /> : <Mail size={13} />}
+                  {t.emailEnviadoEm ? "Reenviar e-mail" : "Enviar e-mail"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => enviar(t, { teste: true })}
+                  disabled={!!enviando[t.id]}
+                  title={`Manda esse e-mail pra ${EMAIL_TESTE_ORGANIZACAO} em vez do representante`}
+                  className="px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-60 shrink-0"
+                  style={{ border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+                >
+                  Testar
+                </button>
               </div>
+              {emailSugerido && (
+                <p className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                  E-mail preenchido automaticamente com o cadastro do representante da turma.
+                </p>
+              )}
+              {erro[t.id] && (
+                <p className="text-xs" style={{ color: "#EF4444", fontFamily: "'Inter', sans-serif" }}>
+                  {erro[t.id]}
+                </p>
+              )}
+              {t.emailEnviadoEm && !erro[t.id] && (
+                <p className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                  Último envio: {new Date(t.emailEnviadoEm).toLocaleString("pt-BR")} para {t.emailComissao}
+                </p>
+              )}
 
-              {t.aprovadoComissao && (
-                <>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <input
-                      type="email"
-                      placeholder="e-mail do representante do time"
-                      value={emailAtual(t)}
-                      onChange={(e) => setEmailPorTime((s) => ({ ...s, [t.id]: e.target.value }))}
-                      className="flex-1 min-w-[220px] px-3 py-2 rounded-lg text-sm"
-                      style={{
-                        backgroundColor: COLORS.card,
-                        border: `1px solid ${COLORS.border}`,
-                        color: COLORS.ink,
-                        fontFamily: "'Inter', sans-serif",
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => enviar(t)}
-                      disabled={!!enviando[t.id]}
-                      className="px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-60 shrink-0"
-                      style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
-                    >
-                      {enviando[t.id] ? <Loader2 size={13} className="animate-spin" /> : <Mail size={13} />}
-                      {t.emailEnviadoEm ? "Reenviar e-mail" : "Enviar e-mail"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => enviar(t, { teste: true })}
-                      disabled={!!enviando[t.id]}
-                      title={`Manda esse e-mail pra ${EMAIL_TESTE_ORGANIZACAO} em vez do representante`}
-                      className="px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-60 shrink-0"
-                      style={{ border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
-                    >
-                      Testar
-                    </button>
-                  </div>
-                  {emailSugerido && (
-                    <p className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-                      E-mail preenchido automaticamente com o cadastro do representante da turma.
-                    </p>
-                  )}
-                  {erro[t.id] && (
-                    <p className="text-xs" style={{ color: "#EF4444", fontFamily: "'Inter', sans-serif" }}>
-                      {erro[t.id]}
-                    </p>
-                  )}
-                  {t.emailEnviadoEm && !erro[t.id] && (
-                    <p className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-                      Último envio: {new Date(t.emailEnviadoEm).toLocaleString("pt-BR")} para {t.emailComissao}
-                    </p>
-                  )}
-
-                  <div className="flex items-center gap-2 flex-wrap pt-1" style={{ borderTop: `1px dashed ${COLORS.border}` }}>
-                    {t.pago ? (
-                      <span className="text-xs font-semibold" style={{ color: "#16A34A", fontFamily: "'Inter', sans-serif" }}>
-                        ✓ Pagamento confirmado — não precisa mais de lembrete.
-                      </span>
-                    ) : (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => enviarPagamento(t)}
-                          disabled={!!enviandoPag[t.id]}
-                          className="px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-60 shrink-0"
-                          style={{ backgroundColor: "#F97316", color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
-                        >
-                          {enviandoPag[t.id] ? <Loader2 size={13} className="animate-spin" /> : <Mail size={13} />}
-                          {t.pagamentoLembradoEm ? "Reenviar lembrete de pagamento" : "Lembrar pagamento"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => enviarPagamento(t, { teste: true })}
-                          disabled={!!enviandoPag[t.id]}
-                          title={`Manda esse e-mail pra ${EMAIL_TESTE_ORGANIZACAO} em vez do representante`}
-                          className="px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-60 shrink-0"
-                          style={{ border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
-                        >
-                          Testar
-                        </button>
-                      </>
-                    )}
-                  </div>
-                  {!t.pago && erroPag[t.id] && (
-                    <p className="text-xs" style={{ color: "#EF4444", fontFamily: "'Inter', sans-serif" }}>
-                      {erroPag[t.id]}
-                    </p>
-                  )}
-                  {!t.pago && t.pagamentoLembradoEm && !erroPag[t.id] && (
-                    <p className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-                      Último lembrete de pagamento: {new Date(t.pagamentoLembradoEm).toLocaleString("pt-BR")} para{" "}
-                      {t.emailComissao}
-                    </p>
-                  )}
-                </>
+              <div className="flex items-center gap-2 flex-wrap pt-1" style={{ borderTop: `1px dashed ${COLORS.border}` }}>
+                <button
+                  type="button"
+                  onClick={() => enviarPagamento(t)}
+                  disabled={!!enviandoPag[t.id]}
+                  className="px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-60 shrink-0"
+                  style={{ backgroundColor: "#F97316", color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+                >
+                  {enviandoPag[t.id] ? <Loader2 size={13} className="animate-spin" /> : <Mail size={13} />}
+                  {t.pagamentoLembradoEm ? "Reenviar lembrete de pagamento" : "Lembrar pagamento"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => enviarPagamento(t, { teste: true })}
+                  disabled={!!enviandoPag[t.id]}
+                  title={`Manda esse e-mail pra ${EMAIL_TESTE_ORGANIZACAO} em vez do representante`}
+                  className="px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-60 shrink-0"
+                  style={{ border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+                >
+                  Testar
+                </button>
+              </div>
+              {erroPag[t.id] && (
+                <p className="text-xs" style={{ color: "#EF4444", fontFamily: "'Inter', sans-serif" }}>
+                  {erroPag[t.id]}
+                </p>
+              )}
+              {t.pagamentoLembradoEm && !erroPag[t.id] && (
+                <p className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                  Último lembrete de pagamento: {new Date(t.pagamentoLembradoEm).toLocaleString("pt-BR")} para{" "}
+                  {t.emailComissao}
+                </p>
               )}
             </div>
             );
@@ -7510,6 +7538,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
       {secaoAtiva === "times" && (
         <>
           <GerenciarElencos teams={teams} saveTeams={saveTeams} />
+          <StatusAprovacaoPagamento teams={teams} saveTeams={saveTeams} />
           <DiagnosticoIrregularidades teams={teams} aprovarExcecao={aprovarExcecao} manterIrregularidade={manterIrregularidade} />
 
           {avaliacoes.filter((a) => a.status === "pendente").length > 0 && (
