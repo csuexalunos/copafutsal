@@ -534,12 +534,13 @@ const WHATSAPP_LINK_REPRESENTANTE =
 // Monta um link wa.me a partir de um número digitado de qualquer jeito
 // (com espaço, parênteses, traço...) — assume Brasil (55) se não vier
 // com código de país.
-function linkWhatsapp(numero) {
+function linkWhatsapp(numero, mensagem) {
   if (!numero) return null;
   let digitos = String(numero).replace(/\D/g, "");
   if (!digitos) return null;
   if (!digitos.startsWith("55")) digitos = "55" + digitos;
-  return `https://wa.me/${digitos}`;
+  const base = `https://wa.me/${digitos}`;
+  return mensagem ? `${base}?text=${encodeURIComponent(mensagem)}` : base;
 }
 
 // Regras de horário dos jogos — 2 tempos de 10min (20min de jogo) + 5min
@@ -4923,7 +4924,12 @@ function DiagnosticoIrregularidades({ teams, aprovarExcecao, manterIrregularidad
               </ul>
               {irregulares.length > 0 && (
                 <div className="mt-2.5 space-y-2">
-                  {irregulares.map((j) => (
+                  {irregulares.map((j) => {
+                    const linkWpp = linkWhatsapp(
+                      time.contato,
+                      `Olá${time.capitao ? ", " + time.capitao : ""}! Aqui é da organização da Copa de Ex-Alunos de Futsal do Colégio Santa Úrsula. Notamos uma irregularidade no elenco do time ${time.nome}: o jogador ${j.apelido || j.nome} está com ano de conclusão ${j.anoConclusao || "não informado"}, que não bate com a turma ${time.nome} (Art. 9º do regulamento). Podemos conversar sobre isso?`
+                    );
+                    return (
                     <div
                       key={j.id}
                       className="flex flex-wrap items-center gap-2 px-2.5 py-2 rounded-lg"
@@ -4932,6 +4938,17 @@ function DiagnosticoIrregularidades({ teams, aprovarExcecao, manterIrregularidad
                       <span className="text-xs font-medium mr-auto" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
                         {j.apelido || j.nome || "Jogador"}
                       </span>
+                      {linkWpp && (
+                        <a
+                          href={linkWpp}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5"
+                          style={{ backgroundColor: "#25D366", color: "#052E16", fontFamily: "'Inter', sans-serif" }}
+                        >
+                          <MessageCircle size={13} /> WhatsApp
+                        </a>
+                      )}
                       <button
                         type="button"
                         onClick={() => aprovarExcecao({ id: null, timeNome: time.nome, jogadorId: j.id })}
@@ -4949,7 +4966,8 @@ function DiagnosticoIrregularidades({ teams, aprovarExcecao, manterIrregularidad
                         Manter irregularidade
                       </button>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
