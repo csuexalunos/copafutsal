@@ -48,6 +48,11 @@ const LINK_SITE_INSCRICAO = "https://csuexalunos.github.io/copafutsal/";
 // Organização testa um novo tipo de e-mail antes de mandar pra alguém de
 // verdade.
 const EMAIL_TESTE_ORGANIZACAO = "csuexalunos@gmail.com";
+// WhatsApp específico pra onde o representante manda a ficha em PDF e o
+// comprovante de pagamento depois de finalizar a inscrição (diferente do
+// WHATSAPP_ORGANIZACAO geral, usado noutro lugar do site).
+const WHATSAPP_CONFIRMACAO_PAGAMENTO = "+55 82 9946-2611";
+const PIX_CHAVE_TEXTO = "12.516.746/0001-31 (CNPJ do Colégio Santa Úrsula)";
 
 // ---------------------------------------------------------------------------
 // Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula — 8ª Edição
@@ -2017,6 +2022,33 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes }) {
               )}
             </div>
           )}
+          {sent &&
+            (() => {
+              const valorUnitario = valorPorAtletaNaData(new Date());
+              const nomeLote = loteNaData(new Date());
+              const total = form.jogadores.length * valorUnitario;
+              const mensagem =
+                `Olá! Sou o representante do time ${nomeTime} na Copa de Ex-Alunos de Futsal do Colégio Santa Úrsula.\n\n` +
+                `Acabei de finalizar a inscrição. Resumo:\n` +
+                `- Time: ${nomeTime}\n` +
+                `- Atletas: ${form.jogadores.length}\n` +
+                `- Valor: ${formatarReais(total)} (${nomeLote})\n` +
+                `- Forma de pagamento: Pix\n` +
+                `- Chave Pix: ${PIX_CHAVE_TEXTO}. Se for Pix, o pagamento deve ser realizado após a inscrição, em um único Pix ref. ao time.\n\n` +
+                `Vou enviar aqui a ficha do time em PDF e o comprovante do pagamento.`;
+              const link = linkWhatsapp(WHATSAPP_CONFIRMACAO_PAGAMENTO, mensagem);
+              return (
+                <a
+                  href={link}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 px-4 py-3 rounded-xl text-sm font-semibold inline-flex items-center gap-2"
+                  style={{ backgroundColor: "#25D366", color: "#052E16", fontFamily: "'Inter', sans-serif" }}
+                >
+                  <MessageCircle size={16} /> Confirmar inscrição no WhatsApp (enviar PDF + comprovante)
+                </a>
+              );
+            })()}
         </form>
 
         <div className="sm:col-span-2">
