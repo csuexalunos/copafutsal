@@ -4973,6 +4973,16 @@ function AprovacaoComissao({ teams, saveTeams, perfis }) {
     );
   };
 
+  const alternarPago = async (team) => {
+    await saveTeams((atuais) =>
+      (atuais || []).map((t) =>
+        t.id === team.id
+          ? { ...t, pago: !t.pago, pagoEm: !t.pago ? new Date().toISOString() : null }
+          : t
+      )
+    );
+  };
+
   const enviar = async (team, opcoes = {}) => {
     const teste = !!opcoes.teste;
     const email = teste ? EMAIL_TESTE_ORGANIZACAO : emailAtual(team).trim();
@@ -5028,14 +5038,28 @@ function AprovacaoComissao({ teams, saveTeams, perfis }) {
   return (
     <div className="rounded-2xl p-5 mt-8" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
       <h3 className="font-semibold mb-1 flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
-        <Mail size={18} color={COLORS.ink} /> Aprovação da comissão e envio de e-mail
+        <Mail size={18} color={COLORS.ink} /> Aprovação da comissão, pagamento e envio de e-mail
       </h3>
       <p className="text-xs mb-4" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-        Marque o time como aprovado depois que a comissão revisar o cadastro. O e-mail já vem
-        preenchido com o e-mail que o representante usou pra se cadastrar — confira antes de
-        enviar. Leva a ficha do time em PDF e o link pra finalizar a inscrição (anexar o PDF e
-        pagar).
+        Marque o time como aprovado depois que a comissão revisar o cadastro, e marque
+        "Pagamento confirmado" quando identificar o Pix/comprovante ou o link pago. O e-mail já
+        vem preenchido com o e-mail que o representante usou pra se cadastrar — confira antes de
+        enviar. Leva a ficha do time em PDF e as instruções de pagamento.
       </p>
+
+      {teams.length > 0 && (
+        <div className="flex gap-4 mb-4 text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+          <span>
+            <strong style={{ color: "#16A34A" }}>{teams.filter((t) => t.pago).length}</strong> pago(s)
+          </span>
+          <span>
+            <strong style={{ color: COLORS.accent }}>
+              {teams.filter((t) => t.aprovadoComissao && !t.pago).length}
+            </strong>{" "}
+            aprovado(s) aguardando pagamento
+          </span>
+        </div>
+      )}
 
       {teams.length === 0 ? (
         <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
@@ -5056,13 +5080,26 @@ function AprovacaoComissao({ teams, saveTeams, perfis }) {
                 <span className="font-semibold text-sm" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
                   {t.nome}
                 </span>
-                <label
-                  className="flex items-center gap-2 text-xs cursor-pointer select-none"
-                  style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
-                >
-                  <input type="checkbox" checked={!!t.aprovadoComissao} onChange={() => alternarAprovado(t)} />
-                  Aprovado pela comissão
-                </label>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <label
+                    className="flex items-center gap-2 text-xs cursor-pointer select-none"
+                    style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+                  >
+                    <input type="checkbox" checked={!!t.aprovadoComissao} onChange={() => alternarAprovado(t)} />
+                    Aprovado pela comissão
+                  </label>
+                  {t.aprovadoComissao && (
+                    <label
+                      className="flex items-center gap-2 text-xs cursor-pointer select-none font-semibold"
+                      style={{ color: t.pago ? "#16A34A" : COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+                    >
+                      <input type="checkbox" checked={!!t.pago} onChange={() => alternarPago(t)} />
+                      {t.pago
+                        ? `Pago em ${new Date(t.pagoEm).toLocaleDateString("pt-BR")}`
+                        : "Pagamento confirmado"}
+                    </label>
+                  )}
+                </div>
               </div>
 
               {t.aprovadoComissao && (
@@ -5119,33 +5156,41 @@ function AprovacaoComissao({ teams, saveTeams, perfis }) {
                   )}
 
                   <div className="flex items-center gap-2 flex-wrap pt-1" style={{ borderTop: `1px dashed ${COLORS.border}` }}>
-                    <button
-                      type="button"
-                      onClick={() => enviarPagamento(t)}
-                      disabled={!!enviandoPag[t.id]}
-                      className="px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-60 shrink-0"
-                      style={{ backgroundColor: "#F97316", color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
-                    >
-                      {enviandoPag[t.id] ? <Loader2 size={13} className="animate-spin" /> : <Mail size={13} />}
-                      {t.pagamentoLembradoEm ? "Reenviar lembrete de pagamento" : "Lembrar pagamento"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => enviarPagamento(t, { teste: true })}
-                      disabled={!!enviandoPag[t.id]}
-                      title={`Manda esse e-mail pra ${EMAIL_TESTE_ORGANIZACAO} em vez do representante`}
-                      className="px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-60 shrink-0"
-                      style={{ border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
-                    >
-                      Testar
-                    </button>
+                    {t.pago ? (
+                      <span className="text-xs font-semibold" style={{ color: "#16A34A", fontFamily: "'Inter', sans-serif" }}>
+                        ✓ Pagamento confirmado — não precisa mais de lembrete.
+                      </span>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => enviarPagamento(t)}
+                          disabled={!!enviandoPag[t.id]}
+                          className="px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-60 shrink-0"
+                          style={{ backgroundColor: "#F97316", color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+                        >
+                          {enviandoPag[t.id] ? <Loader2 size={13} className="animate-spin" /> : <Mail size={13} />}
+                          {t.pagamentoLembradoEm ? "Reenviar lembrete de pagamento" : "Lembrar pagamento"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => enviarPagamento(t, { teste: true })}
+                          disabled={!!enviandoPag[t.id]}
+                          title={`Manda esse e-mail pra ${EMAIL_TESTE_ORGANIZACAO} em vez do representante`}
+                          className="px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-60 shrink-0"
+                          style={{ border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+                        >
+                          Testar
+                        </button>
+                      </>
+                    )}
                   </div>
-                  {erroPag[t.id] && (
+                  {!t.pago && erroPag[t.id] && (
                     <p className="text-xs" style={{ color: "#EF4444", fontFamily: "'Inter', sans-serif" }}>
                       {erroPag[t.id]}
                     </p>
                   )}
-                  {t.pagamentoLembradoEm && !erroPag[t.id] && (
+                  {!t.pago && t.pagamentoLembradoEm && !erroPag[t.id] && (
                     <p className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
                       Último lembrete de pagamento: {new Date(t.pagamentoLembradoEm).toLocaleString("pt-BR")} para{" "}
                       {t.emailComissao}
