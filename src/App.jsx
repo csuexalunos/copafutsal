@@ -97,6 +97,7 @@ const TURMAS_HISTORICAS = [
   { turma: "2018", apelido: "O Pacto de 3 Minutos" },
   { turma: "2012", apelido: "O Talento que Evapora" },
   { turma: "2016", apelido: "" },
+  { turma: "2008", apelido: "" },
 ];
 
 // Elencos inscritos na edição de 2025 (fonte: PDF de inscrições enviado).
@@ -228,6 +229,19 @@ const ESCUDOS_TIMES = {
 };
 
 const ELENCOS_2025 = {
+  "2008": [
+    { numero: 23, apelido: "Torres", nome: "Hugo Torres Melo", periodo: "2008", anoConclusao: "2008" },
+    { numero: 11, apelido: "Pipeta", nome: "Erico Albuquerque", periodo: "1997-2008", anoConclusao: "2008" },
+    { numero: 9, apelido: "Hugo Victor", nome: "Hugo Victor Matias", periodo: "1997-2008", anoConclusao: "2008" },
+    { numero: 14, apelido: "Wagueta", nome: "Wagner Ferreira de Oliveira", periodo: "1996-2008", anoConclusao: "2008" },
+    { numero: 15, apelido: "Marcus", nome: "Marcus Pinheiro", periodo: "1999-2008", anoConclusao: "2008" },
+    { numero: 6, apelido: "Elton", nome: "Elton Brandão", periodo: "1997-2008", anoConclusao: "2008" },
+    { numero: 5, apelido: "Kevanga", nome: "Kevin Sá", periodo: "2002-2008", anoConclusao: "2008" },
+    { numero: 8, apelido: "Thiago", nome: "Thiago Félix", periodo: "2002-2008", anoConclusao: "2008" },
+    { numero: 7, apelido: "Vini", nome: "Vinicius Gouveia", periodo: "2002-2008", anoConclusao: "2008" },
+    { numero: 12, apelido: "Will", nome: "William Salles Pinheiro", periodo: "2000-2007", anoConclusao: "2011" },
+    { numero: 10, apelido: "Dedel", nome: "Fidel Dias de Melo Gomes", periodo: "2006-2008", anoConclusao: "2008" },
+  ],
   "2016": [
     { numero: 99, apelido: "Vitor", nome: "Vitor Martins Luz Mariano", periodo: "2015-2016", anoConclusao: "2016" },
     { numero: 14, apelido: "César", nome: "Bruno César Macedo de Almeida", periodo: "2011-2015", anoConclusao: "2017" },
