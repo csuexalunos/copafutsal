@@ -4584,7 +4584,7 @@ function LembreteInscricao({ teams, perfis }) {
             </button>
             {resultado[p.id]?.ok && (
               <span className="text-xs w-full" style={{ color: "#16A34A", fontFamily: "'Inter', sans-serif" }}>
-                Enviado {new Date(resultado[p.id].em).toLocaleTimeString("pt-BR")}
+                Enviado {new Date(resultado[p.id].em).toLocaleString("pt-BR")}
               </span>
             )}
             {resultado[p.id] && !resultado[p.id].ok && (
