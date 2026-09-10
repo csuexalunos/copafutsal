@@ -3600,6 +3600,9 @@ function envelopeHtmlEmail(corpoInterno) {
   </head>
   <body style="margin:0; padding:0; background-color:#F4F6FB;">
     ${corpoInterno}
+    <p style="font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #98A2B3; text-align: center; max-width: 560px; margin: 8px auto 24px; padding: 0 16px;">
+      Não achou este e-mail na caixa de entrada? Confira a pasta de spam/lixo eletrônico.
+    </p>
   </body>
 </html>`;
 }
@@ -3629,7 +3632,8 @@ async function enviarEmailTesteGenerico() {
       `Teste de envio de e-mail\n\n` +
       `Esse e-mail confirma que o caminho completo está funcionando: o app conseguiu chamar a função do Supabase, que conseguiu falar com o Brevo, que mandou esse e-mail até aqui.\n\n` +
       `Disparado em ${agora}.\n\n` +
-      `Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula`,
+      `Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula\n\n` +
+      `(Não achou este e-mail na caixa de entrada? Confira a pasta de spam/lixo eletrônico.)`,
   });
 }
 
@@ -3680,7 +3684,9 @@ async function enviarEmailAprovacaoTime(team, emailDestino) {
     `Pra finalizar: pague via Pix (chave: ${PIX_CHAVE_TEXTO}, em um único Pix referente ao time, depois da inscrição) e mande o PDF + comprovante pelo WhatsApp da organização:\n` +
     `${linkWpp}\n\n` +
     `Qualquer dúvida, fale com a organização.\n\n` +
-    `Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula`;
+    `Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula
+
+(Não achou este e-mail na caixa de entrada? Confira a pasta de spam/lixo eletrônico.)`;
   return chamarEnvioDeEmail({
     destinatarioEmail: emailDestino.trim(),
     destinatarioNome,
@@ -3744,7 +3750,9 @@ async function enviarLembretePagamentoTime(team, emailDestino) {
     `Pra finalizar: pague via Pix (chave: ${PIX_CHAVE_TEXTO}, em um único Pix referente ao time) e mande o PDF + comprovante pelo WhatsApp da organização:\n` +
     `${linkWpp}\n\n` +
     `Qualquer dúvida, fale com a organização.\n\n` +
-    `Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula`;
+    `Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula
+
+(Não achou este e-mail na caixa de entrada? Confira a pasta de spam/lixo eletrônico.)`;
   return chamarEnvioDeEmail({
     destinatarioEmail: emailDestino.trim(),
     destinatarioNome,
@@ -3803,7 +3811,9 @@ async function enviarLembreteInscricao(destinatarioEmail, destinatarioNome, turm
     `O ${loteNome} (${formatarReais(loteValor)} por atleta) termina em ${fimFormatado}. Depois dessa data o valor da inscrição sobe pro próximo lote.\n\n` +
     `Inscreva seu time agora: ${LINK_SITE_INSCRICAO}\n\n` +
     `Qualquer dúvida, fale com a organização.\n\n` +
-    `Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula`;
+    `Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula
+
+(Não achou este e-mail na caixa de entrada? Confira a pasta de spam/lixo eletrônico.)`;
   return chamarEnvioDeEmail({
     destinatarioEmail: destinatarioEmail.trim(),
     destinatarioNome,
