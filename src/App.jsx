@@ -548,6 +548,25 @@ function linkWhatsapp(numero, mensagem) {
   return mensagem ? `${base}?text=${encodeURIComponent(mensagem)}` : base;
 }
 
+// Mensagem padrão de confirmação de inscrição/pagamento via WhatsApp —
+// usada tanto no botão que aparece pro representante depois de salvar a
+// inscrição quanto nos e-mails de aprovação e lembrete de pagamento.
+function mensagemConfirmacaoPagamento(nomeTime, quantidadeAtletas) {
+  const valorUnitario = valorPorAtletaNaData(new Date());
+  const nomeLote = loteNaData(new Date());
+  const total = quantidadeAtletas * valorUnitario;
+  return (
+    `Olá! Sou o representante do time ${nomeTime} na Copa de Ex-Alunos de Futsal do Colégio Santa Úrsula.\n\n` +
+    `Resumo:\n` +
+    `- Time: ${nomeTime}\n` +
+    `- Atletas: ${quantidadeAtletas}\n` +
+    `- Valor: ${formatarReais(total)} (${nomeLote})\n` +
+    `- Forma de pagamento: Pix\n` +
+    `- Chave Pix: ${PIX_CHAVE_TEXTO}. Se for Pix, o pagamento deve ser realizado após a inscrição, em um único Pix ref. ao time.\n\n` +
+    `Vou enviar aqui a ficha do time em PDF e o comprovante do pagamento.`
+  );
+}
+
 // Regras de horário dos jogos — 2 tempos de 10min (20min de jogo) + 5min
 // de intervalo entre um confronto e outro = 25min entre um início e outro.
 const DURACAO_SLOT_MIN = 25;
@@ -2024,19 +2043,10 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes }) {
           )}
           {sent &&
             (() => {
-              const valorUnitario = valorPorAtletaNaData(new Date());
-              const nomeLote = loteNaData(new Date());
-              const total = form.jogadores.length * valorUnitario;
-              const mensagem =
-                `Olá! Sou o representante do time ${nomeTime} na Copa de Ex-Alunos de Futsal do Colégio Santa Úrsula.\n\n` +
-                `Acabei de finalizar a inscrição. Resumo:\n` +
-                `- Time: ${nomeTime}\n` +
-                `- Atletas: ${form.jogadores.length}\n` +
-                `- Valor: ${formatarReais(total)} (${nomeLote})\n` +
-                `- Forma de pagamento: Pix\n` +
-                `- Chave Pix: ${PIX_CHAVE_TEXTO}. Se for Pix, o pagamento deve ser realizado após a inscrição, em um único Pix ref. ao time.\n\n` +
-                `Vou enviar aqui a ficha do time em PDF e o comprovante do pagamento.`;
-              const link = linkWhatsapp(WHATSAPP_CONFIRMACAO_PAGAMENTO, mensagem);
+              const link = linkWhatsapp(
+                WHATSAPP_CONFIRMACAO_PAGAMENTO,
+                mensagemConfirmacaoPagamento(nomeTime, form.jogadores.length)
+              );
               return (
                 <a
                   href={link}
@@ -3626,7 +3636,10 @@ async function enviarEmailTesteGenerico() {
 async function enviarEmailAprovacaoTime(team, emailDestino) {
   const pdfBase64 = await gerarFichaTimePdfBase64(team);
   const destinatarioNome = team.capitao || team.nome;
-  const assunto = `Time ${team.nome} aprovado — finalize sua inscrição na Copa CSU`;
+  const assunto = `Time ${team.nome} aprovado — confirme sua inscrição na Copa CSU`;
+  const qtdAtletas = (team.jogadores || []).length;
+  const mensagemWpp = mensagemConfirmacaoPagamento(team.nome, qtdAtletas);
+  const linkWpp = linkWhatsapp(WHATSAPP_CONFIRMACAO_PAGAMENTO, mensagemWpp);
   const htmlContent = envelopeHtmlEmail(`
     <div style="font-family: Arial, Helvetica, sans-serif; color: #12203D; max-width: 560px; margin: 0 auto; padding: 24px 16px;">
       <h2 style="color: #12203D;">Seu time foi avaliado e aprovado! 🎉</h2>
@@ -3641,19 +3654,19 @@ async function enviarEmailAprovacaoTime(team, emailDestino) {
       </p>
       <p>Pra finalizar a inscrição, siga estes passos:</p>
       <ol>
-        <li>Acesse o link abaixo;</li>
-        <li>Anexe o PDF da ficha do time (em anexo neste e-mail);</li>
-        <li>Realize o pagamento da inscrição.</li>
+        <li>Realize o pagamento via Pix — chave: <strong>${PIX_CHAVE_TEXTO}</strong>. O pagamento deve ser feito em um único Pix referente ao time, depois da inscrição;</li>
+        <li>Clique no botão abaixo pra abrir o WhatsApp da organização;</li>
+        <li>Envie por lá o PDF da ficha do time (em anexo neste e-mail) e o comprovante do pagamento.</li>
       </ol>
       <p style="text-align: center; margin: 28px 0;">
-        <a href="${LINK_FINALIZACAO_INSCRICAO}"
-           style="background-color: #F97316; color: #FFFFFF; text-decoration: none; font-weight: bold; padding: 12px 24px; border-radius: 8px; display: inline-block;">
-          Finalizar inscrição e pagar
+        <a href="${linkWpp}"
+           style="background-color: #25D366; color: #052E16; text-decoration: none; font-weight: bold; padding: 12px 24px; border-radius: 8px; display: inline-block;">
+          Confirmar no WhatsApp
         </a>
       </p>
       <p style="font-size: 13px; color: #667085;">
         Se o botão não funcionar, copie e cole este link no navegador:<br />
-        <a href="${LINK_FINALIZACAO_INSCRICAO}">${LINK_FINALIZACAO_INSCRICAO}</a>
+        <a href="${linkWpp}">${linkWpp}</a>
       </p>
       <p>Qualquer dúvida, fale com a organização.</p>
       <p>Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula</p>
@@ -3664,8 +3677,8 @@ async function enviarEmailAprovacaoTime(team, emailDestino) {
     `Olá${destinatarioNome ? ", " + destinatarioNome : ""}!\n\n` +
     `O time ${team.nome} foi avaliado pela comissão organizadora da Copa de Ex-Alunos de Futsal do Colégio Santa Úrsula e está aprovado.\n\n` +
     `Em anexo você encontra a ficha do time em PDF, com a lista de jogadores aprovada pela comissão.\n\n` +
-    `Pra finalizar a inscrição: acesse o link abaixo, anexe o PDF (em anexo neste e-mail) e realize o pagamento.\n` +
-    `${LINK_FINALIZACAO_INSCRICAO}\n\n` +
+    `Pra finalizar: pague via Pix (chave: ${PIX_CHAVE_TEXTO}, em um único Pix referente ao time, depois da inscrição) e mande o PDF + comprovante pelo WhatsApp da organização:\n` +
+    `${linkWpp}\n\n` +
     `Qualquer dúvida, fale com a organização.\n\n` +
     `Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula`;
   return chamarEnvioDeEmail({
@@ -3688,6 +3701,9 @@ async function enviarLembretePagamentoTime(team, emailDestino) {
   const pdfBase64 = await gerarFichaTimePdfBase64(team);
   const destinatarioNome = team.capitao || team.nome;
   const assunto = `Falta o pagamento: inscrição do time ${team.nome} na Copa CSU`;
+  const qtdAtletas = (team.jogadores || []).length;
+  const mensagemWpp = mensagemConfirmacaoPagamento(team.nome, qtdAtletas);
+  const linkWpp = linkWhatsapp(WHATSAPP_CONFIRMACAO_PAGAMENTO, mensagemWpp);
   const htmlContent = envelopeHtmlEmail(`
     <div style="font-family: Arial, Helvetica, sans-serif; color: #12203D; max-width: 560px; margin: 0 auto; padding: 24px 16px;">
       <h2 style="color: #12203D;">Falta só o pagamento pra fechar sua inscrição! 💳</h2>
@@ -3702,19 +3718,19 @@ async function enviarLembretePagamentoTime(team, emailDestino) {
       </p>
       <p>Pra finalizar, é só:</p>
       <ol>
-        <li>Acessar o link abaixo;</li>
-        <li>Anexar o PDF da ficha do time (em anexo neste e-mail), se pedir;</li>
-        <li>Realizar o pagamento da inscrição.</li>
+        <li>Realizar o pagamento via Pix — chave: <strong>${PIX_CHAVE_TEXTO}</strong>. Um único Pix referente ao time;</li>
+        <li>Clicar no botão abaixo pra abrir o WhatsApp da organização;</li>
+        <li>Enviar por lá o PDF da ficha do time (em anexo neste e-mail) e o comprovante do pagamento.</li>
       </ol>
       <p style="text-align: center; margin: 28px 0;">
-        <a href="${LINK_FINALIZACAO_INSCRICAO}"
-           style="background-color: #F97316; color: #FFFFFF; text-decoration: none; font-weight: bold; padding: 12px 24px; border-radius: 8px; display: inline-block;">
-          Finalizar pagamento
+        <a href="${linkWpp}"
+           style="background-color: #25D366; color: #052E16; text-decoration: none; font-weight: bold; padding: 12px 24px; border-radius: 8px; display: inline-block;">
+          Confirmar no WhatsApp
         </a>
       </p>
       <p style="font-size: 13px; color: #667085;">
         Se o botão não funcionar, copie e cole este link no navegador:<br />
-        <a href="${LINK_FINALIZACAO_INSCRICAO}">${LINK_FINALIZACAO_INSCRICAO}</a>
+        <a href="${linkWpp}">${linkWpp}</a>
       </p>
       <p>Qualquer dúvida, fale com a organização.</p>
       <p>Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula</p>
@@ -3725,8 +3741,8 @@ async function enviarLembretePagamentoTime(team, emailDestino) {
     `Olá${destinatarioNome ? ", " + destinatarioNome : ""}!\n\n` +
     `O time ${team.nome} já foi aprovado pela comissão, mas ainda não identificamos o pagamento da inscrição.\n\n` +
     `Em anexo está a ficha do time em PDF de novo, caso precise.\n\n` +
-    `Pra finalizar: acesse o link abaixo, anexe o PDF (em anexo neste e-mail) se pedir, e realize o pagamento.\n` +
-    `${LINK_FINALIZACAO_INSCRICAO}\n\n` +
+    `Pra finalizar: pague via Pix (chave: ${PIX_CHAVE_TEXTO}, em um único Pix referente ao time) e mande o PDF + comprovante pelo WhatsApp da organização:\n` +
+    `${linkWpp}\n\n` +
     `Qualquer dúvida, fale com a organização.\n\n` +
     `Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula`;
   return chamarEnvioDeEmail({
