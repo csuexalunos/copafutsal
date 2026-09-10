@@ -3409,12 +3409,17 @@ function preencherJanelaImpressao(win, titulo, corpoHtml) {
   .secao { page-break-after: always; }
   .secao:last-child { page-break-after: auto; }
   .meta { font-size: 12px; color: #555; margin-bottom: 10px; }
-  .imprimir-btn { margin-bottom: 18px; padding: 8px 16px; font-size: 14px; cursor: pointer; }
+  .barra-topo { display: flex; gap: 10px; margin-bottom: 18px; }
+  .barra-topo button { padding: 8px 16px; font-size: 14px; cursor: pointer; border-radius: 6px; border: 1px solid #ccc; }
+  .voltar-btn { background: #12203D; color: #fff; border: none; }
   @media print { .no-print { display: none; } }
 </style>
 </head>
 <body>
-  <button class="imprimir-btn no-print" onclick="window.print()">Imprimir / Salvar como PDF</button>
+  <div class="barra-topo no-print">
+    <button class="voltar-btn" onclick="window.close()">← Voltar pro app</button>
+    <button class="imprimir-btn" onclick="window.print()">Imprimir / Salvar como PDF</button>
+  </div>
   ${corpoHtml}
 </body>
 </html>`);
