@@ -4131,108 +4131,6 @@ const CPFS_PARA_IMPORTAR = [
   { turma: "2013", apelido: "Matteus", nome: "Matteus Lucas de Andrade Xavier", cpf: "121.721.944-76" },
 ];
 
-// ---------------------------------------------------------------------------
-// Adicionar o time 2008 (ficha de inscrição em PDF) — ferramenta de uso
-// único, com o elenco já digitado. O CPF de cada jogador vai direto pra
-// tabela protegida (cpfs_jogadores), nunca pro registro público do time.
-// Atenção: Will (nº12) tem ano de conclusão 2011, que não bate com a turma
-// 2008 — já vai aparecer certinho no Diagnóstico de irregularidades pra
-// alguém da comissão decidir (aprovar exceção ou manter).
-// ---------------------------------------------------------------------------
-const ELENCO_TIME_2008 = [
-  { numero: 23, apelido: "Torres", nome: "Hugo Torres Melo", periodo: "2008", anoConclusao: "2008", cpf: "085.369.564-45" },
-  { numero: 11, apelido: "Pipeta", nome: "Erico Albuquerque", periodo: "1997-2008", anoConclusao: "2008", cpf: "084.644.254-06" },
-  { numero: 9, apelido: "Hugo Victor", nome: "Hugo Victor Matias", periodo: "1997-2008", anoConclusao: "2008", cpf: "071.022.444-36" },
-  { numero: 14, apelido: "Wagueta", nome: "Wagner Ferreira de Oliveira", periodo: "1996-2008", anoConclusao: "2008", cpf: "063.769.994-76" },
-  { numero: 15, apelido: "Marcus", nome: "Marcus Pinheiro", periodo: "1999-2008", anoConclusao: "2008", cpf: "085.158.664-39" },
-  { numero: 6, apelido: "Elton", nome: "Elton Brandão", periodo: "1997-2008", anoConclusao: "2008", cpf: "074.430.154-88" },
-  { numero: 5, apelido: "Kevanga", nome: "Kevin Sá", periodo: "2002-2008", anoConclusao: "2008", cpf: "048.537.554-03" },
-  { numero: 8, apelido: "Thiago", nome: "Thiago Félix", periodo: "2002-2008", anoConclusao: "2008", cpf: "068.315.734-52" },
-  { numero: 7, apelido: "Vini", nome: "Vinicius Gouveia", periodo: "2002-2008", anoConclusao: "2008", cpf: "046.513.544-75" },
-  { numero: 12, apelido: "Will", nome: "William Salles Pinheiro", periodo: "2000-2007", anoConclusao: "2011", cpf: "109.865.194-48" },
-  { numero: 10, apelido: "Dedel", nome: "Fidel Dias de Melo Gomes", periodo: "2006-2008", anoConclusao: "2008", cpf: "046.360.244-78" },
-];
-
-function AdicionarTime2008({ teams, saveTeams }) {
-  const [rodando, setRodando] = useState(false);
-  const [resultado, setResultado] = useState(null);
-  const jaExiste = teams.some((t) => t.nome === "2008");
-
-  const adicionar = async () => {
-    setRodando(true);
-    setResultado(null);
-    try {
-      const novoId = `time_${Date.now()}`;
-      const jogadoresComId = ELENCO_TIME_2008.map((j, i) => ({
-        id: `j_${Date.now()}_${i}`,
-        numero: j.numero,
-        apelido: j.apelido,
-        nome: j.nome,
-        periodo: j.periodo,
-        anoConclusao: j.anoConclusao,
-      }));
-      const novoTime = {
-        id: novoId,
-        nome: "2008",
-        capitao: "Hugo Torres Melo",
-        contato: "(82) 98818-0186",
-        jogadores: jogadoresComId,
-        codigo: gerarCodigoTime(),
-        inscritoEm: new Date().toISOString(),
-      };
-      await saveTeams((atuais) => [...(atuais || []), novoTime]);
-      await salvarCpfsEmLote(
-        jogadoresComId.map((j, i) => ({
-          team_id: novoId,
-          jogador_id: j.id,
-          cpf: ELENCO_TIME_2008[i].cpf,
-        }))
-      );
-      setResultado({ ok: true });
-    } catch (e) {
-      console.error("Falha ao adicionar time 2008", e);
-      setResultado({ ok: false, erro: e.message });
-    } finally {
-      setRodando(false);
-    }
-  };
-
-  if (jaExiste) return null;
-
-  return (
-    <div className="rounded-2xl p-5 mt-8" style={{ backgroundColor: COLORS.card, border: `1.5px dashed ${COLORS.gold}` }}>
-      <h3 className="font-semibold mb-1" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.gold }}>
-        Adicionar time 2008 (uso único)
-      </h3>
-      <p className="text-xs mb-4" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-        Cria o time 2008 com os 11 jogadores da ficha de inscrição em PDF, capitão Hugo Torres
-        Melo. O jogador Will (nº12) tem ano de conclusão diferente da turma — vai aparecer no
-        Diagnóstico de irregularidades pra revisão.
-      </p>
-      <button
-        type="button"
-        onClick={adicionar}
-        disabled={rodando}
-        className="px-4 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2 disabled:opacity-60"
-        style={{ backgroundColor: COLORS.gold, color: "#3A1E00", fontFamily: "'Inter', sans-serif" }}
-      >
-        {rodando && <Loader2 size={14} className="animate-spin" />}
-        Criar time 2008
-      </button>
-      {resultado && resultado.ok && (
-        <p className="text-xs mt-3" style={{ color: "#16A34A", fontFamily: "'Inter', sans-serif" }}>
-          Time criado com sucesso!
-        </p>
-      )}
-      {resultado && !resultado.ok && (
-        <p className="text-xs mt-3" style={{ color: "#EF4444", fontFamily: "'Inter', sans-serif" }}>
-          Erro: {resultado.erro}
-        </p>
-      )}
-    </div>
-  );
-}
-
 function ImportarCpfsPlanilha({ teams }) {
   const [rodando, setRodando] = useState(false);
   const [resultado, setResultado] = useState(null);
@@ -7154,7 +7052,6 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
         <>
           <GerenciarElencos teams={teams} saveTeams={saveTeams} />
           <DiagnosticoIrregularidades teams={teams} aprovarExcecao={aprovarExcecao} manterIrregularidade={manterIrregularidade} />
-          <AdicionarTime2008 teams={teams} saveTeams={saveTeams} />
           <ImportarCpfsPlanilha teams={teams} />
           <PlanilhaInscricoes teams={teams} />
         </>
