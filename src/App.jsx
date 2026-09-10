@@ -6060,18 +6060,19 @@ const GRUPOS_ORGANIZACAO = [
   { chave: "sistema", titulo: "Sistema", subtitulo: "Métricas de acesso ao app", icone: BarChart3 },
 ];
 
-function HubOrganizacao({ souSuperAdmin, onAbrir }) {
+function HubOrganizacao({ souSuperAdmin, onAbrir, badges }) {
   const grupos = GRUPOS_ORGANIZACAO.filter((g) => !g.soSuperAdmin || souSuperAdmin);
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
       {grupos.map((g, i) => {
         const Icone = g.icone;
+        const contagem = (badges && badges[g.chave]) || 0;
         return (
           <button
             key={g.chave}
             type="button"
             onClick={() => onAbrir(g.chave)}
-            className="text-left rounded-2xl p-5 transition-colors"
+            className="relative text-left rounded-2xl p-5 transition-colors"
             style={{
               backgroundColor: COLORS.card,
               borderTop: `3px solid ${i % 2 === 0 ? COLORS.accent : "#16A34A"}`,
@@ -6080,6 +6081,14 @@ function HubOrganizacao({ souSuperAdmin, onAbrir }) {
               borderTopColor: i % 2 === 0 ? COLORS.accent : "#16A34A",
             }}
           >
+            {contagem > 0 && (
+              <span
+                className="absolute -top-2 -right-2 min-w-[22px] h-[22px] px-1.5 rounded-full flex items-center justify-center text-xs font-bold"
+                style={{ backgroundColor: "#EF4444", color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+              >
+                {contagem > 99 ? "99+" : contagem}
+              </span>
+            )}
             <div
               className="w-10 h-10 rounded-xl flex items-center justify-center mb-3"
               style={{ backgroundColor: COLORS.chipSoft }}
@@ -6454,7 +6463,18 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
         </div>
       </div>
 
-      {!secaoAtiva && <HubOrganizacao souSuperAdmin={souSuperAdmin} onAbrir={setSecaoAtiva} />}
+      {!secaoAtiva && (
+        <HubOrganizacao
+          souSuperAdmin={souSuperAdmin}
+          onAbrir={setSecaoAtiva}
+          badges={{
+            pessoas:
+              perfis.filter((p) => p.status === "pendente" && !p.visualizado).length +
+              avaliacoes.filter((a) => a.status === "pendente").length +
+              (souSuperAdmin ? adminRequests.filter((r) => r.status === "pendente").length : 0),
+          }}
+        />
+      )}
 
       {secaoAtiva === "comunicacao" && (
         <>
@@ -7302,11 +7322,18 @@ export default function App() {
           {TABS.map((t) => {
             const Icon = t.icon;
             const active = tab === t.id;
+            const pendenciasOrganizacao =
+              t.id === "organizacao"
+                ? avaliacoes.filter((a) => a.status === "pendente").length +
+                  (sessao && sessao.tipo === "admin" && sessao.superAdmin
+                    ? adminRequests.filter((r) => r.status === "pendente").length
+                    : 0)
+                : 0;
             return (
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors"
+                className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors"
                 style={{
                   backgroundColor: active ? COLORS.accent : "transparent",
                   color: active ? "#FFFFFF" : COLORS.slate,
@@ -7315,6 +7342,14 @@ export default function App() {
               >
                 <Icon size={13} color={active ? "#FFFFFF" : COLORS.accent} />
                 <span className="hidden sm:inline">{t.label}</span>
+                {pendenciasOrganizacao > 0 && (
+                  <span
+                    className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold"
+                    style={{ backgroundColor: "#EF4444", color: "#FFFFFF" }}
+                  >
+                    {pendenciasOrganizacao > 9 ? "9+" : pendenciasOrganizacao}
+                  </span>
+                )}
               </button>
             );
           })}
