@@ -838,6 +838,73 @@ function EmptyState({ children }) {
 }
 
 // ---------------------------------------------------------------------------
+// Modal público de elenco — qualquer visitante pode ver, ao clicar num
+// time (na Classificação ou no Sorteio), a lista de jogadores. Só número,
+// apelido e posição — nunca CPF nem outros dados sensíveis.
+// ---------------------------------------------------------------------------
+function ModalElencoTime({ team, onClose }) {
+  if (!team) return null;
+  const jogadores = Array.isArray(team.jogadores) ? team.jogadores : [];
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: "rgba(0,0,0,0.6)" }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl p-5 max-h-[80vh] overflow-y-auto"
+        style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            {ESCUDOS_TIMES[team.nome] && (
+              <img src={ESCUDOS_TIMES[team.nome]} alt="" className="w-7 h-7 object-contain shrink-0" />
+            )}
+            <h3 className="font-bold text-base" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+              {team.nome}
+            </h3>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Fechar">
+            <X size={18} color={COLORS.slate} />
+          </button>
+        </div>
+        {jogadores.length === 0 ? (
+          <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Elenco ainda não cadastrado.
+          </p>
+        ) : (
+          <table className="w-full text-sm" style={{ fontFamily: "'Inter', sans-serif" }}>
+            <thead>
+              <tr style={{ color: COLORS.slate }}>
+                <th className="text-left py-1.5 pr-3 text-xs uppercase tracking-wide">Nº</th>
+                <th className="text-left py-1.5 pr-3 text-xs uppercase tracking-wide">Apelido</th>
+                <th className="text-left py-1.5 text-xs uppercase tracking-wide">Posição</th>
+              </tr>
+            </thead>
+            <tbody>
+              {jogadores.map((j) => (
+                <tr key={j.id} style={{ borderTop: `1px solid ${COLORS.border}` }}>
+                  <td className="py-1.5 pr-3" style={{ color: COLORS.ink, fontFamily: "'JetBrains Mono', monospace" }}>
+                    {j.numero || "—"}
+                  </td>
+                  <td className="py-1.5 pr-3" style={{ color: COLORS.ink }}>
+                    {j.apelido || "—"}
+                  </td>
+                  <td className="py-1.5" style={{ color: COLORS.ink }}>
+                    {j.posicao || "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // TAB: Início
 // ---------------------------------------------------------------------------
 function Home({ teams, matches, setTab, config, totalPessoas }) {
@@ -2511,7 +2578,8 @@ function Chaveamento({ matches, teams, sessao, saveMatches }) {
 // ---------------------------------------------------------------------------
 // TAB: Classificação
 // ---------------------------------------------------------------------------
-function TabelaClassificacao({ titulo, linhas, destaqueTop }) {
+function TabelaClassificacao({ titulo, linhas, destaqueTop, teams }) {
+  const [timeSelecionado, setTimeSelecionado] = useState(null);
   const cols = ["Time", "J", "V", "E", "D", "GP", "GC", "SG", "Pts"];
   return (
     <div className="mb-8">
@@ -2541,6 +2609,8 @@ function TabelaClassificacao({ titulo, linhas, destaqueTop }) {
               return (
                 <tr
                   key={t.id || t.nome}
+                  onClick={() => teams && setTimeSelecionado(teams.find((tm) => tm.id === t.id) || null)}
+                  className={teams ? "cursor-pointer" : ""}
                   style={{
                     backgroundColor: classificado ? "rgba(22,163,74,0.18)" : idx % 2 === 0 ? COLORS.card : COLORS.zebra,
                     borderLeft: classificado ? "3px solid #16A34A" : "3px solid transparent",
@@ -2576,6 +2646,7 @@ function TabelaClassificacao({ titulo, linhas, destaqueTop }) {
           </tbody>
         </table>
       </div>
+      <ModalElencoTime team={timeSelecionado} onClose={() => setTimeSelecionado(null)} />
     </div>
   );
 }
@@ -2615,7 +2686,7 @@ function Classificacao({ matches, teams }) {
       {teams.length === 0 ? (
         <EmptyState>Ainda não há times inscritos.</EmptyState>
       ) : !temGrupos ? (
-        <TabelaClassificacao linhas={geral} />
+        <TabelaClassificacao linhas={geral} teams={teams} />
       ) : (
         <>
           <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
@@ -2634,13 +2705,14 @@ function Classificacao({ matches, teams }) {
           </div>
 
           {modo === "geral" ? (
-            <TabelaClassificacao titulo="Classificação geral" linhas={geral} destaqueTop={8} />
+            <TabelaClassificacao titulo="Classificação geral" linhas={geral} destaqueTop={8} teams={teams} />
           ) : (
             gruposNomes.map((fase) => (
               <TabelaClassificacao
                 key={fase}
                 titulo={fase}
                 destaqueTop={2}
+                teams={teams}
                 linhas={pontosPartida(matches.filter((m) => m.fase === fase), teams).filter((t) =>
                   matches.some((m) => m.fase === fase && (m.timeA === t.id || m.timeB === t.id))
                 )}
@@ -6045,6 +6117,7 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao }) 
   const [numGrupos, setNumGrupos] = useState(4);
   const potesSugeridos = useMemo(() => montarPotes(teams, numGrupos), [teams, numGrupos]);
   const [atribuicoes, setAtribuicoes] = useState({}); // teamId -> índice do pote (0-based)
+  const [timeSelecionado, setTimeSelecionado] = useState(null);
 
   // Toda vez que o número de grupos mudar (ou times mudarem), recomeça a
   // sugestão automática — o super admin pode ajustar time por time depois.
@@ -6150,7 +6223,12 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao }) 
                 {pote.map((t) => (
                   <li key={t.id} className="flex items-center gap-1.5 text-xs" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
                     {ESCUDOS_TIMES[t.nome] && <img src={ESCUDOS_TIMES[t.nome]} alt="" className="w-4 h-4 object-contain shrink-0" />}
-                    <span className="truncate flex-1">{t.nome}</span>
+                    <span
+                      className="truncate flex-1 cursor-pointer hover:underline"
+                      onClick={() => setTimeSelecionado(t)}
+                    >
+                      {t.nome}
+                    </span>
                     {colocacaoUltimaEdicao(t.nome) && (
                       <span
                         className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold"
@@ -6215,7 +6293,12 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao }) 
                     .map((t) => (
                     <li key={t.id} className="flex items-center gap-2 text-sm" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
                       {ESCUDOS_TIMES[t.nome] && <img src={ESCUDOS_TIMES[t.nome]} alt="" className="w-5 h-5 object-contain shrink-0" />}
-                      <span className="flex-1 truncate">{t.nome}</span>
+                      <span
+                        className="flex-1 truncate cursor-pointer hover:underline"
+                        onClick={() => setTimeSelecionado(t)}
+                      >
+                        {t.nome}
+                      </span>
                       {colocacaoUltimaEdicao(t.nome) && (
                         <span
                           className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold"
@@ -6246,6 +6329,7 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao }) 
           )}
         </div>
       )}
+      <ModalElencoTime team={timeSelecionado} onClose={() => setTimeSelecionado(null)} />
     </div>
   );
 }
