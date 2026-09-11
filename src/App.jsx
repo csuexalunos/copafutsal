@@ -5469,6 +5469,7 @@ function GerenciarElencos({ teams, saveTeams }) {
 // pessoa já está autenticada.
 function CompletarPerfil({ sessao, onCompleted }) {
   const [form, setForm] = useState({ nome: "", tipo: "jogador", turma: "", whatsapp: "", nascimento: "" });
+  const [turmaCustomizada, setTurmaCustomizada] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -5559,8 +5560,16 @@ function CompletarPerfil({ sessao, onCompleted }) {
                 Turma
               </label>
               <select
-                value={form.turma}
-                onChange={(e) => setForm({ ...form, turma: e.target.value })}
+                value={turmaCustomizada ? "outra" : form.turma}
+                onChange={(e) => {
+                  if (e.target.value === "outra") {
+                    setTurmaCustomizada(true);
+                    setForm({ ...form, turma: "" });
+                  } else {
+                    setTurmaCustomizada(false);
+                    setForm({ ...form, turma: e.target.value });
+                  }
+                }}
                 className="w-full px-4 py-2.5 rounded-xl outline-none text-sm"
                 style={{ backgroundColor: COLORS.card, border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
               >
@@ -5570,8 +5579,19 @@ function CompletarPerfil({ sessao, onCompleted }) {
                     {t.turma}
                   </option>
                 ))}
-                <option value="outra">Outra / novo time</option>
+                <option value="outra">Outro ano (não está na lista)</option>
               </select>
+              {turmaCustomizada && (
+                <input
+                  type="text"
+                  value={form.turma}
+                  onChange={(e) => setForm({ ...form, turma: e.target.value })}
+                  placeholder="Digite o ano em que você concluiu, ex: 2011"
+                  autoFocus
+                  className="w-full px-4 py-2.5 rounded-xl outline-none text-sm mt-2"
+                  style={{ backgroundColor: COLORS.card, border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+                />
+              )}
             </div>
           )}
 
@@ -5625,6 +5645,7 @@ function Cadastro({ onVoltar }) {
     nascimento: "",
     senha: "",
   });
+  const [turmaCustomizada, setTurmaCustomizada] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [sent, setSent] = useState(false);
@@ -5735,8 +5756,16 @@ function Cadastro({ onVoltar }) {
               Turma
             </label>
             <select
-              value={form.turma}
-              onChange={(e) => setForm({ ...form, turma: e.target.value })}
+              value={turmaCustomizada ? "outra" : form.turma}
+              onChange={(e) => {
+                if (e.target.value === "outra") {
+                  setTurmaCustomizada(true);
+                  setForm({ ...form, turma: "" });
+                } else {
+                  setTurmaCustomizada(false);
+                  setForm({ ...form, turma: e.target.value });
+                }
+              }}
               className="w-full px-4 py-2.5 rounded-xl outline-none text-sm"
               style={{ backgroundColor: COLORS.card, border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
             >
@@ -5746,8 +5775,19 @@ function Cadastro({ onVoltar }) {
                   {t.turma}
                 </option>
               ))}
-              <option value="outra">Outra / novo time</option>
+              <option value="outra">Outro ano (não está na lista)</option>
             </select>
+            {turmaCustomizada && (
+              <input
+                type="text"
+                value={form.turma}
+                onChange={(e) => setForm({ ...form, turma: e.target.value })}
+                placeholder="Digite o ano em que você concluiu, ex: 2011"
+                autoFocus
+                className="w-full px-4 py-2.5 rounded-xl outline-none text-sm mt-2"
+                style={{ backgroundColor: COLORS.card, border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+              />
+            )}
           </div>
         )}
 
