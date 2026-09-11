@@ -522,6 +522,14 @@ function loteNaData(data) {
 function formatarReais(n) {
   return "R$ " + n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+
+// Enquanto o time não pagar, o valor devido acompanha o lote atual (não
+// fica travado no lote em que ele se inscreveu) — por isso usa "agora"
+// pra quem ainda não pagou, e só usa a data de inscrição (histórico) pra
+// quem já pagou, como registro do que foi cobrado de fato.
+function dataParaCalculoDeLote(team) {
+  return team && team.pago ? team.inscritoEm : new Date();
+}
 const LOCAL_NOME = "Ginásio Poliesportivo do Colégio Santa Úrsula";
 const LOCAL_MAPS_LINK = "https://www.google.com/maps/place/Gin%C3%A1sio+Col%C3%A9gio+Santa+Ursula/@-9.6519727,-35.7061545,17z/data=!4m7!3m6!1s0x70145b3c77ca373:0xe3558847d1b3d687!8m2!3d-9.6519727!4d-35.7013909!15sCjVDb2zDqWdpbyBTYW50YSDDmnJzdWxhIEdpbsOhc2lvIFBvbGllc3BvcnRpdm8gTWFjZWnDs5IBGGdlbmVyYWxfZWR1Y2F0aW9uX3NjaG9vbOABAA!16s%2Fg%2F11btwrds9d?entry=tts";
 const WHATSAPP_ORGANIZACAO = "5582996210019";
@@ -3621,8 +3629,8 @@ function fichaTimeHtml(team, mapaCpf, falhaCpf) {
   const jogadores = (Array.isArray(team.jogadores) ? team.jogadores : []).map((j) =>
     mapaCpf && mapaCpf[j.id] ? { ...j, cpf: mapaCpf[j.id] } : j
   );
-  const valorUnitario = valorPorAtletaNaData(team.inscritoEm);
-  const lote = loteNaData(team.inscritoEm);
+  const valorUnitario = valorPorAtletaNaData(dataParaCalculoDeLote(team));
+  const lote = loteNaData(dataParaCalculoDeLote(team));
   const total = jogadores.length * valorUnitario;
   const naoCadastrados = jogadores.filter((j) => !jogadorPreCadastrado(j, team.nome));
   return `
@@ -3693,8 +3701,8 @@ async function gerarFichaTimePdfBase64(teamOriginal) {
   const jogadores = (Array.isArray(team.jogadores) ? team.jogadores : []).map((j) =>
     mapaCpf[j.id] ? { ...j, cpf: mapaCpf[j.id] } : j
   );
-  const valorUnitario = valorPorAtletaNaData(team.inscritoEm);
-  const lote = loteNaData(team.inscritoEm);
+  const valorUnitario = valorPorAtletaNaData(dataParaCalculoDeLote(team));
+  const lote = loteNaData(dataParaCalculoDeLote(team));
   const total = jogadores.length * valorUnitario;
   const naoCadastrados = jogadores.filter((j) => !jogadorPreCadastrado(j, team.nome));
 
@@ -4161,8 +4169,8 @@ function PlanilhaInscricoes({ teams }) {
     .sort((a, b) => new Date(a.inscritoEm || 0) - new Date(b.inscritoEm || 0))
     .map((t) => {
       const n = Array.isArray(t.jogadores) ? t.jogadores.length : 0;
-      const valorUnitario = valorPorAtletaNaData(t.inscritoEm);
-      return { ...t, nJogadores: n, lote: loteNaData(t.inscritoEm), valorUnitario, valor: n * valorUnitario };
+      const valorUnitario = valorPorAtletaNaData(dataParaCalculoDeLote(t));
+      return { ...t, nJogadores: n, lote: loteNaData(dataParaCalculoDeLote(t)), valorUnitario, valor: n * valorUnitario };
     });
   const totalGeral = linhas.reduce((acc, t) => acc + t.valor, 0);
   const totalAtletas = linhas.reduce((acc, t) => acc + t.nJogadores, 0);
