@@ -6722,9 +6722,40 @@ function HubOrganizacao({ souSuperAdmin, onAbrir, badges }) {
   );
 }
 
-function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, saveAdminRequests, sessao, config, saveConfig, avaliacoes, saveAvaliacoes }) {
+function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, saveAdminRequests, sessao, config, saveConfig, avaliacoes, saveAvaliacoes, sorteio }) {
   const souAdminLogado = sessao && sessao.tipo === "admin";
   const souSuperAdmin = souAdminLogado && sessao.superAdmin;
+
+  const [gerandoTabelaOrg, setGerandoTabelaOrg] = useState(false);
+  const [verificandoMataMata, setVerificandoMataMata] = useState(false);
+  const jaTemJogosDeGrupoOrg = matches.some((m) => (m.fase || "").startsWith("Grupo"));
+
+  const gerarTabelaOrg = async () => {
+    if (!sorteio || !sorteio.grupos) {
+      alert('Ainda não tem sorteio com grupos definidos. Faz o sorteio na aba "Sorteio" primeiro.');
+      return;
+    }
+    if (
+      jaTemJogosDeGrupoOrg &&
+      !confirm("Já existem jogos de fase de grupos lançados. Gerar de novo vai ADICIONAR outra rodada completa (não apaga a antiga). Quer continuar?")
+    ) {
+      return;
+    }
+    setGerandoTabelaOrg(true);
+    const novosJogos = gerarJogosDosGrupos(sorteio.grupos);
+    const todosComHorario = agendarHorarios([...matches, ...novosJogos]);
+    await saveMatches(todosComHorario);
+    setGerandoTabelaOrg(false);
+  };
+
+  const verificarMataMataOrg = async () => {
+    setVerificandoMataMata(true);
+    try {
+      await saveMatches((atuais) => gerarMataMataAutomatico(atuais || [], teams));
+    } finally {
+      setVerificandoMataMata(false);
+    }
+  };
 
   const [perfis, setPerfis] = useState([]);
   const [listaAdmins, setListaAdmins] = useState([]);
@@ -7507,6 +7538,43 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
           </p>
         </div>
 
+        {/* Gerar jogos — fase de grupos (manual, a partir do sorteio) e
+            eliminatórias (automático, mas com botão pra forçar checagem) */}
+        <div className="rounded-2xl p-5" style={{ backgroundColor: COLORS.card, border: `1.5px solid ${COLORS.accent}` }}>
+          <h3 className="font-semibold mb-1 flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+            <Swords size={18} color={COLORS.accent} /> Gerar jogos
+          </h3>
+          <p className="text-xs mb-4" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Depois que o sorteio estiver com os grupos definidos (aba Sorteio), clique abaixo pra
+            gerar todos os jogos da fase de grupos (todos-contra-todos + horários) de uma vez. As
+            eliminatórias (quartas, semifinal, 3º lugar e final) são geradas sozinhas assim que os
+            jogos anteriores terminam — o segundo botão só força essa checagem na hora, caso
+            precise.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={gerarTabelaOrg}
+              disabled={gerandoTabelaOrg}
+              className="px-4 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2 disabled:opacity-60"
+              style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+            >
+              {gerandoTabelaOrg && <Loader2 size={14} className="animate-spin" />}
+              Gerar jogos da fase de grupos
+            </button>
+            <button
+              type="button"
+              onClick={verificarMataMataOrg}
+              disabled={verificandoMataMata}
+              className="px-4 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2 disabled:opacity-60"
+              style={{ border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+            >
+              {verificandoMataMata && <Loader2 size={14} className="animate-spin" />}
+              Verificar/gerar eliminatórias agora
+            </button>
+          </div>
+        </div>
+
         {/* Jogo avulso — só pra mata-mata; a fase de grupos vem do Sorteio */}
         <div className="rounded-2xl p-5" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
           <h3 className="font-semibold mb-1" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
@@ -8038,6 +8106,7 @@ export default function App() {
                 saveConfig={saveConfig}
                 avaliacoes={avaliacoes}
                 saveAvaliacoes={saveAvaliacoes}
+                sorteio={sorteio}
               />
             )}
           </>
