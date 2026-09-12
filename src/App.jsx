@@ -7924,13 +7924,21 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
                 </tr>
               </thead>
               <tbody>
-                {teams.map((t) => (
-                  <tr key={t.id} style={{ color: COLORS.ink }}>
-                    <td className="py-1.5 pr-4">{t.nome}</td>
-                    <td className="py-1.5 pr-4">{t.capitao}</td>
-                    <td className="py-1.5">{t.contato}</td>
-                  </tr>
-                ))}
+                {[...teams]
+                  .sort((a, b) => {
+                    const anosA = anosDaTurma(a.nome);
+                    const anosB = anosDaTurma(b.nome);
+                    const anoA = anosA.length ? Math.min(...anosA) : Infinity;
+                    const anoB = anosB.length ? Math.min(...anosB) : Infinity;
+                    return anoA - anoB;
+                  })
+                  .map((t) => (
+                    <tr key={t.id} style={{ color: COLORS.ink }}>
+                      <td className="py-1.5 pr-4">{t.nome}</td>
+                      <td className="py-1.5 pr-4">{t.capitao}</td>
+                      <td className="py-1.5">{t.contato}</td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
