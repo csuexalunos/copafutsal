@@ -3632,7 +3632,7 @@ function fichaTimeHtml(team, mapaCpf, falhaCpf) {
   const valorUnitario = valorPorAtletaNaData(dataParaCalculoDeLote(team));
   const lote = loteNaData(dataParaCalculoDeLote(team));
   const total = jogadores.length * valorUnitario;
-  const naoCadastrados = jogadores.filter((j) => !jogadorPreCadastrado(j, team.nome));
+  const naoCadastrados = jogadores.filter((j) => precisaConfirmacaoColegio(j, team.nome));
   return `
     <div class="secao">
       <h1>Seleção de ${escapeHtml(team.nome)}</h1>
@@ -3645,7 +3645,7 @@ function fichaTimeHtml(team, mapaCpf, falhaCpf) {
           ${jogadores
             .map(
               (j) =>
-                `<tr${jogadorPreCadastrado(j, team.nome) ? "" : ' style="background:#fdecea;"'}><td>${escapeHtml(j.numero || "—")}</td><td>${escapeHtml(j.nome || "—")}${jogadorPreCadastrado(j, team.nome) ? "" : " *"}</td><td>${escapeHtml(j.cpf || "—")}</td><td>${escapeHtml(j.periodo || "—")}</td><td>${escapeHtml(j.anoConclusao || "—")}</td></tr>`
+                `<tr${precisaConfirmacaoColegio(j, team.nome) ? ' style="background:#fdecea;"' : ""}><td>${escapeHtml(j.numero || "—")}</td><td>${escapeHtml(j.nome || "—")}${precisaConfirmacaoColegio(j, team.nome) ? " *" : ""}</td><td>${escapeHtml(j.cpf || "—")}</td><td>${escapeHtml(j.periodo || "—")}</td><td>${escapeHtml(j.anoConclusao || "—")}</td></tr>`
             )
             .join("")}
         </tbody>
@@ -3704,7 +3704,7 @@ async function gerarFichaTimePdfBase64(teamOriginal) {
   const valorUnitario = valorPorAtletaNaData(dataParaCalculoDeLote(team));
   const lote = loteNaData(dataParaCalculoDeLote(team));
   const total = jogadores.length * valorUnitario;
-  const naoCadastrados = jogadores.filter((j) => !jogadorPreCadastrado(j, team.nome));
+  const naoCadastrados = jogadores.filter((j) => precisaConfirmacaoColegio(j, team.nome));
 
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const marginX = 40;
@@ -3772,7 +3772,7 @@ async function gerarFichaTimePdfBase64(teamOriginal) {
       y = 50;
       desenharCabecalho();
     }
-    const suspeito = !jogadorPreCadastrado(j, team.nome);
+    const suspeito = precisaConfirmacaoColegio(j, team.nome);
     let x = marginX;
     const vals = [
       j.numero || "—",
@@ -4107,9 +4107,19 @@ async function enviarLembreteInscricao(destinatarioEmail, destinatarioNome, turm
 }
 
 async function baixarFichaTodosTimes(teams) {
+  // Só os times que já pagaram, do mais antigo pro mais novo (mesma
+  // lógica de ordenação por ano usada na lista de turmas históricas).
+  const elegiveis = teams.filter((t) => t.pago);
+  const ordenados = [...elegiveis].sort((a, b) => {
+    const anosA = anosDaTurma(a.nome);
+    const anosB = anosDaTurma(b.nome);
+    const anoA = anosA.length ? Math.min(...anosA) : Infinity;
+    const anoB = anosB.length ? Math.min(...anosB) : Infinity;
+    return anoA - anoB;
+  });
   const win = abrirJanelaImpressao();
   const partes = await Promise.all(
-    teams.map(async (t) => {
+    ordenados.map(async (t) => {
       let mapaCpf = {};
       let falhaCpf = false;
       try {
@@ -4309,12 +4319,16 @@ function DocumentosOrganizacao({ teams, matches }) {
       <button
         type="button"
         onClick={() => baixarFichaTodosTimes(teams)}
-        disabled={teams.length === 0}
-        className="px-4 py-2 rounded-xl text-sm font-semibold inline-flex items-center gap-1.5 mb-5 disabled:opacity-50"
+        disabled={teams.filter((t) => t.pago).length === 0}
+        className="px-4 py-2 rounded-xl text-sm font-semibold inline-flex items-center gap-1.5 disabled:opacity-50"
         style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}
       >
         <Download size={14} /> Ficha de todos os times
       </button>
+      <p className="text-xs mt-1.5 mb-5" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+        Só entram os times que já pagaram ({teams.filter((t) => t.pago).length} de {teams.length}),
+        ordenados da turma mais antiga pra mais nova.
+      </p>
 
       {teams.length > 0 && (
         <div className="mb-5">
@@ -4425,6 +4439,13 @@ function jogadorPreCadastrado(jogador, turma) {
   const apelidoNorm = normalizarTexto(jogador.apelido);
   const nomeNorm = normalizarTexto(jogador.nome);
   return (apelidoNorm && historicos.has(apelidoNorm)) || (nomeNorm && historicos.has(nomeNorm));
+}
+
+// Decide se ainda precisa mostrar o aviso de "não cadastrado" na ficha —
+// deixa de precisar assim que o colégio confirma que o jogador estudou
+// lá de verdade, mesmo não estando na lista histórica.
+function precisaConfirmacaoColegio(jogador, turma) {
+  return !jogadorPreCadastrado(jogador, turma) && !jogador.confirmadoColegio;
 }
 
 const CPFS_PARA_IMPORTAR = [
@@ -5419,6 +5440,78 @@ function DiagnosticoIrregularidades({ teams, aprovarExcecao, manterIrregularidad
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Confirmação do colégio — jogadores que apareceram na ficha marcados com
+// "não cadastrado" (não batem com o histórico da turma). O colégio
+// verifica se a pessoa estudou lá de verdade e confirma aqui; depois
+// disso a marca vermelha some da ficha desse jogador.
+// ---------------------------------------------------------------------------
+function ConfirmacaoAlunosColegio({ teams, saveTeams }) {
+  const pendentes = teams
+    .map((time) => ({
+      time,
+      jogadores: (time.jogadores || []).filter((j) => precisaConfirmacaoColegio(j, time.nome)),
+    }))
+    .filter((x) => x.jogadores.length > 0);
+
+  const confirmar = async (time, jogadorId) => {
+    await saveTeams((atuais) =>
+      (atuais || []).map((t) =>
+        t.id === time.id
+          ? { ...t, jogadores: (t.jogadores || []).map((j) => (j.id === jogadorId ? { ...j, confirmadoColegio: true } : j)) }
+          : t
+      )
+    );
+  };
+
+  if (pendentes.length === 0) return null;
+
+  const totalPendentes = pendentes.reduce((acc, x) => acc + x.jogadores.length, 0);
+
+  return (
+    <div className="rounded-2xl p-5 mt-8" style={{ backgroundColor: COLORS.card, border: `1.5px solid ${COLORS.accent}` }}>
+      <h3 className="font-semibold mb-1 flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+        <AlertTriangle size={18} color={COLORS.accent} /> Confirmação do colégio ({totalPendentes})
+      </h3>
+      <p className="text-xs mb-4" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+        Esses jogadores foram adicionados pelo representante, mas não estão no cadastro histórico
+        da turma — aparecem marcados com * na ficha. Depois que o colégio confirmar que a pessoa
+        estudou lá de verdade, a marca some da ficha desse jogador.
+      </p>
+      <div className="space-y-3">
+        {pendentes.map(({ time, jogadores }) => (
+          <div key={time.id} className="rounded-lg p-3" style={{ backgroundColor: COLORS.zebra }}>
+            <div className="text-sm font-semibold mb-2" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+              {time.nome}
+            </div>
+            <div className="space-y-2">
+              {jogadores.map((j) => (
+                <div
+                  key={j.id}
+                  className="flex flex-wrap items-center gap-2 px-2.5 py-2 rounded-lg"
+                  style={{ backgroundColor: COLORS.card }}
+                >
+                  <span className="text-xs font-medium mr-auto" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+                    {j.apelido || j.nome || "Jogador"} — {j.nome}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => confirmar(time, j.id)}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+                    style={{ backgroundColor: "#16A34A", color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+                  >
+                    Confirmar que estudou aqui
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -7740,6 +7833,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
           <GerenciarElencos teams={teams} saveTeams={saveTeams} />
           <StatusAprovacaoPagamento teams={teams} saveTeams={saveTeams} />
           <DiagnosticoIrregularidades teams={teams} aprovarExcecao={aprovarExcecao} manterIrregularidade={manterIrregularidade} />
+          <ConfirmacaoAlunosColegio teams={teams} saveTeams={saveTeams} />
 
           {avaliacoes.filter((a) => a.status === "pendente").length > 0 && (
             <div
