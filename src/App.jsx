@@ -6259,6 +6259,11 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao }) 
   const potesSugeridos = useMemo(() => montarPotes(teams, numGrupos), [teams, numGrupos]);
   const [atribuicoes, setAtribuicoes] = useState({}); // teamId -> índice do pote (0-based)
   const [timeSelecionado, setTimeSelecionado] = useState(null);
+  const [confirmandoPotes, setConfirmandoPotes] = useState(false);
+  const [sorteandoGrupos, setSorteandoGrupos] = useState(false);
+  const [gruposEditados, setGruposEditados] = useState(null); // null = ainda não sorteado/editado nesta sessão
+
+  const potesConfirmados = !!(sorteio && sorteio.potesConfirmadosEm);
 
   // Toda vez que o número de grupos mudar (ou times mudarem), recomeça a
   // sugestão automática — o super admin pode ajustar time por time depois.
@@ -6299,9 +6304,48 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao }) 
     setAtribuicoes((atual) => ({ ...atual, [teamId]: novoPote }));
   };
 
+  const confirmarPotes = async () => {
+    setConfirmandoPotes(true);
+    await saveSorteio((atual) => ({
+      ...(atual || {}),
+      potesConfirmadosEm: new Date().toISOString(),
+      numGrupos,
+      potes: potes.map((pote) => pote.map((t) => t.id)),
+    }));
+    setConfirmandoPotes(false);
+  };
+
+  const desfazerConfirmacaoPotes = async () => {
+    await saveSorteio((atual) => {
+      const { potesConfirmadosEm, ...resto } = atual || {};
+      return resto;
+    });
+  };
+
   const realizarSorteio = async () => {
+    setSorteandoGrupos(true);
     const grupos = sortearGrupos(potes, numGrupos);
-    await saveSorteio({ grupos, numGrupos, sorteadoEm: new Date().toISOString() });
+    setGruposEditados(grupos);
+    setSorteandoGrupos(false);
+  };
+
+  const gruposParaMostrar = gruposEditados || (sorteio && sorteio.grupos) || null;
+
+  const moverTimeDeGrupo = (teamId, novoGrupoNome) => {
+    setGruposEditados((atual) => {
+      const base = atual || (sorteio && sorteio.grupos) || {};
+      const copia = {};
+      Object.keys(base).forEach((g) => (copia[g] = base[g].filter((t) => t.id !== teamId)));
+      const timeMovido = teams.find((t) => t.id === teamId);
+      if (timeMovido) copia[novoGrupoNome] = [...(copia[novoGrupoNome] || []), timeMovido];
+      return copia;
+    });
+  };
+
+  const confirmarGrupos = async () => {
+    if (!gruposParaMostrar) return;
+    await saveSorteio((atual) => ({ ...(atual || {}), grupos: gruposParaMostrar, numGrupos, sorteadoEm: new Date().toISOString() }));
+    setGruposEditados(null);
   };
 
   const [gerandoTabela, setGerandoTabela] = useState(false);
@@ -6379,7 +6423,7 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao }) 
                         {colocacaoUltimaEdicao(t.nome)}
                       </span>
                     )}
-                    {souSuperAdmin && (
+                    {souSuperAdmin && !potesConfirmados && (
                       <select
                         value={i}
                         onChange={(e) => moverTimeDePote(t.id, Number(e.target.value))}
@@ -6401,6 +6445,41 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao }) 
         ))}
       </div>
 
+      {souSuperAdmin && (
+        <div className="flex items-center gap-3 flex-wrap mb-8">
+          {potesConfirmados ? (
+            <>
+              <span
+                className="text-sm font-semibold inline-flex items-center gap-1.5"
+                style={{ color: "#16A34A", fontFamily: "'Inter', sans-serif" }}
+              >
+                <Check size={16} /> Potes e times confirmados em{" "}
+                {new Date(sorteio.potesConfirmadosEm).toLocaleString("pt-BR")}
+              </span>
+              <button
+                type="button"
+                onClick={desfazerConfirmacaoPotes}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+                style={{ border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+              >
+                Reabrir potes pra editar
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={confirmarPotes}
+              disabled={confirmandoPotes || teams.length === 0}
+              className="px-5 py-2.5 rounded-xl font-semibold text-sm inline-flex items-center gap-2 disabled:opacity-50"
+              style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+            >
+              {confirmandoPotes && <Loader2 size={14} className="animate-spin" />}
+              Confirmar potes e times
+            </button>
+          )}
+        </div>
+      )}
+
       <div
         className="rounded-xl px-4 py-3.5 mb-8"
         style={{ backgroundColor: COLORS.accentSoft }}
@@ -6414,6 +6493,72 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao }) 
           lá — assim que o sorteio acontecer, os grupos são atualizados aqui.
         </p>
       </div>
+
+      {souSuperAdmin && potesConfirmados && (
+        <div className="mb-8">
+          <SectionLabel eyebrow="Depois do sorteio presencial" title="Definir os grupos" />
+          <p className="text-xs mb-4 max-w-xl" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Clique em "Sortear agora" pra fazer o sorteio pela própria tela (respeitando os
+            potes e a regra do campeão cabeça de chave do Grupo A), ou ajuste manualmente time
+            por time se o resultado presencial saiu diferente. Só depois de "Confirmar grupos"
+            é que a classificação e os jogos passam a valer esse resultado.
+          </p>
+          <div className="flex items-center gap-3 flex-wrap mb-4">
+            <button
+              type="button"
+              onClick={realizarSorteio}
+              disabled={sorteandoGrupos}
+              className="px-4 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2 disabled:opacity-60"
+              style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}
+            >
+              {sorteandoGrupos && <Loader2 size={14} className="animate-spin" />}
+              <Dices size={14} /> {gruposParaMostrar ? "Sortear de novo" : "Sortear agora"}
+            </button>
+            {gruposParaMostrar && (
+              <button
+                type="button"
+                onClick={confirmarGrupos}
+                className="px-4 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2"
+                style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+              >
+                <Check size={14} /> Confirmar grupos
+              </button>
+            )}
+          </div>
+
+          {gruposParaMostrar && (
+            <div className="grid sm:grid-cols-2 gap-4">
+              {Object.entries(gruposParaMostrar).map(([nomeGrupo, times]) => (
+                <div key={nomeGrupo} className="rounded-xl p-4" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+                  <div className="text-sm font-bold mb-2" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>
+                    Grupo {nomeGrupo}
+                  </div>
+                  <ul className="space-y-1.5">
+                    {times.map((t) => (
+                      <li key={t.id} className="flex items-center gap-2 text-xs" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+                        {ESCUDOS_TIMES[t.nome] && <img src={ESCUDOS_TIMES[t.nome]} alt="" className="w-4 h-4 object-contain shrink-0" />}
+                        <span className="truncate flex-1">{t.nome}</span>
+                        <select
+                          value={nomeGrupo}
+                          onChange={(e) => moverTimeDeGrupo(t.id, e.target.value)}
+                          className="text-[10px] px-1 py-0.5 rounded shrink-0"
+                          style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, border: `1px solid ${COLORS.border}` }}
+                        >
+                          {Object.keys(gruposParaMostrar).map((g) => (
+                            <option key={g} value={g}>
+                              {g}
+                            </option>
+                          ))}
+                        </select>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {sorteio && sorteio.grupos && (
         <div>
