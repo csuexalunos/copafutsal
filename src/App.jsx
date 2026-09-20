@@ -5078,6 +5078,13 @@ function StatusAprovacaoPagamento({ teams, saveTeams }) {
     );
   };
 
+  const corrigirDataPagamento = async (team, novaDataYYYYMMDD) => {
+    if (!novaDataYYYYMMDD) return;
+    // Guarda como meio-dia local, só pra não virar o dia por causa de fuso.
+    const novaData = new Date(novaDataYYYYMMDD + "T12:00:00").toISOString();
+    await saveTeams((atuais) => (atuais || []).map((t) => (t.id === team.id ? { ...t, pagoEm: novaData } : t)));
+  };
+
   return (
     <div className="rounded-2xl p-5 mt-8" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
       <h3 className="font-semibold mb-1 flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
@@ -5132,8 +5139,18 @@ function StatusAprovacaoPagamento({ teams, saveTeams }) {
                     style={{ color: t.pago ? "#16A34A" : COLORS.slate, fontFamily: "'Inter', sans-serif" }}
                   >
                     <input type="checkbox" checked={!!t.pago} onChange={() => alternarPago(t)} />
-                    {t.pago ? `Pago em ${new Date(t.pagoEm).toLocaleDateString("pt-BR")}` : "Pagamento confirmado"}
+                    {t.pago ? "Pago em" : "Pagamento confirmado"}
                   </label>
+                )}
+                {t.pago && (
+                  <input
+                    type="date"
+                    value={t.pagoEm ? new Date(t.pagoEm).toISOString().slice(0, 10) : ""}
+                    onChange={(e) => corrigirDataPagamento(t, e.target.value)}
+                    title="Corrigir a data em que o pagamento foi feito de verdade"
+                    className="text-xs px-2 py-1 rounded-lg"
+                    style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+                  />
                 )}
               </div>
             </div>
