@@ -583,6 +583,12 @@ function resumoValorTime(team) {
 function jogadoresPendentesDePagamento(team) {
   const jogadores = Array.isArray(team.jogadores) ? team.jogadores : [];
   if (!team.pago) return jogadores;
+  // Time marcado como pago antes dessa lista existir — nunca teve
+  // "jogadoresConfirmadosPagos" gravado (é diferente de ter sido salva
+  // vazia de propósito). Trata como se todo o elenco atual já tivesse
+  // sido confirmado, senão todo time pago antigo aparece com pendência
+  // do zero.
+  if (team.jogadoresConfirmadosPagos === undefined) return [];
   const confirmados = team.jogadoresConfirmadosPagos || [];
   return jogadores.filter((j) => !confirmados.includes(j.id));
 }
