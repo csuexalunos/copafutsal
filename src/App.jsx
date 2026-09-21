@@ -530,6 +530,63 @@ function formatarReais(n) {
 function dataParaCalculoDeLote(team) {
   return team && team.pago ? team.inscritoEm : new Date();
 }
+
+function valorPorLote(nomeLote) {
+  const lote = LOTES_INSCRICAO.find((l) => l.nome === nomeLote);
+  return lote ? lote.valor : LOTES_INSCRICAO[LOTES_INSCRICAO.length - 1].valor;
+}
+
+// Carimba em cada jogador o lote em que ele foi cobrado, no momento em
+// que é adicionado ao time — sem mexer em quem já tinha o carimbo. Assim
+// um jogador incluído depois (time já com outros jogadores em lote
+// anterior) paga o lote vigente na hora que ele entrou, e não some
+// escondido dentro do valor do time inteiro.
+function carimbarLoteContratado(jogadores) {
+  return (jogadores || []).map((j) => (j.loteContratado ? j : { ...j, loteContratado: loteNaData(new Date()) }));
+}
+
+// Valor de um jogador específico: usa o lote carimbado nele; se não tiver
+// (jogador cadastrado antes dessa carimbagem existir), cai no cálculo
+// antigo por data do time inteiro, pra não quebrar dado histórico.
+function valorDoJogador(jogador, team) {
+  if (jogador && jogador.loteContratado) return valorPorLote(jogador.loteContratado);
+  return valorPorAtletaNaData(dataParaCalculoDeLote(team));
+}
+
+// Resumo financeiro do time: total a pagar e o detalhamento por lote
+// (só interessante mostrar o detalhamento quando os jogadores estão
+// espalhados em mais de um lote — ex: time pagou lote 1 e depois
+// adicionou alguém que entrou no lote 2).
+function resumoValorTime(team) {
+  const jogadores = Array.isArray(team.jogadores) ? team.jogadores : [];
+  const porLote = {};
+  jogadores.forEach((j) => {
+    const nomeLote = j.loteContratado || loteNaData(dataParaCalculoDeLote(team));
+    const valor = valorDoJogador(j, team);
+    if (!porLote[nomeLote]) porLote[nomeLote] = { nome: nomeLote, qtd: 0, valorUnitario: valor, subtotal: 0 };
+    porLote[nomeLote].qtd += 1;
+    porLote[nomeLote].subtotal += valor;
+  });
+  const detalhamento = Object.values(porLote).sort((a, b) => {
+    const ia = LOTES_INSCRICAO.findIndex((l) => l.nome === a.nome);
+    const ib = LOTES_INSCRICAO.findIndex((l) => l.nome === b.nome);
+    return ia - ib;
+  });
+  const total = detalhamento.reduce((soma, d) => soma + d.subtotal, 0);
+  return { total, detalhamento, misto: detalhamento.length > 1 };
+}
+
+// Jogadores do time cujo pagamento ainda não foi confirmado — ou porque
+// o time nunca foi marcado como pago, ou porque foram adicionados depois
+// da última confirmação (jogadoresConfirmadosPagos guarda os ids de quem
+// já tinha entrado na confirmação anterior).
+function jogadoresPendentesDePagamento(team) {
+  const jogadores = Array.isArray(team.jogadores) ? team.jogadores : [];
+  if (!team.pago) return jogadores;
+  const confirmados = team.jogadoresConfirmadosPagos || [];
+  return jogadores.filter((j) => !confirmados.includes(j.id));
+}
+
 const LOCAL_NOME = "Ginásio Poliesportivo do Colégio Santa Úrsula";
 const LOCAL_MAPS_LINK = "https://www.google.com/maps/place/Gin%C3%A1sio+Col%C3%A9gio+Santa+Ursula/@-9.6519727,-35.7061545,17z/data=!4m7!3m6!1s0x70145b3c77ca373:0xe3558847d1b3d687!8m2!3d-9.6519727!4d-35.7013909!15sCjVDb2zDqWdpbyBTYW50YSDDmnJzdWxhIEdpbsOhc2lvIFBvbGllc3BvcnRpdm8gTWFjZWnDs5IBGGdlbmVyYWxfZWR1Y2F0aW9uX3NjaG9vbOABAA!16s%2Fg%2F11btwrds9d?entry=tts";
 const WHATSAPP_ORGANIZACAO = "5582996210019";
@@ -552,18 +609,29 @@ function linkWhatsapp(numero, mensagem) {
 // Mensagem padrão de confirmação de inscrição/pagamento via WhatsApp —
 // usada nos e-mails de aprovação e lembrete de pagamento. Varia conforme
 // a forma de pagamento escolhida na inscrição: no Pix já manda a chave;
-// no cartão de crédito, pede a geração do link de pagamento.
-function mensagemConfirmacaoPagamento(nomeTime, quantidadeAtletas, formaPagamento) {
-  const valorUnitario = valorPorAtletaNaData(new Date());
-  const nomeLote = loteNaData(new Date());
-  const total = quantidadeAtletas * valorUnitario;
+// no cartão de crédito, pede a geração do link de pagamento. Se receber
+// um "resumo" (de resumoValorTime), usa o valor por lote de cada
+// jogador — importante quando o time tem gente em lotes diferentes
+// (alguém pago antes, alguém adicionado depois no lote vigente).
+function mensagemConfirmacaoPagamento(nomeTime, quantidadeAtletas, formaPagamento, resumo) {
+  let linhaValor;
+  let total;
+  if (resumo) {
+    total = resumo.total;
+    linhaValor = resumo.detalhamento.map((d) => `${d.qtd} no ${d.nome} (${formatarReais(d.subtotal)})`).join(" + ");
+  } else {
+    const valorUnitario = valorPorAtletaNaData(new Date());
+    const nomeLote = loteNaData(new Date());
+    total = quantidadeAtletas * valorUnitario;
+    linhaValor = `${nomeLote}`;
+  }
 
   if (formaPagamento === "credito") {
     return (
       `Olá! Sou o representante do time ${nomeTime} na Copa de Ex-Alunos de Futsal do Colégio Santa Úrsula.\n\n` +
       `- Time: ${nomeTime}\n` +
       `- Atletas: ${quantidadeAtletas}\n` +
-      `- Valor: ${formatarReais(total)} (${nomeLote})\n` +
+      `- Valor: ${formatarReais(total)} (${linhaValor})\n` +
       `- Forma de pagamento: Cartão de crédito\n\n` +
       `Segue em anexo a ficha do time em PDF. Solicito a geração do link de pagamento da taxa de inscrição.`
     );
@@ -573,7 +641,7 @@ function mensagemConfirmacaoPagamento(nomeTime, quantidadeAtletas, formaPagament
     `Olá! Sou o representante do time ${nomeTime} na Copa de Ex-Alunos de Futsal do Colégio Santa Úrsula.\n\n` +
     `- Time: ${nomeTime}\n` +
     `- Atletas: ${quantidadeAtletas}\n` +
-    `- Valor: ${formatarReais(total)} (${nomeLote})\n` +
+    `- Valor: ${formatarReais(total)} (${linhaValor})\n` +
     `- Forma de pagamento: Pix\n` +
     `- Chave Pix: ${PIX_CHAVE_TEXTO}. Pagamento em um único Pix referente ao time.`
   );
@@ -1465,7 +1533,7 @@ function RosterEditor({ team, onSave, autenticado = true }) {
     }
     // CPF nunca vai pro registro público do time — fica só na tabela
     // protegida (cpfs_jogadores), separada.
-    const semCpf = jogadores.map(({ cpf, ...resto }) => resto);
+    const semCpf = carimbarLoteContratado(jogadores.map(({ cpf, ...resto }) => resto));
     await onSave({ ...team, jogadores: semCpf });
     if (autenticado) {
       try {
@@ -1909,7 +1977,7 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes }) {
     setSaving(true);
     let codigo = null;
     let idParaCpfs = null;
-    const jogadoresSemCpf = form.jogadores.map(({ cpf, ...resto }) => resto);
+    const jogadoresSemCpf = carimbarLoteContratado(form.jogadores.map(({ cpf, ...resto }) => resto));
     await saveTeams((atuais) => {
       const lista = atuais || [];
       if (timeExistente) {
@@ -3629,9 +3697,7 @@ function fichaTimeHtml(team, mapaCpf, falhaCpf) {
   const jogadores = (Array.isArray(team.jogadores) ? team.jogadores : []).map((j) =>
     mapaCpf && mapaCpf[j.id] ? { ...j, cpf: mapaCpf[j.id] } : j
   );
-  const valorUnitario = valorPorAtletaNaData(dataParaCalculoDeLote(team));
-  const lote = loteNaData(dataParaCalculoDeLote(team));
-  const total = jogadores.length * valorUnitario;
+  const resumo = resumoValorTime(team);
   const naoCadastrados = jogadores.filter((j) => precisaConfirmacaoColegio(j, team.nome));
   return `
     <div class="secao">
@@ -3652,7 +3718,11 @@ function fichaTimeHtml(team, mapaCpf, falhaCpf) {
       </table>
       ${naoCadastrados.length > 0 ? `<div class="meta" style="margin-top:6px;">* Não consta no cadastro histórico da turma — confirmar matrícula.</div>` : ""}
       <div class="meta" style="margin-top:16px; font-size:14px;">
-        <strong>Valor da inscrição (${escapeHtml(lote)}):</strong> ${jogadores.length} atleta(s) × ${escapeHtml(formatarReais(valorUnitario))} = <strong>${escapeHtml(formatarReais(total))}</strong>
+        <strong>Valor da inscrição:</strong>
+        ${resumo.detalhamento
+          .map((d) => `${d.qtd} atleta(s) no ${escapeHtml(d.nome)} × ${escapeHtml(formatarReais(d.valorUnitario))} = ${escapeHtml(formatarReais(d.subtotal))}`)
+          .join(" + ")}
+        ${resumo.misto ? ` → <strong>Total: ${escapeHtml(formatarReais(resumo.total))}</strong>` : ` = <strong>${escapeHtml(formatarReais(resumo.total))}</strong>`}
       </div>
     </div>`;
 }
@@ -3701,9 +3771,7 @@ async function gerarFichaTimePdfBase64(teamOriginal) {
   const jogadores = (Array.isArray(team.jogadores) ? team.jogadores : []).map((j) =>
     mapaCpf[j.id] ? { ...j, cpf: mapaCpf[j.id] } : j
   );
-  const valorUnitario = valorPorAtletaNaData(dataParaCalculoDeLote(team));
-  const lote = loteNaData(dataParaCalculoDeLote(team));
-  const total = jogadores.length * valorUnitario;
+  const resumo = resumoValorTime(team);
   const naoCadastrados = jogadores.filter((j) => precisaConfirmacaoColegio(j, team.nome));
 
   const doc = new jsPDF({ unit: "pt", format: "a4" });
@@ -3808,11 +3876,13 @@ async function gerarFichaTimePdfBase64(teamOriginal) {
   }
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
-  doc.text(
-    `Valor da inscrição (${lote}): ${jogadores.length} atleta(s) × ${formatarReais(valorUnitario)} = ${formatarReais(total)}`,
-    marginX,
-    y
-  );
+  const linhaValor =
+    "Valor da inscrição: " +
+    resumo.detalhamento
+      .map((d) => `${d.qtd} atleta(s) no ${d.nome} × ${formatarReais(d.valorUnitario)} = ${formatarReais(d.subtotal)}`)
+      .join(" + ") +
+    (resumo.misto ? ` → Total: ${formatarReais(resumo.total)}` : ` = ${formatarReais(resumo.total)}`);
+  doc.text(linhaValor, marginX, y, { maxWidth: larguraUtil });
 
   // "datauristring" já devolve no formato "data:application/pdf;base64,XXXX"
   const dataUri = doc.output("datauristring");
@@ -3923,7 +3993,7 @@ async function enviarEmailAprovacaoTime(team, emailDestino) {
   const destinatarioNome = team.capitao || team.nome;
   const assunto = `Time ${team.nome} aprovado — confirme sua inscrição na Copa CSU`;
   const qtdAtletas = (team.jogadores || []).length;
-  const mensagemWpp = mensagemConfirmacaoPagamento(team.nome, qtdAtletas, team.formaPagamento);
+  const mensagemWpp = mensagemConfirmacaoPagamento(team.nome, qtdAtletas, team.formaPagamento, resumoValorTime(team));
   const linkWpp = linkWhatsapp(WHATSAPP_CONFIRMACAO_PAGAMENTO, mensagemWpp);
   const passos = passosPagamento(team.formaPagamento);
   const htmlContent = envelopeHtmlEmail(`
@@ -3990,7 +4060,7 @@ async function enviarLembretePagamentoTime(team, emailDestino) {
   const destinatarioNome = team.capitao || team.nome;
   const assunto = `Falta o pagamento: inscrição do time ${team.nome} na Copa CSU`;
   const qtdAtletas = (team.jogadores || []).length;
-  const mensagemWpp = mensagemConfirmacaoPagamento(team.nome, qtdAtletas, team.formaPagamento);
+  const mensagemWpp = mensagemConfirmacaoPagamento(team.nome, qtdAtletas, team.formaPagamento, resumoValorTime(team));
   const linkWpp = linkWhatsapp(WHATSAPP_CONFIRMACAO_PAGAMENTO, mensagemWpp);
   const passos = passosPagamento(team.formaPagamento);
   const htmlContent = envelopeHtmlEmail(`
@@ -4107,9 +4177,10 @@ async function enviarLembreteInscricao(destinatarioEmail, destinatarioNome, turm
 }
 
 async function baixarFichaTodosTimes(teams) {
-  // Só os times que já pagaram, do mais antigo pro mais novo (mesma
-  // lógica de ordenação por ano usada na lista de turmas históricas).
-  const elegiveis = teams.filter((t) => t.pago);
+  // Só os times totalmente pagos (sem jogador novo pendente), do mais
+  // antigo pro mais novo (mesma lógica de ordenação por ano usada na
+  // lista de turmas históricas).
+  const elegiveis = teams.filter((t) => t.pago && jogadoresPendentesDePagamento(t).length === 0);
   const ordenados = [...elegiveis].sort((a, b) => {
     const anosA = anosDaTurma(a.nome);
     const anosB = anosDaTurma(b.nome);
@@ -4179,8 +4250,14 @@ function PlanilhaInscricoes({ teams }) {
     .sort((a, b) => new Date(a.inscritoEm || 0) - new Date(b.inscritoEm || 0))
     .map((t) => {
       const n = Array.isArray(t.jogadores) ? t.jogadores.length : 0;
-      const valorUnitario = valorPorAtletaNaData(dataParaCalculoDeLote(t));
-      return { ...t, nJogadores: n, lote: loteNaData(dataParaCalculoDeLote(t)), valorUnitario, valor: n * valorUnitario };
+      const resumo = resumoValorTime(t);
+      return {
+        ...t,
+        nJogadores: n,
+        lote: resumo.misto ? "Misto" : resumo.detalhamento[0]?.nome || loteNaData(dataParaCalculoDeLote(t)),
+        valorUnitario: resumo.misto ? null : resumo.detalhamento[0]?.valorUnitario ?? null,
+        valor: resumo.total,
+      };
     });
   const totalGeral = linhas.reduce((acc, t) => acc + t.valor, 0);
   const totalAtletas = linhas.reduce((acc, t) => acc + t.nJogadores, 0);
@@ -4194,7 +4271,7 @@ function PlanilhaInscricoes({ teams }) {
           <td>${t.inscritoEm ? escapeHtml(new Date(t.inscritoEm).toLocaleString("pt-BR")) : "—"}</td>
           <td>${escapeHtml(t.lote)}</td>
           <td>${t.nJogadores}</td>
-          <td>${escapeHtml(formatarReais(t.valorUnitario))}</td>
+          <td>${escapeHtml(t.valorUnitario != null ? formatarReais(t.valorUnitario) : "—")}</td>
           <td>${escapeHtml(formatarReais(t.valor))}</td>
         </tr>`
       )
@@ -4319,14 +4396,14 @@ function DocumentosOrganizacao({ teams, matches }) {
       <button
         type="button"
         onClick={() => baixarFichaTodosTimes(teams)}
-        disabled={teams.filter((t) => t.pago).length === 0}
+        disabled={teams.filter((t) => t.pago && jogadoresPendentesDePagamento(t).length === 0).length === 0}
         className="px-4 py-2 rounded-xl text-sm font-semibold inline-flex items-center gap-1.5 disabled:opacity-50"
         style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}
       >
         <Download size={14} /> Ficha de todos os times
       </button>
       <p className="text-xs mt-1.5 mb-5" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-        Só entram os times que já pagaram ({teams.filter((t) => t.pago).length} de {teams.length}),
+        Só entram os times totalmente pagos ({teams.filter((t) => t.pago && jogadoresPendentesDePagamento(t).length === 0).length} de {teams.length}),
         ordenados da turma mais antiga pra mais nova.
       </p>
 
@@ -5070,9 +5147,32 @@ function StatusAprovacaoPagamento({ teams, saveTeams }) {
 
   const alternarPago = async (team) => {
     await saveTeams((atuais) =>
+      (atuais || []).map((t) => {
+        if (t.id !== team.id) return t;
+        if (t.pago) {
+          // Desmarcar = desfazer tudo, volta a ficar "nunca confirmado".
+          return { ...t, pago: false, pagoEm: null, jogadoresConfirmadosPagos: [] };
+        }
+        return {
+          ...t,
+          pago: true,
+          pagoEm: new Date().toISOString(),
+          jogadoresConfirmadosPagos: (t.jogadores || []).map((j) => j.id),
+        };
+      })
+    );
+  };
+
+  const confirmarPendentes = async (team) => {
+    await saveTeams((atuais) =>
       (atuais || []).map((t) =>
         t.id === team.id
-          ? { ...t, pago: !t.pago, pagoEm: !t.pago ? new Date().toISOString() : null }
+          ? {
+              ...t,
+              pago: true,
+              pagoEm: new Date().toISOString(),
+              jogadoresConfirmadosPagos: (t.jogadores || []).map((j) => j.id),
+            }
           : t
       )
     );
@@ -5085,6 +5185,13 @@ function StatusAprovacaoPagamento({ teams, saveTeams }) {
     await saveTeams((atuais) => (atuais || []).map((t) => (t.id === team.id ? { ...t, pagoEm: novaData } : t)));
   };
 
+  const times = teams.map((t) => ({
+    time: t,
+    pendentes: jogadoresPendentesDePagamento(t),
+  }));
+  const totalmentePagos = times.filter((x) => x.time.pago && x.pendentes.length === 0).length;
+  const aguardandoAlgo = times.filter((x) => x.time.aprovadoComissao && (!x.time.pago || x.pendentes.length > 0)).length;
+
   return (
     <div className="rounded-2xl p-5 mt-8" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
       <h3 className="font-semibold mb-1 flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
@@ -5092,20 +5199,19 @@ function StatusAprovacaoPagamento({ teams, saveTeams }) {
       </h3>
       <p className="text-xs mb-4" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
         Marque o time como aprovado depois que a comissão revisar o cadastro, e marque
-        "Pagamento confirmado" quando identificar o Pix/comprovante ou o link pago. O e-mail de
-        aviso pra cada time fica na aba Comunicação.
+        "Pagamento confirmado" quando identificar o Pix/comprovante ou o link pago. Se o
+        representante adicionar jogador novo depois, o time volta a aparecer com pendência — só
+        do valor referente a quem entrou depois, no lote vigente na hora. O e-mail de aviso pra
+        cada time fica na aba Comunicação.
       </p>
 
       {teams.length > 0 && (
         <div className="flex gap-4 mb-4 text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
           <span>
-            <strong style={{ color: "#16A34A" }}>{teams.filter((t) => t.pago).length}</strong> pago(s)
+            <strong style={{ color: "#16A34A" }}>{totalmentePagos}</strong> pago(s)
           </span>
           <span>
-            <strong style={{ color: COLORS.accent }}>
-              {teams.filter((t) => t.aprovadoComissao && !t.pago).length}
-            </strong>{" "}
-            aprovado(s) aguardando pagamento
+            <strong style={{ color: COLORS.accent }}>{aguardandoAlgo}</strong> aprovado(s) aguardando pagamento
           </span>
         </div>
       )}
@@ -5116,45 +5222,72 @@ function StatusAprovacaoPagamento({ teams, saveTeams }) {
         </p>
       ) : (
         <div className="space-y-2">
-          {teams.map((t) => (
-            <div
-              key={t.id}
-              className="rounded-xl p-3 flex items-center justify-between gap-3 flex-wrap"
-              style={{ backgroundColor: COLORS.zebra, border: `1px solid ${COLORS.border}` }}
-            >
-              <span className="font-semibold text-sm" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
-                {t.nome}
-              </span>
-              <div className="flex items-center gap-3 flex-wrap">
-                <label
-                  className="flex items-center gap-2 text-xs cursor-pointer select-none"
-                  style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
-                >
-                  <input type="checkbox" checked={!!t.aprovadoComissao} onChange={() => alternarAprovado(t)} />
-                  Aprovado pela comissão
-                </label>
-                {t.aprovadoComissao && (
-                  <label
-                    className="flex items-center gap-2 text-xs cursor-pointer select-none font-semibold"
-                    style={{ color: t.pago ? "#16A34A" : COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+          {times.map(({ time: t, pendentes }) => {
+            const totalmentePago = t.pago && pendentes.length === 0;
+            const pagamentoParcial = t.pago && pendentes.length > 0;
+            const valorPendente = pendentes.reduce((soma, j) => soma + valorDoJogador(j, t), 0);
+            return (
+              <div
+                key={t.id}
+                className="rounded-xl p-3 flex flex-col gap-2"
+                style={{ backgroundColor: COLORS.zebra, border: `1px solid ${COLORS.border}` }}
+              >
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <span className="font-semibold text-sm" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+                    {t.nome}
+                  </span>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <label
+                      className="flex items-center gap-2 text-xs cursor-pointer select-none"
+                      style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+                    >
+                      <input type="checkbox" checked={!!t.aprovadoComissao} onChange={() => alternarAprovado(t)} />
+                      Aprovado pela comissão
+                    </label>
+                    {t.aprovadoComissao && (
+                      <label
+                        className="flex items-center gap-2 text-xs cursor-pointer select-none font-semibold"
+                        style={{ color: totalmentePago ? "#16A34A" : COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+                      >
+                        <input type="checkbox" checked={!!t.pago} onChange={() => alternarPago(t)} />
+                        {t.pago ? "Pago em" : "Pagamento confirmado"}
+                      </label>
+                    )}
+                    {t.pago && (
+                      <input
+                        type="date"
+                        value={t.pagoEm ? new Date(t.pagoEm).toISOString().slice(0, 10) : ""}
+                        onChange={(e) => corrigirDataPagamento(t, e.target.value)}
+                        title="Corrigir a data em que o pagamento foi feito de verdade"
+                        className="text-xs px-2 py-1 rounded-lg"
+                        style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+                      />
+                    )}
+                  </div>
+                </div>
+                {pagamentoParcial && (
+                  <div
+                    className="flex items-center justify-between gap-3 flex-wrap px-3 py-2 rounded-lg"
+                    style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.accent}` }}
                   >
-                    <input type="checkbox" checked={!!t.pago} onChange={() => alternarPago(t)} />
-                    {t.pago ? "Pago em" : "Pagamento confirmado"}
-                  </label>
-                )}
-                {t.pago && (
-                  <input
-                    type="date"
-                    value={t.pagoEm ? new Date(t.pagoEm).toISOString().slice(0, 10) : ""}
-                    onChange={(e) => corrigirDataPagamento(t, e.target.value)}
-                    title="Corrigir a data em que o pagamento foi feito de verdade"
-                    className="text-xs px-2 py-1 rounded-lg"
-                    style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
-                  />
+                    <span className="text-xs" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
+                      Pagamento parcial — {pendentes.length} jogador(es) adicionado(s) depois ainda não pago(s):{" "}
+                      {pendentes.map((j) => j.apelido || j.nome).join(", ")} ·{" "}
+                      <strong>faltam {formatarReais(valorPendente)}</strong>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => confirmarPendentes(t)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0"
+                      style={{ backgroundColor: "#16A34A", color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+                    >
+                      Confirmar pagamento dos novos
+                    </button>
+                  </div>
                 )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -5226,8 +5359,9 @@ function AprovacaoComissao({ teams, saveTeams, perfis }) {
   };
 
   // Só entra aqui quem ainda tem etapa pendente: time aprovado que ainda
-  // não pagou. Quem já pagou não precisa mais de e-mail nenhum.
-  const timesComPendencia = teams.filter((t) => t.aprovadoComissao && !t.pago);
+  // não pagou, ou que pagou mas tem jogador novo adicionado depois sem
+  // pagamento confirmado. Quem está 100% pago não precisa mais de e-mail.
+  const timesComPendencia = teams.filter((t) => t.aprovadoComissao && jogadoresPendentesDePagamento(t).length > 0);
 
   return (
     <div className="rounded-2xl p-5 mt-8" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
