@@ -4251,6 +4251,50 @@ function baixarSumula(match, teams) {
 
 // Planilha financeira — times ordenados por data de inscrição, com
 // quantidade de jogadores, valor a pagar e soma total.
+function baixarPlanilhaInscricoes(teams) {
+  const linhas = [...teams]
+    .sort((a, b) => new Date(a.inscritoEm || 0) - new Date(b.inscritoEm || 0))
+    .map((t) => {
+      const n = Array.isArray(t.jogadores) ? t.jogadores.length : 0;
+      const resumo = resumoValorTime(t);
+      return {
+        ...t,
+        nJogadores: n,
+        lote: resumo.misto ? "Misto" : resumo.detalhamento[0]?.nome || loteNaData(dataParaCalculoDeLote(t)),
+        valorUnitario: resumo.misto ? null : resumo.detalhamento[0]?.valorUnitario ?? null,
+        valor: resumo.total,
+      };
+    });
+  const totalGeral = linhas.reduce((acc, t) => acc + t.valor, 0);
+  const totalAtletas = linhas.reduce((acc, t) => acc + t.nJogadores, 0);
+  const linhasHtml = linhas
+    .map(
+      (t, i) => `<tr>
+        <td>${i + 1}</td>
+        <td>${escapeHtml(t.nome)}</td>
+        <td>${t.inscritoEm ? escapeHtml(new Date(t.inscritoEm).toLocaleString("pt-BR")) : "—"}</td>
+        <td>${escapeHtml(t.lote)}</td>
+        <td>${t.nJogadores}</td>
+        <td>${escapeHtml(t.valorUnitario != null ? formatarReais(t.valorUnitario) : "—")}</td>
+        <td>${escapeHtml(formatarReais(t.valor))}</td>
+      </tr>`
+    )
+    .join("");
+  const corpo = `
+    <div class="secao">
+      <h1>Planilha de inscrições</h1>
+      <div class="meta">${linhas.length} time(s) · valor por atleta conforme o lote (Art. 8º)</div>
+      <table>
+        <thead><tr><th>#</th><th>Time</th><th>Data de inscrição</th><th>Lote</th><th>Jogadores</th><th>Valor/atleta</th><th>Total</th></tr></thead>
+        <tbody>${linhasHtml}</tbody>
+      </table>
+      <div class="meta" style="margin-top:16px; font-size:15px;">
+        <strong>Total de atletas: ${totalAtletas}</strong> · <strong>Total geral: ${escapeHtml(formatarReais(totalGeral))}</strong>
+      </div>
+    </div>`;
+  abrirImpressao("Planilha de inscrições", corpo);
+}
+
 function PlanilhaInscricoes({ teams }) {
   const linhas = [...teams]
     .sort((a, b) => new Date(a.inscritoEm || 0) - new Date(b.inscritoEm || 0))
@@ -4268,35 +4312,6 @@ function PlanilhaInscricoes({ teams }) {
   const totalGeral = linhas.reduce((acc, t) => acc + t.valor, 0);
   const totalAtletas = linhas.reduce((acc, t) => acc + t.nJogadores, 0);
 
-  const baixarPlanilha = () => {
-    const linhasHtml = linhas
-      .map(
-        (t, i) => `<tr>
-          <td>${i + 1}</td>
-          <td>${escapeHtml(t.nome)}</td>
-          <td>${t.inscritoEm ? escapeHtml(new Date(t.inscritoEm).toLocaleString("pt-BR")) : "—"}</td>
-          <td>${escapeHtml(t.lote)}</td>
-          <td>${t.nJogadores}</td>
-          <td>${escapeHtml(t.valorUnitario != null ? formatarReais(t.valorUnitario) : "—")}</td>
-          <td>${escapeHtml(formatarReais(t.valor))}</td>
-        </tr>`
-      )
-      .join("");
-    const corpo = `
-      <div class="secao">
-        <h1>Planilha de inscrições</h1>
-        <div class="meta">${linhas.length} time(s) · valor por atleta conforme o lote (Art. 8º)</div>
-        <table>
-          <thead><tr><th>#</th><th>Time</th><th>Data de inscrição</th><th>Lote</th><th>Jogadores</th><th>Valor/atleta</th><th>Total</th></tr></thead>
-          <tbody>${linhasHtml}</tbody>
-        </table>
-        <div class="meta" style="margin-top:16px; font-size:15px;">
-          <strong>Total de atletas: ${totalAtletas}</strong> · <strong>Total geral: ${escapeHtml(formatarReais(totalGeral))}</strong>
-        </div>
-      </div>`;
-    abrirImpressao("Planilha de inscrições", corpo);
-  };
-
   return (
     <div className="rounded-2xl p-5 mt-8" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
       <div className="flex items-center justify-between gap-3 mb-1 flex-wrap">
@@ -4306,7 +4321,7 @@ function PlanilhaInscricoes({ teams }) {
         {linhas.length > 0 && (
           <button
             type="button"
-            onClick={baixarPlanilha}
+            onClick={() => baixarPlanilhaInscricoes(teams)}
             className="px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5"
             style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}
           >
@@ -4408,6 +4423,27 @@ function DocumentosOrganizacao({ teams, matches }) {
       >
         <Download size={14} /> Ficha de todos os times
       </button>
+
+      <div className="flex flex-wrap gap-2 mt-3 mb-5">
+        <button
+          type="button"
+          onClick={() => baixarPlanilhaInscricoes(teams)}
+          disabled={teams.length === 0}
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-50"
+          style={{ border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+        >
+          <Download size={12} /> Planilha de inscrições
+        </button>
+        <a
+          href="regulamento.pdf"
+          target="_blank"
+          rel="noreferrer"
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5"
+          style={{ border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+        >
+          <Download size={12} /> Regulamento oficial (PDF)
+        </a>
+      </div>
       <p className="text-xs mt-1.5 mb-5" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
         Só entram os times totalmente pagos ({teams.filter((t) => t.pago && jogadoresPendentesDePagamento(t).length === 0).length} de {teams.length}),
         ordenados da turma mais antiga pra mais nova.
@@ -5157,36 +5193,71 @@ function StatusAprovacaoPagamento({ teams, saveTeams }) {
         if (t.id !== team.id) return t;
         if (t.pago) {
           // Desmarcar = desfazer tudo, volta a ficar "nunca confirmado".
-          return { ...t, pago: false, pagoEm: null, jogadoresConfirmadosPagos: [] };
+          return { ...t, pago: false, pagoEm: null, jogadoresConfirmadosPagos: [], historicoPagamentos: [] };
         }
+        const jogadoresAtuais = t.jogadores || [];
+        const agora = new Date().toISOString();
         return {
           ...t,
           pago: true,
-          pagoEm: new Date().toISOString(),
-          jogadoresConfirmadosPagos: (t.jogadores || []).map((j) => j.id),
+          pagoEm: agora,
+          jogadoresConfirmadosPagos: jogadoresAtuais.map((j) => j.id),
+          historicoPagamentos: [
+            {
+              data: agora,
+              qtd: jogadoresAtuais.length,
+              lote: resumoValorTime({ ...t, jogadores: jogadoresAtuais }).detalhamento.map((d) => d.nome).join(" + "),
+            },
+          ],
         };
       })
     );
   };
 
-  const confirmarPendentes = async (team) => {
+  const confirmarPendentes = async (team, pendentes) => {
     await saveTeams((atuais) =>
-      (atuais || []).map((t) =>
-        t.id === team.id
-          ? {
-              ...t,
-              pago: true,
-              pagoEm: new Date().toISOString(),
-              jogadoresConfirmadosPagos: (t.jogadores || []).map((j) => j.id),
-            }
-          : t
-      )
+      (atuais || []).map((t) => {
+        if (t.id !== team.id) return t;
+        const agora = new Date().toISOString();
+        const resumoPendentes = resumoValorTime({ ...t, jogadores: pendentes });
+        return {
+          ...t,
+          pago: true,
+          pagoEm: agora,
+          jogadoresConfirmadosPagos: (t.jogadores || []).map((j) => j.id),
+          historicoPagamentos: [
+            ...(t.historicoPagamentos || []),
+            {
+              data: agora,
+              qtd: pendentes.length,
+              lote: resumoPendentes.detalhamento.map((d) => d.nome).join(" + "),
+            },
+          ],
+        };
+      })
     );
   };
 
-  const corrigirDataPagamento = async (team, novaDataYYYYMMDD) => {
+  const corrigirDataHistorico = async (team, indice, novaDataYYYYMMDD) => {
     if (!novaDataYYYYMMDD) return;
-    // Guarda como meio-dia local, só pra não virar o dia por causa de fuso.
+    const novaData = new Date(novaDataYYYYMMDD + "T12:00:00").toISOString();
+    await saveTeams((atuais) =>
+      (atuais || []).map((t) => {
+        if (t.id !== team.id) return t;
+        const historico = [...(t.historicoPagamentos || [])];
+        if (historico[indice]) historico[indice] = { ...historico[indice], data: novaData };
+        // O campo antigo (pagoEm) acompanha a data mais recente do
+        // histórico, pra quem ainda depende dele (ex: filtros antigos).
+        const maisRecente = historico.reduce((max, h) => (!max || h.data > max ? h.data : max), null);
+        return { ...t, historicoPagamentos: historico, pagoEm: maisRecente || t.pagoEm };
+      })
+    );
+  };
+
+  // Corrige a data de um time pago "antigo" (marcado como pago antes do
+  // histórico de datas existir) — só tem o campo pagoEm único, sem lista.
+  const corrigirDataPagamentoAntigo = async (team, novaDataYYYYMMDD) => {
+    if (!novaDataYYYYMMDD) return;
     const novaData = new Date(novaDataYYYYMMDD + "T12:00:00").toISOString();
     await saveTeams((atuais) => (atuais || []).map((t) => (t.id === team.id ? { ...t, pagoEm: novaData } : t)));
   };
@@ -5256,21 +5327,45 @@ function StatusAprovacaoPagamento({ teams, saveTeams }) {
                         style={{ color: totalmentePago ? "#16A34A" : COLORS.slate, fontFamily: "'Inter', sans-serif" }}
                       >
                         <input type="checkbox" checked={!!t.pago} onChange={() => alternarPago(t)} />
-                        {t.pago ? "Pago em" : "Pagamento confirmado"}
+                        Pagamento confirmado
                       </label>
                     )}
-                    {t.pago && (
+                  </div>
+                </div>
+                {t.pago && (t.historicoPagamentos || []).length > 0 ? (
+                  <div className="flex flex-col gap-1">
+                    {(t.historicoPagamentos || []).map((h, i) => (
+                      <div key={i} className="flex items-center gap-2 text-xs flex-wrap" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                        <span>
+                          Pago em {h.qtd} atleta(s) ({h.lote || "—"}):
+                        </span>
+                        <input
+                          type="date"
+                          value={h.data ? new Date(h.data).toISOString().slice(0, 10) : ""}
+                          onChange={(e) => corrigirDataHistorico(t, i, e.target.value)}
+                          title="Corrigir a data em que esse pagamento foi feito de verdade"
+                          className="text-xs px-2 py-1 rounded-lg"
+                          style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  t.pago &&
+                  t.pagoEm && (
+                    <div className="flex items-center gap-2 text-xs flex-wrap" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                      <span>Pago em:</span>
                       <input
                         type="date"
-                        value={t.pagoEm ? new Date(t.pagoEm).toISOString().slice(0, 10) : ""}
-                        onChange={(e) => corrigirDataPagamento(t, e.target.value)}
+                        value={new Date(t.pagoEm).toISOString().slice(0, 10)}
+                        onChange={(e) => corrigirDataPagamentoAntigo(t, e.target.value)}
                         title="Corrigir a data em que o pagamento foi feito de verdade"
                         className="text-xs px-2 py-1 rounded-lg"
                         style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
                       />
-                    )}
-                  </div>
-                </div>
+                    </div>
+                  )
+                )}
                 {pagamentoParcial && (
                   <div
                     className="flex items-center justify-between gap-3 flex-wrap px-3 py-2 rounded-lg"
@@ -5283,7 +5378,7 @@ function StatusAprovacaoPagamento({ teams, saveTeams }) {
                     </span>
                     <button
                       type="button"
-                      onClick={() => confirmarPendentes(t)}
+                      onClick={() => confirmarPendentes(t, pendentes)}
                       className="px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0"
                       style={{ backgroundColor: "#16A34A", color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
                     >
@@ -5510,7 +5605,7 @@ function diagnosticarTime(team) {
   return problemas;
 }
 
-function DiagnosticoIrregularidades({ teams, aprovarExcecao, manterIrregularidade }) {
+function DiagnosticoIrregularidades({ teams, avaliacoes, aprovarExcecao, manterIrregularidade }) {
   const times = teams.map((t) => ({ time: t, problemas: diagnosticarTime(t) })).filter((x) => x.problemas.length > 0);
 
   if (times.length === 0) return null;
@@ -5553,15 +5648,27 @@ function DiagnosticoIrregularidades({ teams, aprovarExcecao, manterIrregularidad
                       time.contato,
                       `Olá${time.capitao ? ", " + time.capitao : ""}! Aqui é da organização da Copa de Ex-Alunos de Futsal do Colégio Santa Úrsula. Notamos uma irregularidade no elenco do time ${time.nome}: o jogador ${j.apelido || j.nome} está com ano de conclusão ${j.anoConclusao || "não informado"}, que não bate com a turma ${time.nome} (Art. 9º do regulamento). Podemos conversar sobre isso?`
                     );
+                    const pedidoPeloRepresentante = (avaliacoes || []).some(
+                      (a) => a.status === "pendente" && a.timeNome === time.nome && a.jogadorId === j.id
+                    );
                     return (
                     <div
                       key={j.id}
                       className="flex flex-wrap items-center gap-2 px-2.5 py-2 rounded-lg"
                       style={{ backgroundColor: COLORS.card }}
                     >
-                      <span className="text-xs font-medium mr-auto" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+                      <span className="text-xs font-medium" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
                         {j.apelido || j.nome || "Jogador"}
                       </span>
+                      {pedidoPeloRepresentante && (
+                        <span
+                          className="text-[10px] font-semibold px-1.5 py-0.5 rounded mr-auto"
+                          style={{ backgroundColor: COLORS.accentSoft, color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}
+                        >
+                          Representante pediu revisão
+                        </span>
+                      )}
+                      {!pedidoPeloRepresentante && <span className="mr-auto" />}
                       {linkWpp && (
                         <a
                           href={linkWpp}
@@ -7392,7 +7499,16 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
         return { ...t, jogadores: jogadoresAtualizados };
       })
     );
-    await saveAvaliacoes(avaliacoes.map((a) => (a.id === caso.id ? { ...a, status: "aprovada" } : a)));
+    // Casa por time+jogador (não só por id) — assim funciona tanto vindo
+    // do Diagnóstico automático (sem avaliação vinculada) quanto de uma
+    // avaliação que o representante pediu.
+    await saveAvaliacoes((atuais) =>
+      (atuais || []).map((a) =>
+        a.status === "pendente" && a.timeNome === caso.timeNome && a.jogadorId === caso.jogadorId
+          ? { ...a, status: "aprovada" }
+          : a
+      )
+    );
   };
 
   const manterIrregularidade = async (caso) => {
@@ -7406,7 +7522,13 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
         return { ...t, jogadores: (t.jogadores || []).filter((j) => j.id !== caso.jogadorId) };
       })
     );
-    await saveAvaliacoes(avaliacoes.map((a) => (a.id === caso.id ? { ...a, status: "mantida" } : a)));
+    await saveAvaliacoes((atuais) =>
+      (atuais || []).map((a) =>
+        a.status === "pendente" && a.timeNome === caso.timeNome && a.jogadorId === caso.jogadorId
+          ? { ...a, status: "mantida" }
+          : a
+      )
+    );
   };
 
   const addMatch = async (e) => {
@@ -8134,61 +8256,13 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
         <>
           <GerenciarElencos teams={teams} saveTeams={saveTeams} />
           <StatusAprovacaoPagamento teams={teams} saveTeams={saveTeams} />
-          <DiagnosticoIrregularidades teams={teams} aprovarExcecao={aprovarExcecao} manterIrregularidade={manterIrregularidade} />
+          <DiagnosticoIrregularidades
+            teams={teams}
+            avaliacoes={avaliacoes}
+            aprovarExcecao={aprovarExcecao}
+            manterIrregularidade={manterIrregularidade}
+          />
           <ConfirmacaoAlunosColegio teams={teams} saveTeams={saveTeams} />
-
-          {avaliacoes.filter((a) => a.status === "pendente").length > 0 && (
-            <div
-              className="rounded-2xl p-5 mb-8"
-              style={{ backgroundColor: COLORS.card, border: `1.5px solid ${COLORS.accent}` }}
-            >
-              <h3 className="font-semibold mb-1 flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
-                <AlertTriangle size={16} color={COLORS.accent} /> Casos pra avaliação da comissão ({avaliacoes.filter((a) => a.status === "pendente").length})
-              </h3>
-              <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-                O representante pediu revisão de um jogador marcado como irregular — Art. 9º dá
-                direito a esse esclarecimento antes de qualquer punição. "Aprovar exceção" libera o
-                jogador; "Manter irregularidade" <strong>remove ele do time</strong> (o representante
-                pode corrigir e adicionar de novo depois).
-              </p>
-              <ul className="space-y-2">
-                {avaliacoes
-                  .filter((a) => a.status === "pendente")
-                  .map((a) => (
-                    <li
-                      key={a.id}
-                      className="flex flex-col gap-2 text-sm px-3 py-2.5 rounded-lg"
-                      style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
-                    >
-                      <div className="break-words">
-                        <div className="font-medium">{a.jogadorApelido || a.jogadorNome || "Jogador"}</div>
-                        <div className="text-xs" style={{ color: COLORS.slate }}>
-                          Time {a.timeNome} · ano de conclusão {a.anoConclusao || "—"} não bate com a turma
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={() => aprovarExcecao(a)}
-                          className="px-3 py-1.5 rounded-lg text-xs font-semibold"
-                          style={{ backgroundColor: "#16A34A", color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
-                        >
-                          Aprovar exceção
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => manterIrregularidade(a)}
-                          className="px-3 py-1.5 rounded-lg text-xs font-semibold"
-                          style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
-                        >
-                          Manter irregularidade
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-              </ul>
-            </div>
-          )}
           <ImportarCpfsPlanilha teams={teams} />
           <PlanilhaInscricoes teams={teams} />
         </>
