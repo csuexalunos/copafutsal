@@ -4257,16 +4257,21 @@ function baixarPlanilhaInscricoes(teams) {
     .map((t) => {
       const n = Array.isArray(t.jogadores) ? t.jogadores.length : 0;
       const resumo = resumoValorTime(t);
+      const pendentes = jogadoresPendentesDePagamento(t);
+      const status = !t.pago ? "Pendente" : pendentes.length === 0 ? "Pago" : "Parcial";
       return {
         ...t,
         nJogadores: n,
         lote: resumo.misto ? "Misto" : resumo.detalhamento[0]?.nome || loteNaData(dataParaCalculoDeLote(t)),
         valorUnitario: resumo.misto ? null : resumo.detalhamento[0]?.valorUnitario ?? null,
         valor: resumo.total,
+        statusPagamento: status,
       };
     });
   const totalGeral = linhas.reduce((acc, t) => acc + t.valor, 0);
   const totalAtletas = linhas.reduce((acc, t) => acc + t.nJogadores, 0);
+  const totalRecebido = linhas.filter((t) => t.statusPagamento === "Pago").reduce((acc, t) => acc + t.valor, 0);
+  const totalAReceber = totalGeral - totalRecebido;
   const linhasHtml = linhas
     .map(
       (t, i) => `<tr>
@@ -4277,6 +4282,7 @@ function baixarPlanilhaInscricoes(teams) {
         <td>${t.nJogadores}</td>
         <td>${escapeHtml(t.valorUnitario != null ? formatarReais(t.valorUnitario) : "—")}</td>
         <td>${escapeHtml(formatarReais(t.valor))}</td>
+        <td>${escapeHtml(t.statusPagamento)}</td>
       </tr>`
     )
     .join("");
@@ -4285,11 +4291,13 @@ function baixarPlanilhaInscricoes(teams) {
       <h1>Planilha de inscrições</h1>
       <div class="meta">${linhas.length} time(s) · valor por atleta conforme o lote (Art. 8º)</div>
       <table>
-        <thead><tr><th>#</th><th>Time</th><th>Data de inscrição</th><th>Lote</th><th>Jogadores</th><th>Valor/atleta</th><th>Total</th></tr></thead>
+        <thead><tr><th>#</th><th>Time</th><th>Data de inscrição</th><th>Lote</th><th>Jogadores</th><th>Valor/atleta</th><th>Total</th><th>Pagamento</th></tr></thead>
         <tbody>${linhasHtml}</tbody>
       </table>
       <div class="meta" style="margin-top:16px; font-size:15px;">
-        <strong>Total de atletas: ${totalAtletas}</strong> · <strong>Total geral: ${escapeHtml(formatarReais(totalGeral))}</strong>
+        <strong>Total de atletas: ${totalAtletas}</strong> · <strong>Total geral: ${escapeHtml(formatarReais(totalGeral))}</strong><br/>
+        <strong style="color:#16A34A;">Recebido: ${escapeHtml(formatarReais(totalRecebido))}</strong> ·
+        <strong style="color:#c0392b;">A receber: ${escapeHtml(formatarReais(totalAReceber))}</strong>
       </div>
     </div>`;
   abrirImpressao("Planilha de inscrições", corpo);
@@ -4301,16 +4309,23 @@ function PlanilhaInscricoes({ teams }) {
     .map((t) => {
       const n = Array.isArray(t.jogadores) ? t.jogadores.length : 0;
       const resumo = resumoValorTime(t);
+      const pendentes = jogadoresPendentesDePagamento(t);
+      const status = !t.pago ? "Pendente" : pendentes.length === 0 ? "Pago" : "Parcial";
       return {
         ...t,
         nJogadores: n,
         lote: resumo.misto ? "Misto" : resumo.detalhamento[0]?.nome || loteNaData(dataParaCalculoDeLote(t)),
         valorUnitario: resumo.misto ? null : resumo.detalhamento[0]?.valorUnitario ?? null,
         valor: resumo.total,
+        statusPagamento: status,
       };
     });
   const totalGeral = linhas.reduce((acc, t) => acc + t.valor, 0);
   const totalAtletas = linhas.reduce((acc, t) => acc + t.nJogadores, 0);
+  const totalRecebido = linhas.filter((t) => t.statusPagamento === "Pago").reduce((acc, t) => acc + t.valor, 0);
+  const totalAReceber = totalGeral - totalRecebido;
+
+  const corPorStatus = { Pago: "#16A34A", Parcial: COLORS.accent, Pendente: COLORS.slate };
 
   return (
     <div className="rounded-2xl p-5 mt-8" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
@@ -4329,10 +4344,17 @@ function PlanilhaInscricoes({ teams }) {
           </button>
         )}
       </div>
-      <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+      <p className="text-xs mb-1" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
         {linhas.length} time(s) · {totalAtletas} atleta(s) no total · valor por atleta conforme o
         lote (Art. 8º): {LOTES_INSCRICAO.map((l) => `${l.nome} ${formatarReais(l.valor)}`).join(" · ")}
       </p>
+      {linhas.length > 0 && (
+        <p className="text-xs mb-3" style={{ fontFamily: "'Inter', sans-serif" }}>
+          <span style={{ color: "#16A34A", fontWeight: 600 }}>Recebido: {formatarReais(totalRecebido)}</span>
+          {" · "}
+          <span style={{ color: COLORS.accent, fontWeight: 600 }}>A receber: {formatarReais(totalAReceber)}</span>
+        </p>
+      )}
       {linhas.length === 0 ? (
         <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
           Nenhum time inscrito ainda.
@@ -4354,8 +4376,11 @@ function PlanilhaInscricoes({ teams }) {
                 <th className="text-center py-1.5 pr-3 text-xs uppercase tracking-wide" style={{ color: COLORS.slate }}>
                   Jogadores
                 </th>
-                <th className="text-right py-1.5 text-xs uppercase tracking-wide" style={{ color: COLORS.slate }}>
+                <th className="text-right py-1.5 pr-3 text-xs uppercase tracking-wide" style={{ color: COLORS.slate }}>
                   Valor
+                </th>
+                <th className="text-right py-1.5 text-xs uppercase tracking-wide" style={{ color: COLORS.slate }}>
+                  Pagamento
                 </th>
               </tr>
             </thead>
@@ -4377,8 +4402,16 @@ function PlanilhaInscricoes({ teams }) {
                   <td className="py-2 pr-3 text-center" style={{ fontFamily: "'JetBrains Mono', monospace", color: COLORS.ink }}>
                     {t.nJogadores}
                   </td>
-                  <td className="py-2 text-right font-semibold" style={{ fontFamily: "'JetBrains Mono', monospace", color: COLORS.accent }}>
+                  <td className="py-2 pr-3 text-right font-semibold" style={{ fontFamily: "'JetBrains Mono', monospace", color: COLORS.accent }}>
                     {formatarReais(t.valor)}
+                  </td>
+                  <td className="py-2 text-right">
+                    <span
+                      className="text-xs font-semibold px-2 py-0.5 rounded-full inline-block"
+                      style={{ backgroundColor: `${corPorStatus[t.statusPagamento]}22`, color: corPorStatus[t.statusPagamento], fontFamily: "'Inter', sans-serif" }}
+                    >
+                      {t.statusPagamento}
+                    </span>
                   </td>
                 </tr>
               ))}
@@ -4391,9 +4424,10 @@ function PlanilhaInscricoes({ teams }) {
                 <td className="py-2 pr-3 text-center font-bold" style={{ fontFamily: "'JetBrains Mono', monospace", color: COLORS.ink }}>
                   {totalAtletas}
                 </td>
-                <td className="py-2 text-right font-bold" style={{ fontFamily: "'JetBrains Mono', monospace", color: COLORS.ink }}>
+                <td className="py-2 pr-3 text-right font-bold" style={{ fontFamily: "'JetBrains Mono', monospace", color: COLORS.ink }}>
                   {formatarReais(totalGeral)}
                 </td>
+                <td></td>
               </tr>
             </tfoot>
           </table>
