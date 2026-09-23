@@ -29,6 +29,8 @@ import {
   Mail,
   BarChart3,
   ChevronLeft,
+  Heart,
+  Send,
 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import {
@@ -2988,7 +2990,51 @@ function Comunidade({ posts, savePosts }) {
   const [capturing, setCapturing] = useState(false);
   const [subindoVideo, setSubindoVideo] = useState(false);
 
+  // Curtidas: como esse mural é aberto (sem exigir login de ninguém pra
+  // ver ou interagir), guarda no navegador de quem curtiu quais posts —
+  // só pra saber mostrar o coração preenchido ou não pra essa pessoa. O
+  // número em si (curtidas) é compartilhado de verdade, salvo no banco.
+  const [curtidasLocais, setCurtidasLocais] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("copasu_curtidas") || "[]");
+    } catch {
+      return [];
+    }
+  });
+  const [comentarioAberto, setComentarioAberto] = useState(null);
+  const [rascunhoComentario, setRascunhoComentario] = useState({});
+
   const MAX_VIDEO_BYTES = 60 * 1024 * 1024; // limite generoso do plano gratuito do Storage
+
+  const alternarCurtida = async (post) => {
+    const jaCurtiu = curtidasLocais.includes(post.id);
+    await savePosts((atuais) =>
+      (atuais || []).map((p) =>
+        p.id === post.id ? { ...p, curtidas: Math.max(0, (p.curtidas || 0) + (jaCurtiu ? -1 : 1)) } : p
+      )
+    );
+    const novoSet = jaCurtiu ? curtidasLocais.filter((id) => id !== post.id) : [...curtidasLocais, post.id];
+    setCurtidasLocais(novoSet);
+    try {
+      localStorage.setItem("copasu_curtidas", JSON.stringify(novoSet));
+    } catch {
+      // sem problema se o navegador bloquear — só não lembra na próxima visita
+    }
+  };
+
+  const enviarComentario = async (post) => {
+    const rascunho = rascunhoComentario[post.id] || {};
+    const nome = (rascunho.nome || "").trim();
+    const texto = (rascunho.texto || "").trim();
+    if (!nome || !texto) return;
+    const novoComentario = { id: `c_${Date.now()}`, nome, texto, criadoEm: new Date().toISOString() };
+    await savePosts((atuais) =>
+      (atuais || []).map((p) =>
+        p.id === post.id ? { ...p, comentarios: [...(p.comentarios || []), novoComentario] } : p
+      )
+    );
+    setRascunhoComentario((s) => ({ ...s, [post.id]: { nome, texto: "" } }));
+  };
 
   const publicar = async (extra) => {
     setSaving(true);
@@ -3059,7 +3105,7 @@ function Comunidade({ posts, savePosts }) {
       <SectionLabel eyebrow="Comunidade" title="Fotos e vídeos" />
       <p className="text-sm mb-6 max-w-xl" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
         Espaço aberto pra quem estiver no app compartilhar fotos e vídeos da Copa — direto
-        da câmera ou da galeria do celular, sem link.
+        da câmera ou da galeria do celular, sem link. Qualquer pessoa pode curtir e comentar.
       </p>
 
       <div className="flex items-center gap-3 mb-3 flex-wrap">
@@ -3225,6 +3271,78 @@ function Comunidade({ posts, savePosts }) {
                     <p className="text-sm mt-1" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
                       {p.legenda}
                     </p>
+                  )}
+                  <div className="flex items-center gap-4 mt-3 pt-3" style={{ borderTop: `1px solid ${COLORS.border}` }}>
+                    <button
+                      type="button"
+                      onClick={() => alternarCurtida(p)}
+                      className="flex items-center gap-1.5"
+                    >
+                      <Heart
+                        size={18}
+                        color={COLORS.accent}
+                        fill={curtidasLocais.includes(p.id) ? COLORS.accent : "none"}
+                      />
+                      <span className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                        {p.curtidas || 0}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setComentarioAberto(comentarioAberto === p.id ? null : p.id)}
+                      className="flex items-center gap-1.5"
+                    >
+                      <MessageCircle size={18} color={COLORS.slate} />
+                      <span className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                        {(p.comentarios || []).length}
+                      </span>
+                    </button>
+                  </div>
+                  {comentarioAberto === p.id && (
+                    <div className="mt-3 space-y-2.5">
+                      {(p.comentarios || []).map((c) => (
+                        <div key={c.id} className="text-sm" style={{ fontFamily: "'Inter', sans-serif" }}>
+                          <span className="font-semibold" style={{ color: COLORS.ink }}>
+                            {c.nome}
+                          </span>{" "}
+                          <span style={{ color: COLORS.slate }}>{c.texto}</span>
+                        </div>
+                      ))}
+                      <div className="flex flex-col gap-2 pt-1">
+                        <input
+                          type="text"
+                          placeholder="Seu nome"
+                          value={(rascunhoComentario[p.id] || {}).nome || ""}
+                          onChange={(e) =>
+                            setRascunhoComentario((s) => ({ ...s, [p.id]: { ...(s[p.id] || {}), nome: e.target.value } }))
+                          }
+                          className="px-3 py-2 rounded-lg text-sm"
+                          style={{ backgroundColor: COLORS.bg, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+                        />
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="Escreva um comentário..."
+                            value={(rascunhoComentario[p.id] || {}).texto || ""}
+                            onChange={(e) =>
+                              setRascunhoComentario((s) => ({ ...s, [p.id]: { ...(s[p.id] || {}), texto: e.target.value } }))
+                            }
+                            onKeyDown={(e) => e.key === "Enter" && enviarComentario(p)}
+                            className="flex-1 min-w-0 px-3 py-2 rounded-lg text-sm"
+                            style={{ backgroundColor: COLORS.bg, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => enviarComentario(p)}
+                            className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+                            style={{ backgroundColor: COLORS.accent }}
+                            aria-label="Enviar comentário"
+                          >
+                            <Send size={16} color="#FFFFFF" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
