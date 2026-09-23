@@ -1044,9 +1044,6 @@ function Home({ teams, matches, setTab, config, totalPessoas }) {
         style={{ backgroundColor: COLORS.accentSoft }}
       >
         <div className="text-sm" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
-          <strong>Inscrições:</strong> {PRAZO_INSCRICAO}
-        </div>
-        <div className="text-sm" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
           <strong>Competição:</strong> {DATA_EVENTO}
         </div>
         <div className="text-sm" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
