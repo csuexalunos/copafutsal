@@ -596,6 +596,17 @@ function jogadoresPendentesDePagamento(team) {
   return jogadores.filter((j) => !confirmados.includes(j.id));
 }
 
+// A inscrição só é considerada CONCLUÍDA quando o time está marcado como
+// pago e não tem nenhum jogador com pagamento pendente. Times que ainda
+// não pagaram (mesmo já aprovados pela comissão) não contam como
+// "inscritos" nas telas públicas/oficiais — Início, lista de inscritos,
+// Sorteio (potes/grupos) e Classificação. Eles continuam aparecendo
+// normalmente nas telas de gestão da Organização (aprovação, pagamento,
+// elencos), que precisam ver todo mundo pra poder cobrar.
+function timeInscritoOficialmente(team) {
+  return !!(team.pago && jogadoresPendentesDePagamento(team).length === 0);
+}
+
 const LOCAL_NOME = "Ginásio Poliesportivo do Colégio Santa Úrsula";
 const LOCAL_MAPS_LINK = "https://www.google.com/maps/place/Gin%C3%A1sio+Col%C3%A9gio+Santa+Ursula/@-9.6519727,-35.7061545,17z/data=!4m7!3m6!1s0x70145b3c77ca373:0xe3558847d1b3d687!8m2!3d-9.6519727!4d-35.7013909!15sCjVDb2zDqWdpbyBTYW50YSDDmnJzdWxhIEdpbsOhc2lvIFBvbGllc3BvcnRpdm8gTWFjZWnDs5IBGGdlbmVyYWxfZWR1Y2F0aW9uX3NjaG9vbOABAA!16s%2Fg%2F11btwrds9d?entry=tts";
 const WHATSAPP_ORGANIZACAO = "5582996210019";
@@ -1814,6 +1825,11 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes }) {
   const isAdmin = sessao && sessao.tipo === "admin";
   const podeAcessar = sessao && (isAdmin || sessao.representanteAprovado);
   const turmaFixa = !isAdmin && sessao ? sessao.turma || "" : "";
+  // Lista pública "Times já inscritos" só mostra quem de fato concluiu a
+  // inscrição (pagamento confirmado) — times aprovados mas ainda sem
+  // pagamento continuam usando `teams` normalmente no resto do formulário
+  // (validação de turma duplicada etc.), só não aparecem aqui como inscritos.
+  const timesConfirmados = teams.filter(timeInscritoOficialmente);
 
   const montarEstadoInicial = () => {
     const turmaAlvo = isAdmin ? "" : turmaFixa;
@@ -2362,15 +2378,15 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes }) {
               className="text-xs font-semibold uppercase tracking-wide mb-3"
               style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
             >
-              Times já inscritos ({teams.length})
+              Times já inscritos ({timesConfirmados.length})
             </div>
-            {teams.length === 0 ? (
+            {timesConfirmados.length === 0 ? (
               <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
                 Nenhum time inscrito ainda. Seja o primeiro time da {EDITION_ROMAN} edição.
               </p>
             ) : (
               <ul className="space-y-2 max-h-80 overflow-y-auto">
-                {teams.map((t) => (
+                {timesConfirmados.map((t) => (
                   <li
                     key={t.id}
                     className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg"
@@ -8530,6 +8546,12 @@ export default function App() {
   const loading =
     loadingTeams || loadingMatches || loadingPosts || loadingAdminRequests || loadingSorteio || loadingConfig || loadingAvaliacoes || checandoSessao;
 
+  // Times com inscrição de fato concluída (aprovados e com pagamento
+  // confirmado) — é essa lista que aparece nas telas públicas/oficiais
+  // (Início, Sorteio, Classificação). Times ainda não pagos continuam
+  // visíveis inteiramente na Organização, que precisa vê-los pra cobrar.
+  const teamsInscritos = useMemo(() => teams.filter(timeInscritoOficialmente), [teams]);
+
   // Registra 1 acesso por abertura do app — só uma vez por sessão aberta.
   useEffect(() => {
     if (acessoRegistradoRef.current) return;
@@ -8751,17 +8773,17 @@ export default function App() {
           </div>
         ) : (
           <>
-            {tab === "inicio" && <Home teams={teams} matches={matches} setTab={setTab} config={config} totalPessoas={totalPessoas} />}
+            {tab === "inicio" && <Home teams={teamsInscritos} matches={matches} setTab={setTab} config={config} totalPessoas={totalPessoas} />}
             {tab === "inscricao" && (
               <Inscricao teams={teams} saveTeams={saveTeams} sessao={sessao} avaliacoes={avaliacoes} saveAvaliacoes={saveAvaliacoes} />
             )}
             {tab === "sorteio" && (
-              <Sorteio teams={teams} sorteio={sorteio} saveSorteio={saveSorteio} matches={matches} saveMatches={saveMatches} sessao={sessao} />
+              <Sorteio teams={teamsInscritos} sorteio={sorteio} saveSorteio={saveSorteio} matches={matches} saveMatches={saveMatches} sessao={sessao} />
             )}
             {tab === "chaveamento" && (
               <Chaveamento matches={matches} teams={teams} sessao={sessao} saveMatches={saveMatches} />
             )}
-            {tab === "classificacao" && <Classificacao matches={matches} teams={teams} />}
+            {tab === "classificacao" && <Classificacao matches={matches} teams={teamsInscritos} />}
             {tab === "comunidade" && <Comunidade posts={posts} savePosts={savePosts} />}
             {tab === "galeria" && <Galeria config={config} />}
             {tab === "organizacao" && (
