@@ -110,6 +110,11 @@ export async function promoverParaAdmin(userId, email) {
   if (error) throw error;
 }
 
+export async function removerAdmin(userId) {
+  const { error } = await supabase.from("admins").delete().eq("user_id", userId);
+  if (error) throw error;
+}
+
 // ---------------------------------------------------------------------
 // Armazenamento de fotos e vídeos (Supabase Storage) — bucket PRIVADO:
 // só quem tem login consegue subir ou ver. Como não é mais público, não

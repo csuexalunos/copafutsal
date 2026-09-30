@@ -36,7 +36,7 @@ import { jsPDF } from "jspdf";
 import {
   readKey, writeKey, cadastrarConta, entrarConta, sairConta, sessaoAtual, aoMudarSessao,
   criarPerfil, buscarPerfil, listarPerfis, atualizarPerfil, souAdmin, listarAdmins,
-  promoverParaAdmin, subirArquivo, urlAssinada, contarPessoasInscritas, buscarCpfsDaTurma,
+  promoverParaAdmin, removerAdmin, subirArquivo, urlAssinada, contarPessoasInscritas, buscarCpfsDaTurma,
   registrarAcesso, contarAcessos, esqueciSenha, definirNovaSenha, supabase,
   buscarCpfsDoTime, salvarCpfJogador, salvarCpfsEmLote, excluirCpfsDoJogador,
 } from "./lib/supabase.js";
@@ -7619,6 +7619,26 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
     }
   };
 
+  const [removendoAdminId, setRemovendoAdminId] = useState(null);
+
+  const removerAcessoAdmin = async (admin) => {
+    if (admin.user_id === sessao.id) {
+      alert("Você não pode remover seu próprio acesso de admin por aqui.");
+      return;
+    }
+    if (!window.confirm(`Remover o acesso de admin de ${admin.email}?`)) return;
+    setRemovendoAdminId(admin.user_id);
+    try {
+      await removerAdmin(admin.user_id);
+      setListaAdmins(await listarAdmins());
+    } catch (err) {
+      console.error("Falha ao remover admin:", err);
+      alert("Não consegui remover essa pessoa: " + err.message);
+    } finally {
+      setRemovendoAdminId(null);
+    }
+  };
+
   const recusarSolicitacao = async (req) => {
     await saveAdminRequests(adminRequests.map((r) => (r.id === req.id ? { ...r, status: "recusado" } : r)));
   };
@@ -8160,6 +8180,47 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
               {promovendo ? "Tornando admin..." : "Tornar admin"}
             </button>
           </form>
+
+          {listaAdmins.length > 0 && (
+            <div className="mt-5 pt-4" style={{ borderTop: `1px solid ${COLORS.border}` }}>
+              <h4 className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                Administradores atuais ({listaAdmins.length})
+              </h4>
+              <ul className="space-y-2">
+                {listaAdmins.map((a) => {
+                  const perfil = perfis.find((p) => (p.email || "").trim().toLowerCase() === (a.email || "").trim().toLowerCase());
+                  const souEu = a.user_id === sessao.id;
+                  return (
+                    <li
+                      key={a.user_id}
+                      className="flex items-center justify-between gap-3 text-sm px-3 py-2 rounded-lg"
+                      style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate font-medium">
+                          {perfil?.nome || a.email} {souEu && <span style={{ color: COLORS.slate }}>(você)</span>}
+                        </div>
+                        <div className="text-xs truncate" style={{ color: COLORS.slate }}>
+                          {a.email} · {a.super_admin ? "Super admin" : "Admin"}
+                        </div>
+                      </div>
+                      {!souEu && (
+                        <button
+                          type="button"
+                          onClick={() => removerAcessoAdmin(a)}
+                          disabled={removendoAdminId === a.user_id}
+                          className="text-xs font-semibold shrink-0 disabled:opacity-60"
+                          style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+                        >
+                          {removendoAdminId === a.user_id ? "Removendo..." : "Remover acesso"}
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
         </div>
       )}
 
