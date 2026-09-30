@@ -7892,7 +7892,7 @@ const GRUPOS_ORGANIZACAO = [
 
 function SubAbasOrganizacao({ abas, ativa, onMudar }) {
   return (
-    <div className="flex flex-wrap gap-2 mb-5">
+    <div className="flex flex-nowrap gap-2 mb-5 overflow-x-auto -mx-1 px-1" style={{ scrollbarWidth: "none" }}>
       {abas.map((a) => {
         const selecionada = ativa === a.chave;
         return (
@@ -7900,7 +7900,7 @@ function SubAbasOrganizacao({ abas, ativa, onMudar }) {
             key={a.chave}
             type="button"
             onClick={() => onMudar(a.chave)}
-            className="px-3.5 py-1.5 rounded-full text-xs font-semibold transition-colors inline-flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded-full text-xs font-semibold transition-colors inline-flex items-center gap-1.5 shrink-0 whitespace-nowrap"
             style={{
               backgroundColor: selecionada ? COLORS.ink : COLORS.chipSoft,
               color: selecionada ? COLORS.bg : COLORS.ink,
@@ -8118,8 +8118,6 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
       cancelado = true;
     };
   }, [secaoAtiva]);
-  const jaMarcouVistoRef = React.useRef(false);
-
   useEffect(() => {
     if (!souAdminLogado) return;
     let cancelado = false;
@@ -8130,25 +8128,6 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
           setPerfis(p);
           setListaAdmins(a);
           setCarregandoPainel(false);
-
-          // Marca como "visto" alguns segundos depois de abrir a página —
-          // dá tempo da pessoa reparar no selinho "Novo" antes dele sumir.
-          // Só faz isso uma vez por sessão aberta, pra quem chegar depois
-          // (durante a mesma sessão) continuar aparecendo como novo.
-          if (!jaMarcouVistoRef.current) {
-            jaMarcouVistoRef.current = true;
-            const naoVistos = p.filter((x) => x.status !== "aprovado" && !x.visualizado);
-            if (naoVistos.length > 0) {
-              setTimeout(async () => {
-                try {
-                  await Promise.all(naoVistos.map((x) => atualizarPerfil(x.id, { visualizado: true })));
-                  setPerfis((atual) => atual.map((x) => (naoVistos.some((n) => n.id === x.id) ? { ...x, visualizado: true } : x)));
-                } catch (e) {
-                  console.error("Falha ao marcar inscritos como vistos", e);
-                }
-              }, 4000);
-            }
-          }
         }
       } catch (e) {
         console.error("Falha ao carregar painel de organização", e);
@@ -8162,6 +8141,26 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
       clearInterval(id);
     };
   }, [souAdminLogado]);
+
+  // Marca os inscritos pendentes como "vistos" alguns segundos depois da
+  // pessoa realmente abrir a sub-aba "Inscritos" — é só aí que o selinho
+  // "Novo" (e a contagem na pílula da sub-aba) deve sumir, não assim que
+  // o admin entra na Organização de um jeito geral.
+  useEffect(() => {
+    if (secaoAtiva !== "pessoas" || subAbaPessoas !== "inscritos") return;
+    const naoVistos = perfis.filter((x) => x.status !== "aprovado" && x.status !== "recusado" && !x.visualizado);
+    if (naoVistos.length === 0) return;
+    const t = setTimeout(async () => {
+      try {
+        await Promise.all(naoVistos.map((x) => atualizarPerfil(x.id, { visualizado: true })));
+        setPerfis((atual) => atual.map((x) => (naoVistos.some((n) => n.id === x.id) ? { ...x, visualizado: true } : x)));
+      } catch (e) {
+        console.error("Falha ao marcar inscritos como vistos", e);
+      }
+    }, 4000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [secaoAtiva, subAbaPessoas]);
 
   const [reqNome, setReqNome] = useState("");
   const [reqEmail, setReqEmail] = useState("");
@@ -8542,7 +8541,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
       {secaoAtiva === "pessoas" && (
       <>
       {(() => {
-        const pendentesCount = perfis.filter((p) => p.status !== "aprovado" && p.status !== "recusado").length;
+        const pendentesCount = perfis.filter((p) => p.status !== "aprovado" && p.status !== "recusado" && !p.visualizado).length;
         const solicitacoesCount = adminRequests.filter((r) => r.status === "pendente").length;
         const abas = [
           { chave: "inscritos", titulo: "Inscritos", contagem: pendentesCount },
