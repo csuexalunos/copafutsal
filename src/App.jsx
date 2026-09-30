@@ -7896,33 +7896,42 @@ const GRUPOS_ORGANIZACAO = [
 
 function SubAbasOrganizacao({ abas, ativa, onMudar }) {
   return (
-    <div className="flex flex-nowrap gap-2 mb-5 overflow-x-auto -mx-1 px-1" style={{ scrollbarWidth: "none" }}>
-      {abas.map((a) => {
+    <div
+      className="rounded-2xl overflow-hidden mb-5"
+      style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
+    >
+      {abas.map((a, i) => {
         const selecionada = ativa === a.chave;
         return (
           <button
             key={a.chave}
             type="button"
             onClick={() => onMudar(a.chave)}
-            className="px-3 py-1.5 rounded-full text-xs font-semibold transition-colors inline-flex items-center gap-1.5 shrink-0 whitespace-nowrap"
+            className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left text-sm font-semibold transition-colors"
             style={{
-              backgroundColor: selecionada ? COLORS.ink : COLORS.chipSoft,
-              color: selecionada ? COLORS.bg : COLORS.ink,
+              backgroundColor: selecionada ? COLORS.chipSoft : "transparent",
+              color: COLORS.ink,
               fontFamily: "'Inter', sans-serif",
+              borderTop: i === 0 ? "none" : `1px solid ${COLORS.border}`,
+              borderLeft: `3px solid ${selecionada ? COLORS.accent : "transparent"}`,
             }}
           >
-            {a.titulo}
-            {a.contagem > 0 && (
-              <span
-                className="min-w-[17px] h-[17px] px-1 rounded-full flex items-center justify-center text-[10px] font-bold"
-                style={{
-                  backgroundColor: selecionada ? COLORS.bg : "#EF4444",
-                  color: selecionada ? COLORS.ink : "#FFFFFF",
-                }}
-              >
-                {a.contagem > 99 ? "99+" : a.contagem}
-              </span>
-            )}
+            <span className="flex items-center gap-2">
+              {a.titulo}
+              {a.contagem > 0 && (
+                <span
+                  className="min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
+                  style={{ backgroundColor: "#EF4444", color: "#FFFFFF" }}
+                >
+                  {a.contagem > 99 ? "99+" : a.contagem}
+                </span>
+              )}
+            </span>
+            <ChevronDown
+              size={15}
+              color={COLORS.slate}
+              style={{ transform: selecionada ? "rotate(180deg)" : "rotate(-90deg)", transition: "transform 0.15s" }}
+            />
           </button>
         );
       })}
@@ -8030,7 +8039,7 @@ function HubOrganizacao({ souSuperAdmin, onAbrir, badges }) {
   );
 }
 
-function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, saveAdminRequests, sessao, config, saveConfig, avaliacoes, saveAvaliacoes, sorteio, saveSorteio, posts, savePosts }) {
+function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, saveAdminRequests, sessao, config, saveConfig, avaliacoes, saveAvaliacoes, sorteio, saveSorteio, posts, savePosts, perfis, setPerfis }) {
   const souAdminLogado = sessao && sessao.tipo === "admin";
   const souSuperAdmin = souAdminLogado && sessao.superAdmin;
 
@@ -8065,7 +8074,6 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
     }
   };
 
-  const [perfis, setPerfis] = useState([]);
   const [listaAdmins, setListaAdmins] = useState([]);
   const [carregandoPainel, setCarregandoPainel] = useState(true);
   const [buscaInscritos, setBuscaInscritos] = useState("");
@@ -8079,7 +8087,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   const abrirSecaoOrganizacao = (chave) => {
     setSecaoAtiva(chave);
     if (chave === "pessoas") {
-      const temInscritoNovo = perfis.some((p) => p.status === "pendente" && !p.visualizado);
+      const temInscritoNovo = perfis.some((p) => p.status !== "aprovado" && p.status !== "recusado" && !p.visualizado);
       const temSolicitacao = souSuperAdmin && adminRequests.some((r) => r.status === "pendente");
       setSubAbaPessoas(temInscritoNovo ? "inscritos" : temSolicitacao ? "admins" : "inscritos");
     }
@@ -8146,14 +8154,15 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
       cancelado = true;
     };
   }, [secaoAtiva]);
+  // "perfis" vem de props (App carrega e mantém atualizado pro topo do
+  // app e pra cá lerem o mesmo dado) — aqui só busca a lista de admins.
   useEffect(() => {
     if (!souAdminLogado) return;
     let cancelado = false;
     const carregar = async () => {
       try {
-        const [p, a] = await Promise.all([listarPerfis(), listarAdmins()]);
+        const a = await listarAdmins();
         if (!cancelado) {
-          setPerfis(p);
           setListaAdmins(a);
           setCarregandoPainel(false);
         }
@@ -8528,7 +8537,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
           onAbrir={abrirSecaoOrganizacao}
           badges={{
             pessoas:
-              perfis.filter((p) => p.status === "pendente" && !p.visualizado).length +
+              perfis.filter((p) => p.status !== "aprovado" && p.status !== "recusado" && !p.visualizado).length +
               (souSuperAdmin ? adminRequests.filter((r) => r.status === "pendente").length : 0),
             times:
               avaliacoes.filter((a) => a.status === "pendente").length +
@@ -9398,7 +9407,7 @@ export default function App() {
   const [config, saveConfig, loadingConfig] = useSharedStorage("copasu:config", {}, 10000);
   const [avaliacoes, saveAvaliacoes, loadingAvaliacoes] = useSharedStorage("copasu:avaliacoes", [], 8000);
   const [totalPessoas, setTotalPessoas] = useState(0);
-  const [pessoasPendentesCount, setPessoasPendentesCount] = useState(0);
+  const [perfis, setPerfis] = useState([]);
   const acessoRegistradoRef = React.useRef(false);
   const [fabBusy, setFabBusy] = useState(false);
   const [fabDone, setFabDone] = useState(false);
@@ -9427,31 +9436,29 @@ export default function App() {
     registrarEvento("aba", tab).catch((e) => console.error("Falha ao registrar evento de aba", e));
   }, [tab]);
 
-  // Contagem de inscritos pendentes (ainda não vistos) — só pra quem é
-  // admin. Alimenta o selinho de notificação da aba Organização, que
-  // precisa bater com o mesmo número mostrado dentro da Organização
-  // (senão a notificação chega mas ninguém acha o que mudou).
+  // Lista de perfis (inscritos/representantes) — carregada aqui, no topo,
+  // e passada pra Organização como prop, em vez de cada um buscar a sua
+  // cópia separada. Antes o selinho do topo e o de dentro da Organização
+  // vinham de buscas independentes e podiam ficar fora de sincronia por
+  // segundos (um já marcado como visto, o outro ainda não).
   useEffect(() => {
     if (!sessao || sessao.tipo !== "admin") return;
     let cancelado = false;
     const buscar = () => {
       listarPerfis()
         .then((p) => {
-          if (!cancelado) {
-            setPessoasPendentesCount(
-              (p || []).filter((x) => x.status !== "aprovado" && x.status !== "recusado" && !x.visualizado).length
-            );
-          }
+          if (!cancelado) setPerfis(p || []);
         })
-        .catch((e) => console.error("Falha ao contar inscritos pendentes", e));
+        .catch((e) => console.error("Falha ao buscar perfis", e));
     };
     buscar();
-    const id = setInterval(buscar, 15000);
+    const id = setInterval(buscar, 8000);
     return () => {
       cancelado = true;
       clearInterval(id);
     };
   }, [sessao]);
+  const pessoasPendentesCount = perfis.filter((x) => x.status !== "aprovado" && x.status !== "recusado" && !x.visualizado).length;
 
   // Contagem pública de pessoas cadastradas — atualiza sozinha de tempos
   // em tempos, igual o resto dos dados compartilhados.
@@ -9696,6 +9703,8 @@ export default function App() {
                 saveSorteio={saveSorteio}
                 posts={posts}
                 savePosts={savePosts}
+                perfis={perfis}
+                setPerfis={setPerfis}
               />
             )}
           </>
