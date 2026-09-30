@@ -217,3 +217,18 @@ export async function contarAcessos() {
   if (error) throw error;
   return data || 0;
 }
+
+// Métricas detalhadas — abas mais acessadas, links mais clicados e
+// compartilhamentos. "registrarEvento" é chamado por qualquer visitante
+// (sem precisar de login); "buscarMetricasDetalhadas" só funciona pra
+// quem é admin (a função no banco confere isso por dentro dela mesma).
+export async function registrarEvento(tipo, detalhe) {
+  const { error } = await supabase.rpc("registrar_evento", { p_tipo: tipo, p_detalhe: detalhe || null });
+  if (error) throw error;
+}
+
+export async function buscarMetricasDetalhadas() {
+  const { data, error } = await supabase.rpc("metricas_detalhadas");
+  if (error) throw error;
+  return data;
+}

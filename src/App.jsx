@@ -32,13 +32,15 @@ import {
   Heart,
   Send,
   RotateCcw,
+  Share2,
+  MousePointerClick,
 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import {
   readKey, writeKey, cadastrarConta, entrarConta, sairConta, sessaoAtual, aoMudarSessao,
   criarPerfil, buscarPerfil, listarPerfis, atualizarPerfil, souAdmin, listarAdmins,
   promoverParaAdmin, removerAdmin, subirArquivo, urlAssinada, contarPessoasInscritas, buscarCpfsDaTurma,
-  registrarAcesso, contarAcessos, esqueciSenha, definirNovaSenha, supabase,
+  registrarAcesso, contarAcessos, registrarEvento, buscarMetricasDetalhadas, esqueciSenha, definirNovaSenha, supabase,
   buscarCpfsDoTime, salvarCpfJogador, salvarCpfsEmLote, excluirCpfsDoJogador,
 } from "./lib/supabase.js";
 
@@ -58,7 +60,7 @@ const WHATSAPP_CONFIRMACAO_PAGAMENTO = "+55 82 9946-2611";
 const PIX_CHAVE_TEXTO = "12.516.746/0001-31 (CNPJ do Colégio Santa Úrsula)";
 
 // ---------------------------------------------------------------------------
-// Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula — 8ª Edição
+// Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula — IX Edição
 // Redesign limpo e moderno: navy como base, laranja como único acento vivo,
 // muito branco, cartões com sombra suave em vez de blocos de cor pesados.
 // ---------------------------------------------------------------------------
@@ -1048,8 +1050,26 @@ function ModalElencoTime({ team, onClose }) {
 function Home({ teams, matches, setTab, config, totalPessoas }) {
   const dataEventoTexto = (config && config.dataEvento) || DATA_EVENTO;
   const prazoInscricaoTexto = (config && config.prazoInscricao) || PRAZO_INSCRICAO;
+  const [compartilhado, setCompartilhado] = useState(false);
+
+  const compartilharApp = async () => {
+    const url = window.location.href;
+    const texto = "Copa de Ex-Alunos de Futsal do Santa Úrsula — inscreva seu time e acompanhe os jogos!";
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Copa de Ex-Alunos de Futsal", text: texto, url });
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(url);
+        setCompartilhado(true);
+        setTimeout(() => setCompartilhado(false), 2500);
+      }
+      registrarEvento("compartilhamento", "home").catch((e) => console.error("Falha ao registrar compartilhamento", e));
+    } catch (e) {
+      // Cancelou o compartilhamento nativo — não é erro, não faz nada.
+    }
+  };
   const menuItems = [
-    { id: "inscricao", label: "Inscrição", desc: "Inscreva seu time para a 8ª edição", icon: Users },
+    { id: "inscricao", label: "Inscrição", desc: `Inscreva seu time para a ${EDITION}ª edição`, icon: Users },
     { id: "sorteio", label: "Sorteio", desc: "Potes e grupos da edição", icon: Dices },
     { id: "chaveamento", label: "Jogos ao Vivo", desc: "Todos os confrontos, horários e placares em tempo real", icon: Swords },
     { id: "classificacao", label: "Classificação", desc: "Tabela, resultados e saldo de gols", icon: ListOrdered },
@@ -1081,7 +1101,7 @@ function Home({ teams, matches, setTab, config, totalPessoas }) {
             Copa de Ex-Alunos de Futsal
           </h1>
           <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-            Colégio Santa Úrsula · 8ª edição
+            Colégio Santa Úrsula · {EDITION}ª edição
           </p>
         </div>
       </div>
@@ -1090,9 +1110,18 @@ function Home({ teams, matches, setTab, config, totalPessoas }) {
         className="text-sm leading-relaxed mb-4 max-w-xl"
         style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
       >
-        Oito edições de reencontro entre quem passou pelo Santa Úrsula. Inscreva o seu
+        {EDITION}ª edição de reencontro entre quem passou pelo Santa Úrsula. Inscreva o seu
         time, acompanhe o chaveamento e siga a classificação em tempo real.
       </p>
+
+      <button
+        type="button"
+        onClick={compartilharApp}
+        className="inline-flex items-center gap-1.5 text-xs font-semibold mb-6 px-3 py-1.5 rounded-full"
+        style={{ backgroundColor: COLORS.chipSoft, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+      >
+        <Share2 size={13} /> {compartilhado ? "Link copiado!" : "Compartilhar"}
+      </button>
 
       <div
         className="flex flex-wrap gap-x-6 gap-y-1 mb-6 rounded-xl px-4 py-3"
@@ -1124,6 +1153,7 @@ function Home({ teams, matches, setTab, config, totalPessoas }) {
           href={config.linkTransmissao}
           target="_blank"
           rel="noreferrer"
+          onClick={() => registrarEvento("clique", "transmissao_ao_vivo").catch((e) => console.error("Falha ao registrar clique", e))}
           className="flex items-center gap-3 mb-3 rounded-xl px-4 py-3.5"
           style={{ backgroundColor: COLORS.navy }}
         >
@@ -1149,6 +1179,7 @@ function Home({ teams, matches, setTab, config, totalPessoas }) {
         href={LOCAL_MAPS_LINK}
         target="_blank"
         rel="noreferrer"
+        onClick={() => registrarEvento("clique", "local_mapa").catch((e) => console.error("Falha ao registrar clique", e))}
         className="flex items-center gap-3 mb-6 rounded-xl px-4 py-3.5"
         style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
       >
@@ -7649,7 +7680,7 @@ function LoginGate({ onLogin }) {
             Copa de Ex-Alunos de Futsal
           </h1>
           <p className="text-sm mt-1" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-            Colégio Santa Úrsula · 8ª edição
+            Colégio Santa Úrsula · {EDITION}ª edição
           </p>
         </div>
 
@@ -7842,6 +7873,58 @@ function SubAbasOrganizacao({ abas, ativa, onMudar }) {
   );
 }
 
+const ROTULOS_CLIQUES = {
+  transmissao_ao_vivo: "Transmissão ao vivo",
+  local_mapa: "Local no mapa",
+};
+const ROTULOS_COMPARTILHAMENTOS = {
+  home: "Página inicial",
+};
+
+function RankingMetricas({ titulo, icone: Icone, itens, rotular, vazio }) {
+  const total = (itens || []).reduce((soma, i) => soma + Number(i.total || 0), 0);
+  const maior = (itens || []).reduce((m, i) => Math.max(m, Number(i.total || 0)), 0);
+  return (
+    <div
+      className="rounded-2xl p-5 mb-5"
+      style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
+    >
+      <h4 className="font-semibold mb-3 flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+        {Icone && <Icone size={15} color={COLORS.accent} />} {titulo}
+      </h4>
+      {!itens || itens.length === 0 ? (
+        <p className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+          {vazio || "Ainda sem dados."}
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {itens.map((item) => {
+            const pct = maior > 0 ? Math.max(6, Math.round((Number(item.total || 0) / maior) * 100)) : 0;
+            return (
+              <li key={item.nome} className="text-sm" style={{ fontFamily: "'Inter', sans-serif" }}>
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <span style={{ color: COLORS.ink }}>{rotular ? rotular(item.nome) : item.nome}</span>
+                  <span className="font-mono text-xs shrink-0" style={{ color: COLORS.slate }}>
+                    {Number(item.total || 0).toLocaleString("pt-BR")}
+                  </span>
+                </div>
+                <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: COLORS.zebra }}>
+                  <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: COLORS.accent }} />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {total > 0 && (
+        <p className="text-[11px] mt-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+          {total.toLocaleString("pt-BR")} no total
+        </p>
+      )}
+    </div>
+  );
+}
+
 function HubOrganizacao({ souSuperAdmin, onAbrir, badges }) {
   const grupos = GRUPOS_ORGANIZACAO.filter((g) => !g.soSuperAdmin || souSuperAdmin);
   return (
@@ -7947,6 +8030,8 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   const [verRecusadosInscritos, setVerRecusadosInscritos] = useState(false);
   const [verPendentesAntigos, setVerPendentesAntigos] = useState(false);
   const [acessos, setAcessos] = useState(null);
+  const [metricas, setMetricas] = useState(null);
+  const [carregandoMetricas, setCarregandoMetricas] = useState(false);
 
   useEffect(() => {
     if (!souAdminLogado) return;
@@ -7960,6 +8045,26 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
       cancelado = true;
     };
   }, [souAdminLogado]);
+
+  // Métricas detalhadas (abas, cliques, compartilhamentos) só busca
+  // quando a pessoa realmente abre "Sistema" — é uma consulta mais pesada
+  // que a contagem simples de acessos.
+  useEffect(() => {
+    if (secaoAtiva !== "sistema") return;
+    let cancelado = false;
+    setCarregandoMetricas(true);
+    buscarMetricasDetalhadas()
+      .then((m) => {
+        if (!cancelado) setMetricas(m);
+      })
+      .catch((e) => console.error("Falha ao buscar métricas detalhadas", e))
+      .finally(() => {
+        if (!cancelado) setCarregandoMetricas(false);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [secaoAtiva]);
   const jaMarcouVistoRef = React.useRef(false);
 
   useEffect(() => {
@@ -9058,19 +9163,104 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
       )}
 
       {secaoAtiva === "sistema" && (
-      <div
-        className="rounded-2xl p-5 mt-8"
-        style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
-      >
-        <h3 className="font-semibold mb-1" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
-          Métricas do app
-        </h3>
-        <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-          Total de vezes que o app foi aberto (não é visitante único, é toda vez que alguém entra).
-        </p>
-        <div className="text-3xl font-bold" style={{ color: COLORS.accent, fontFamily: "'JetBrains Mono', monospace" }}>
-          {acessos === null ? "—" : acessos.toLocaleString("pt-BR")}
+      <div className="mt-8">
+        <div
+          className="rounded-2xl p-5 mb-5"
+          style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
+        >
+          <h3 className="font-semibold mb-3" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+            Métricas do app
+          </h3>
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <div className="text-2xl font-bold" style={{ color: COLORS.accent, fontFamily: "'JetBrains Mono', monospace" }}>
+                {acessos === null ? "—" : acessos.toLocaleString("pt-BR")}
+              </div>
+              <div className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                Acessos ao app
+              </div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold" style={{ color: COLORS.accent, fontFamily: "'JetBrains Mono', monospace" }}>
+                {carregandoMetricas ? "—" : (metricas?.cliquesTotais ?? 0).toLocaleString("pt-BR")}
+              </div>
+              <div className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                Cliques em links
+              </div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold" style={{ color: COLORS.accent, fontFamily: "'JetBrains Mono', monospace" }}>
+                {carregandoMetricas ? "—" : (metricas?.compartilhamentosTotais ?? 0).toLocaleString("pt-BR")}
+              </div>
+              <div className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                Compartilhamentos
+              </div>
+            </div>
+          </div>
+          <p className="text-[11px] mt-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            "Acessos" conta toda vez que alguém abre o app (não é visitante único).
+          </p>
         </div>
+
+        {carregandoMetricas && !metricas ? (
+          <div className="flex items-center gap-2 text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            <Loader2 size={14} className="animate-spin" /> Carregando métricas...
+          </div>
+        ) : (
+          <>
+            <RankingMetricas
+              titulo="Abas mais acessadas"
+              icone={MousePointerClick}
+              itens={metricas?.abas}
+              rotular={(chave) => TABS.find((t) => t.id === chave)?.label || chave}
+              vazio="Ainda sem visitas registradas."
+            />
+            <RankingMetricas
+              titulo="Links mais clicados"
+              icone={ArrowRight}
+              itens={metricas?.cliques}
+              rotular={(chave) => ROTULOS_CLIQUES[chave] || chave}
+              vazio="Ainda sem cliques registrados."
+            />
+            <RankingMetricas
+              titulo="De onde vieram os compartilhamentos"
+              icone={Share2}
+              itens={metricas?.compartilhamentos}
+              rotular={(chave) => ROTULOS_COMPARTILHAMENTOS[chave] || chave}
+              vazio="Ainda ninguém compartilhou pelo botão do app."
+            />
+            {metricas?.acessosUltimos7Dias && metricas.acessosUltimos7Dias.length > 0 && (
+              <div
+                className="rounded-2xl p-5"
+                style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
+              >
+                <h4 className="font-semibold mb-3" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+                  Acessos nos últimos 7 dias
+                </h4>
+                <div className="flex items-end gap-2 h-24">
+                  {metricas.acessosUltimos7Dias.map((d) => {
+                    const maxDia = Math.max(...metricas.acessosUltimos7Dias.map((x) => Number(x.total || 0)), 1);
+                    const altura = Math.max(6, Math.round((Number(d.total || 0) / maxDia) * 100));
+                    return (
+                      <div key={d.data} className="flex-1 flex flex-col items-center gap-1">
+                        <div className="w-full flex items-end" style={{ height: "72px" }}>
+                          <div
+                            className="w-full rounded-t-md"
+                            style={{ height: `${altura}%`, backgroundColor: COLORS.accent }}
+                            title={`${d.total} acessos`}
+                          />
+                        </div>
+                        <span className="text-[10px]" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                          {d.data}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
       )}
     </div>
@@ -9123,7 +9313,14 @@ export default function App() {
     if (acessoRegistradoRef.current) return;
     acessoRegistradoRef.current = true;
     registrarAcesso().catch((e) => console.error("Falha ao registrar acesso", e));
+    registrarEvento("acesso", null).catch((e) => console.error("Falha ao registrar evento de acesso", e));
   }, []);
+
+  // Registra qual aba está aberta sempre que ela muda — é isso que
+  // alimenta o ranking de "aba mais acessada" nas Métricas do app.
+  useEffect(() => {
+    registrarEvento("aba", tab).catch((e) => console.error("Falha ao registrar evento de aba", e));
+  }, [tab]);
 
   // Contagem pública de pessoas cadastradas — atualiza sozinha de tempos
   // em tempos, igual o resto dos dados compartilhados.
