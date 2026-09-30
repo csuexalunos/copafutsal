@@ -4268,6 +4268,59 @@ async function enviarEmailAprovacaoTime(team, emailDestino) {
 }
 
 // ---------------------------------------------------------------------------
+// E-mail avisando que a pessoa virou admin (organizador) do app — disparado
+// tanto na promoção direta por e-mail quanto na aprovação de uma
+// solicitação pra virar organizador.
+// ---------------------------------------------------------------------------
+async function enviarEmailNovoAdmin(emailDestino, nomeDestino) {
+  const assunto = "Você agora é organizador(a) da Copa CSU";
+  const htmlContent = envelopeHtmlEmail(`
+    <div style="font-family: Arial, Helvetica, sans-serif; color: #12203D; max-width: 560px; margin: 0 auto; padding: 24px 16px;">
+      <h2 style="color: #12203D;">Você agora é organizador(a)! 🛡️</h2>
+      <p>Olá${nomeDestino ? ", " + nomeDestino : ""}!</p>
+      <p>
+        Você recebeu acesso de <strong>organizador(a)</strong> no app da Copa de Ex-Alunos de
+        Futsal do Colégio Santa Úrsula. Com isso, você pode entrar no app e usar a aba
+        <strong>Organização</strong> — aprovar times, lançar jogos e resultados, gerenciar
+        inscritos e mais.
+      </p>
+      <p style="text-align: center; margin: 28px 0;">
+        <a href="${LINK_SITE_INSCRICAO}"
+           style="background-color: #FF6B35; color: #FFFFFF; text-decoration: none; font-weight: bold; padding: 12px 24px; border-radius: 8px; display: inline-block;">
+          Entrar no app
+        </a>
+      </p>
+      <p style="font-size: 13px; color: #667085;">
+        Entre com o e-mail e senha que você já usa no app. Se o botão não funcionar, copie e
+        cole este link no navegador:<br />
+        <a href="${LINK_SITE_INSCRICAO}">${LINK_SITE_INSCRICAO}</a>
+      </p>
+      <p>Qualquer dúvida, fale com quem te deu esse acesso.</p>
+      <p>Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula</p>
+    </div>
+  `);
+  const textContent =
+    `Você agora é organizador(a)!\n\n` +
+    `Olá${nomeDestino ? ", " + nomeDestino : ""}!\n\n` +
+    `Você recebeu acesso de organizador(a) no app da Copa de Ex-Alunos de Futsal do Colégio ` +
+    `Santa Úrsula. Com isso, você pode entrar no app e usar a aba Organização — aprovar times, ` +
+    `lançar jogos e resultados, gerenciar inscritos e mais.\n\n` +
+    `Entre no app por aqui: ${LINK_SITE_INSCRICAO}\n\n` +
+    `Entre com o e-mail e senha que você já usa no app.\n\n` +
+    `Qualquer dúvida, fale com quem te deu esse acesso.\n\n` +
+    `Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula
+
+(Não achou este e-mail na caixa de entrada? Confira a pasta de spam/lixo eletrônico.)`;
+  return chamarEnvioDeEmail({
+    destinatarioEmail: emailDestino.trim(),
+    destinatarioNome: nomeDestino,
+    assunto,
+    htmlContent,
+    textContent,
+  });
+}
+
+// ---------------------------------------------------------------------------
 // E-mail de lembrete de pagamento — pro time já aprovado que ainda não
 // finalizou o pagamento. Mesma ficha em PDF e mesmo link do e-mail de
 // aprovação, só muda o tom (foco em "falta pagar", não "você foi aprovado").
@@ -8152,6 +8205,12 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
     await saveAdminRequests(adminRequests.map((r) => (r.id === req.id ? { ...r, status: "aprovado" } : r)));
     setListaAdmins(await listarAdmins());
     setUltimaSenhaGerada(null);
+    try {
+      await enviarEmailNovoAdmin(alvo.email, alvo.nome);
+    } catch (err) {
+      console.error("Falha ao enviar e-mail de novo admin:", err);
+      alert(`${alvo.nome || alvo.email} virou admin, mas não consegui avisar por e-mail: ${err.message}`);
+    }
   };
 
   const [emailNovoAdmin, setEmailNovoAdmin] = useState("");
@@ -8173,7 +8232,13 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
       await promoverParaAdmin(alvo.id, alvo.email);
       setListaAdmins(await listarAdmins());
       setEmailNovoAdmin("");
-      alert(`${alvo.nome || alvo.email} agora é admin.`);
+      try {
+        await enviarEmailNovoAdmin(alvo.email, alvo.nome);
+        alert(`${alvo.nome || alvo.email} agora é admin. Um e-mail avisando foi enviado.`);
+      } catch (errEmail) {
+        console.error("Falha ao enviar e-mail de novo admin:", errEmail);
+        alert(`${alvo.nome || alvo.email} agora é admin, mas não consegui avisar por e-mail: ${errEmail.message}`);
+      }
     } catch (err) {
       console.error("Falha ao promover admin:", err);
       alert("Não consegui tornar essa pessoa admin: " + err.message);
