@@ -7806,6 +7806,42 @@ const GRUPOS_ORGANIZACAO = [
   { chave: "sistema", titulo: "Sistema", subtitulo: "Métricas de acesso ao app", icone: BarChart3 },
 ];
 
+function SubAbasOrganizacao({ abas, ativa, onMudar }) {
+  return (
+    <div className="flex flex-wrap gap-2 mb-5">
+      {abas.map((a) => {
+        const selecionada = ativa === a.chave;
+        return (
+          <button
+            key={a.chave}
+            type="button"
+            onClick={() => onMudar(a.chave)}
+            className="px-3.5 py-1.5 rounded-full text-xs font-semibold transition-colors inline-flex items-center gap-1.5"
+            style={{
+              backgroundColor: selecionada ? COLORS.ink : COLORS.chipSoft,
+              color: selecionada ? COLORS.bg : COLORS.ink,
+              fontFamily: "'Inter', sans-serif",
+            }}
+          >
+            {a.titulo}
+            {a.contagem > 0 && (
+              <span
+                className="min-w-[17px] h-[17px] px-1 rounded-full flex items-center justify-center text-[10px] font-bold"
+                style={{
+                  backgroundColor: selecionada ? COLORS.bg : "#EF4444",
+                  color: selecionada ? COLORS.ink : "#FFFFFF",
+                }}
+              >
+                {a.contagem > 99 ? "99+" : a.contagem}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function HubOrganizacao({ souSuperAdmin, onAbrir, badges }) {
   const grupos = GRUPOS_ORGANIZACAO.filter((g) => !g.soSuperAdmin || souSuperAdmin);
   return (
@@ -7894,6 +7930,8 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   const [carregandoPainel, setCarregandoPainel] = useState(true);
   const [buscaInscritos, setBuscaInscritos] = useState("");
   const [secaoAtiva, setSecaoAtiva] = useState(null);
+  const [subAbaPessoas, setSubAbaPessoas] = useState("inscritos");
+  const [subAbaTimes, setSubAbaTimes] = useState("elencos");
 
   // Marca "visto" os times novos ~4s depois de abrir o grupo "Times e
   // elencos" — mesmo padrão usado pros inscritos novos. Guarda a data em
@@ -8333,6 +8371,18 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
 
       {secaoAtiva === "pessoas" && (
       <>
+      {(() => {
+        const pendentesCount = perfis.filter((p) => p.status !== "aprovado" && p.status !== "recusado").length;
+        const solicitacoesCount = adminRequests.filter((r) => r.status === "pendente").length;
+        const abas = [
+          { chave: "inscritos", titulo: "Inscritos", contagem: pendentesCount },
+          { chave: "representantes", titulo: "Representantes", contagem: 0 },
+        ];
+        if (souSuperAdmin) abas.push({ chave: "admins", titulo: "Administradores", contagem: solicitacoesCount });
+        return <SubAbasOrganizacao abas={abas} ativa={subAbaPessoas} onMudar={setSubAbaPessoas} />;
+      })()}
+
+      {subAbaPessoas === "representantes" && (
       <div
         className="rounded-2xl p-5 mb-8"
         style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
@@ -8401,7 +8451,9 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
           </ul>
         )}
       </div>
+      )}
 
+      {subAbaPessoas === "inscritos" && (
       <div
         className="rounded-2xl p-5 mb-8"
         style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
@@ -8584,9 +8636,9 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
           })()
         )}
       </div>
+      )}
 
-
-      {souSuperAdmin && (
+      {subAbaPessoas === "admins" && souSuperAdmin && (
         <div
           className="rounded-2xl p-5 mb-8"
           style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
@@ -8661,7 +8713,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
         </div>
       )}
 
-      {souSuperAdmin && adminRequests.filter((r) => r.status === "pendente").length > 0 && (
+      {subAbaPessoas === "admins" && souSuperAdmin && adminRequests.filter((r) => r.status === "pendente").length > 0 && (
         <div
           className="rounded-2xl p-5 mb-8"
           style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
@@ -8922,17 +8974,32 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
 
       {secaoAtiva === "times" && (
         <>
-          <GerenciarElencos teams={teams} saveTeams={saveTeams} />
-          <StatusAprovacaoPagamento teams={teams} saveTeams={saveTeams} />
-          <DiagnosticoIrregularidades
-            teams={teams}
-            avaliacoes={avaliacoes}
-            aprovarExcecao={aprovarExcecao}
-            manterIrregularidade={manterIrregularidade}
+          <SubAbasOrganizacao
+            abas={[
+              { chave: "elencos", titulo: "Elencos", contagem: 0 },
+              { chave: "pagamentos", titulo: "Pagamentos", contagem: 0 },
+              { chave: "irregularidades", titulo: "Irregularidades", contagem: 0 },
+              { chave: "confirmacao", titulo: "Confirmação colégio", contagem: 0 },
+              { chave: "cpfs", titulo: "CPFs", contagem: 0 },
+              { chave: "planilha", titulo: "Planilha", contagem: 0 },
+              { chave: "contatos", titulo: "Contatos", contagem: 0 },
+            ]}
+            ativa={subAbaTimes}
+            onMudar={setSubAbaTimes}
           />
-          <ConfirmacaoAlunosColegio teams={teams} saveTeams={saveTeams} />
-          <ImportarCpfsPlanilha teams={teams} />
-          <PlanilhaInscricoes teams={teams} />
+          {subAbaTimes === "elencos" && <GerenciarElencos teams={teams} saveTeams={saveTeams} />}
+          {subAbaTimes === "pagamentos" && <StatusAprovacaoPagamento teams={teams} saveTeams={saveTeams} />}
+          {subAbaTimes === "irregularidades" && (
+            <DiagnosticoIrregularidades
+              teams={teams}
+              avaliacoes={avaliacoes}
+              aprovarExcecao={aprovarExcecao}
+              manterIrregularidade={manterIrregularidade}
+            />
+          )}
+          {subAbaTimes === "confirmacao" && <ConfirmacaoAlunosColegio teams={teams} saveTeams={saveTeams} />}
+          {subAbaTimes === "cpfs" && <ImportarCpfsPlanilha teams={teams} />}
+          {subAbaTimes === "planilha" && <PlanilhaInscricoes teams={teams} />}
         </>
       )}
 
@@ -8945,7 +9012,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
 
       {secaoAtiva === "documentos" && <DocumentosOrganizacao teams={teams} matches={matches} />}
 
-      {secaoAtiva === "times" && (
+      {secaoAtiva === "times" && subAbaTimes === "contatos" && (
       <div
         className="rounded-2xl p-5 mt-8"
         style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
