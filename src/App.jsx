@@ -31,6 +31,7 @@ import {
   ChevronLeft,
   Heart,
   Send,
+  RotateCcw,
 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import {
@@ -1005,6 +1006,8 @@ function ModalElencoTime({ team, onClose }) {
 // TAB: Início
 // ---------------------------------------------------------------------------
 function Home({ teams, matches, setTab, config, totalPessoas }) {
+  const dataEventoTexto = (config && config.dataEvento) || DATA_EVENTO;
+  const prazoInscricaoTexto = (config && config.prazoInscricao) || PRAZO_INSCRICAO;
   const menuItems = [
     { id: "inscricao", label: "Inscrição", desc: "Inscreva seu time para a 8ª edição", icon: Users },
     { id: "sorteio", label: "Sorteio", desc: "Potes e grupos da edição", icon: Dices },
@@ -1056,10 +1059,10 @@ function Home({ teams, matches, setTab, config, totalPessoas }) {
         style={{ backgroundColor: COLORS.accentSoft }}
       >
         <div className="text-sm" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
-          <strong>Inscrições:</strong> {PRAZO_INSCRICAO}
+          <strong>Inscrições:</strong> {prazoInscricaoTexto}
         </div>
         <div className="text-sm" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
-          <strong>Competição:</strong> {DATA_EVENTO}
+          <strong>Competição:</strong> {dataEventoTexto}
         </div>
         <div className="text-sm" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
           <strong>Valor:</strong> {VALOR_INSCRICAO_ATLETA}
@@ -1822,7 +1825,8 @@ function AddPlayerForm({ onAdd }) {
   );
 }
 
-function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes }) {
+function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes, config }) {
+  const prazoInscricaoTexto = (config && config.prazoInscricao) || PRAZO_INSCRICAO;
   const isAdmin = sessao && sessao.tipo === "admin";
   const podeAcessar = sessao && (isAdmin || sessao.representanteAprovado);
   const turmaFixa = !isAdmin && sessao ? sessao.turma || "" : "";
@@ -2108,7 +2112,7 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes }) {
       <div>
         <SectionLabel eyebrow="Participe" title="Inscrição de time" />
         <EmptyState>
-          O período de inscrição ({PRAZO_INSCRICAO}) está encerrado por enquanto. Se você já
+          O período de inscrição ({prazoInscricaoTexto}) está encerrado por enquanto. Se você já
           inscreveu seu time, fale com a organização pra qualquer ajuste — o cadastro de novos
           times volta a abrir na próxima edição.
         </EmptyState>
@@ -5172,6 +5176,278 @@ function EditorHallDaFama({ config, saveConfig }) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Encerrar temporada — só pro super admin. Faz tudo de uma vez:
+// 1) arquiva times, jogos, sorteio, fotos e avaliações da edição atual
+//    (guardado em copasu:arquivo, nada é apagado de verdade);
+// 2) lança o campeão (e opcionalmente o melhor jogador) no Hall da Fama;
+// 3) limpa times/jogos/sorteio/fotos/avaliações pra começar a próxima
+//    edição do zero.
+// A data e o prazo de inscrição exibidos no site também ficam editáveis
+// aqui (config.dataEvento / config.prazoInscricao), pra não depender de
+// mudar código toda edição. O número/algarismo romano da edição (ex: VIII)
+// e as datas que travam o período de inscrição e os horários dos jogos
+// continuam fixos no código — é rápido ajustar quando chegar a hora, é só
+// avisar qual o número e as datas da próxima edição.
+// ---------------------------------------------------------------------------
+function EncerrarTemporada({ teams, matches, sorteio, posts, avaliacoes, config, saveConfig, saveTeams, saveMatches, saveSorteio, savePosts, saveAvaliacoes }) {
+  const nomeTime = (id) => (teams.find((t) => t.id === id) || {}).nome || "";
+  const jogoFinal = matches.find((m) => m.fase === "Final");
+  const geralAtual = useMemo(() => calcularClassificacaoGeral(matches, teams), [matches, teams]);
+  const campeaoSugerido = jogoFinal && jogoDecidido(jogoFinal) ? nomeTime(vencedorJogo(jogoFinal)) : geralAtual[0]?.nome || "";
+
+  const [edicaoLabel, setEdicaoLabel] = useState(String(new Date().getFullYear()));
+  const [turmaCampeao, setTurmaCampeao] = useState(campeaoSugerido);
+  const [nomeMelhorJogador, setNomeMelhorJogador] = useState("");
+  const [turmaMelhorJogador, setTurmaMelhorJogador] = useState("");
+  const [encerrando, setEncerrando] = useState(false);
+  const [feito, setFeito] = useState(false);
+  const [erro, setErro] = useState(null);
+
+  const [dataEvento, setDataEvento] = useState((config && config.dataEvento) || DATA_EVENTO);
+  const [prazoInscricao, setPrazoInscricao] = useState((config && config.prazoInscricao) || PRAZO_INSCRICAO);
+  const [salvandoDatas, setSalvandoDatas] = useState(false);
+  const [datasSalvas, setDatasSalvas] = useState(false);
+
+  const salvarDatas = async () => {
+    setSalvandoDatas(true);
+    try {
+      await saveConfig((atual) => ({ ...(atual || {}), dataEvento: dataEvento.trim(), prazoInscricao: prazoInscricao.trim() }));
+      setDatasSalvas(true);
+      setTimeout(() => setDatasSalvas(false), 2000);
+    } catch (e) {
+      console.error("Falha ao salvar datas", e);
+      alert("Não consegui salvar as datas: " + e.message);
+    } finally {
+      setSalvandoDatas(false);
+    }
+  };
+
+  const encerrarTemporada = async () => {
+    if (teams.length === 0 && matches.length === 0) {
+      alert("Não tem time nem jogo cadastrado nessa temporada — nada pra encerrar ainda.");
+      return;
+    }
+    if (
+      !window.confirm(
+        `Confirma encerrar a temporada atual?\n\n` +
+          `Isso vai:\n` +
+          `• Arquivar os ${teams.length} times, ${matches.length} jogos, sorteio, fotos e avaliações de agora (fica tudo salvo, só sai das telas ativas)\n` +
+          `• Lançar "${turmaCampeao || "(em branco)"}" como campeã de ${edicaoLabel} no Hall da Fama\n` +
+          `• Limpar times, jogos, sorteio, fotos e avaliações pra começar a próxima edição do zero\n\n` +
+          `Essa ação não tem desfazer automático.`
+      )
+    ) {
+      return;
+    }
+    setEncerrando(true);
+    setErro(null);
+    try {
+      // 1) Arquiva a temporada atual (nada é apagado, só sai de uso)
+      const arquivoAtual = (await readKey("copasu:arquivo")) || [];
+      const novoArquivo = [
+        ...arquivoAtual,
+        {
+          edicao: edicaoLabel.trim() || EDITION_ROMAN,
+          numeroEdicao: EDITION,
+          encerradoEm: new Date().toISOString(),
+          teams,
+          matches,
+          sorteio,
+          posts,
+          avaliacoes,
+        },
+      ];
+      await writeKey("copasu:arquivo", novoArquivo);
+
+      // 2) Lança no Hall da Fama
+      const dadosHall = (config && config.hallDaFama) || HALL_DA_FAMA;
+      const novoHall = { ...dadosHall };
+      if (turmaCampeao.trim()) {
+        novoHall.campeoes = [...(dadosHall.campeoes || []), { edicao: edicaoLabel.trim() || EDITION_ROMAN, turma: turmaCampeao.trim() }];
+      }
+      if (nomeMelhorJogador.trim()) {
+        novoHall.melhorJogador = [
+          ...(dadosHall.melhorJogador || []),
+          { ano: edicaoLabel.trim(), nome: nomeMelhorJogador.trim(), turma: turmaMelhorJogador.trim() },
+        ];
+      }
+      await saveConfig((atual) => ({ ...(atual || {}), hallDaFama: novoHall }));
+
+      // 3) Reseta a temporada — aqui é INTENCIONAL usar valor direto (não a
+      // função updater) porque o objetivo é zerar tudo, não mesclar com o
+      // que já está salvo.
+      await saveTeams([]);
+      await saveMatches([]);
+      await saveSorteio({});
+      await savePosts([]);
+      await saveAvaliacoes([]);
+
+      setFeito(true);
+    } catch (e) {
+      console.error("Falha ao encerrar temporada", e);
+      setErro(e.message);
+    } finally {
+      setEncerrando(false);
+    }
+  };
+
+  if (feito) {
+    return (
+      <div className="rounded-2xl p-5 mt-8" style={{ backgroundColor: COLORS.card, border: `1.5px dashed ${COLORS.gold}` }}>
+        <h3 className="font-semibold mb-2 flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.gold }}>
+          <RotateCcw size={18} color={COLORS.gold} /> Temporada encerrada
+        </h3>
+        <p className="text-sm" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+          Times, jogos, sorteio, fotos e avaliações foram arquivados e a tela está limpa pra
+          próxima edição. O Hall da Fama já foi atualizado — confira em "Conteúdo do site".
+        </p>
+        <p className="text-xs mt-2" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+          Pra trocar o número da edição (ex: de VIII pra IX) e as datas que travam inscrição e
+          jogos, me chama com o número e as datas novas que eu atualizo no código.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl p-5 mt-8" style={{ backgroundColor: COLORS.card, border: `1.5px dashed ${COLORS.gold}` }}>
+      <h3 className="font-semibold mb-1 flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.gold }}>
+        <RotateCcw size={18} color={COLORS.gold} /> Encerrar temporada e começar a próxima
+      </h3>
+      <p className="text-xs mb-4" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+        Quando a copa acabar: confirme o campeão, arquive tudo e limpe a tela pra próxima edição
+        de uma vez só. Só você vê isto.
+      </p>
+
+      <div className="space-y-3 mb-5">
+        <div>
+          <label className="block text-xs font-semibold mb-1" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+            Edição (rótulo que aparece no Hall da Fama)
+          </label>
+          <input
+            type="text"
+            value={edicaoLabel}
+            onChange={(e) => setEdicaoLabel(e.target.value)}
+            className="w-full px-3 py-2 rounded-xl text-sm"
+            style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold mb-1" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+            Turma campeã {campeaoSugerido && "(sugerido a partir da Final/classificação — confira antes)"}
+          </label>
+          <input
+            type="text"
+            value={turmaCampeao}
+            onChange={(e) => setTurmaCampeao(e.target.value)}
+            placeholder="ex: 2010"
+            className="w-full px-3 py-2 rounded-xl text-sm"
+            style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="block text-xs font-semibold mb-1" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+              Melhor jogador (opcional)
+            </label>
+            <input
+              type="text"
+              value={nomeMelhorJogador}
+              onChange={(e) => setNomeMelhorJogador(e.target.value)}
+              placeholder="nome/apelido"
+              className="w-full px-3 py-2 rounded-xl text-sm"
+              style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+              Turma dele
+            </label>
+            <input
+              type="text"
+              value={turmaMelhorJogador}
+              onChange={(e) => setTurmaMelhorJogador(e.target.value)}
+              placeholder="ex: 2010"
+              className="w-full px-3 py-2 rounded-xl text-sm"
+              style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+            />
+          </div>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={encerrarTemporada}
+        disabled={encerrando}
+        className="px-4 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2 disabled:opacity-60"
+        style={{ backgroundColor: COLORS.gold, color: "#3A1E00", fontFamily: "'Inter', sans-serif" }}
+      >
+        {encerrando && <Loader2 size={14} className="animate-spin" />}
+        {encerrando ? "Encerrando..." : "Encerrar temporada e arquivar"}
+      </button>
+      {erro && (
+        <p className="text-xs mt-2" style={{ color: "#EF4444", fontFamily: "'Inter', sans-serif" }}>
+          Não consegui encerrar: {erro}
+        </p>
+      )}
+
+      <div className="mt-6 pt-5" style={{ borderTop: `1px solid ${COLORS.border}` }}>
+        <h4 className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+          Data e prazo exibidos no site
+        </h4>
+        <div className="grid sm:grid-cols-2 gap-2 mb-3">
+          <div>
+            <label className="block text-xs font-semibold mb-1" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+              Data da competição
+            </label>
+            <input
+              type="text"
+              value={dataEvento}
+              onChange={(e) => setDataEvento(e.target.value)}
+              placeholder="ex: 6, 7 e 8 de novembro"
+              className="w-full px-3 py-2 rounded-xl text-sm"
+              style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+              Prazo de inscrição (texto)
+            </label>
+            <input
+              type="text"
+              value={prazoInscricao}
+              onChange={(e) => setPrazoInscricao(e.target.value)}
+              placeholder="ex: aberta até 30 de setembro"
+              className="w-full px-3 py-2 rounded-xl text-sm"
+              style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+            />
+          </div>
+        </div>
+        <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+          Isso muda só o texto exibido na Início e na Inscrição. A data que realmente trava o
+          período de inscrição e os horários dos jogos gerados continuam fixos no código — me
+          avisa as datas novas que eu atualizo.
+        </p>
+        <button
+          type="button"
+          onClick={salvarDatas}
+          disabled={salvandoDatas}
+          className="px-4 py-2 rounded-xl text-sm font-semibold disabled:opacity-60"
+          style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}
+        >
+          {salvandoDatas ? "Salvando..." : "Salvar data e prazo"}
+        </button>
+        {datasSalvas && (
+          <span className="ml-3 text-sm" style={{ color: "#16A34A", fontFamily: "'Inter', sans-serif" }}>
+            Salvo!
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function TestarEnvioEmail() {
   const [enviando, setEnviando] = useState(false);
   const [resultado, setResultado] = useState(null);
@@ -7383,6 +7659,7 @@ const GRUPOS_ORGANIZACAO = [
   { chave: "jogos", titulo: "Jogos", subtitulo: "Transmissão, mata-mata, tabela", icone: Swords },
   { chave: "documentos", titulo: "Documentos", subtitulo: "Fichas e súmulas pra imprimir", icone: Download },
   { chave: "conteudo", titulo: "Conteúdo do site", subtitulo: "Hall da Fama (super admin)", icone: Trophy, soSuperAdmin: true },
+  { chave: "temporada", titulo: "Nova temporada", subtitulo: "Encerrar edição e recomeçar (super admin)", icone: RotateCcw, soSuperAdmin: true },
   { chave: "sistema", titulo: "Sistema", subtitulo: "Métricas de acesso ao app", icone: BarChart3 },
 ];
 
@@ -7434,7 +7711,7 @@ function HubOrganizacao({ souSuperAdmin, onAbrir, badges }) {
   );
 }
 
-function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, saveAdminRequests, sessao, config, saveConfig, avaliacoes, saveAvaliacoes, sorteio }) {
+function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, saveAdminRequests, sessao, config, saveConfig, avaliacoes, saveAvaliacoes, sorteio, saveSorteio, posts, savePosts }) {
   const souAdminLogado = sessao && sessao.tipo === "admin";
   const souSuperAdmin = souAdminLogado && sessao.superAdmin;
 
@@ -7893,6 +8170,23 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
       )}
 
       {souSuperAdmin && secaoAtiva === "conteudo" && <EditorHallDaFama config={config} saveConfig={saveConfig} />}
+
+      {souSuperAdmin && secaoAtiva === "temporada" && (
+        <EncerrarTemporada
+          teams={teams}
+          matches={matches}
+          sorteio={sorteio}
+          posts={posts}
+          avaliacoes={avaliacoes}
+          config={config}
+          saveConfig={saveConfig}
+          saveTeams={saveTeams}
+          saveMatches={saveMatches}
+          saveSorteio={saveSorteio}
+          savePosts={savePosts}
+          saveAvaliacoes={saveAvaliacoes}
+        />
+      )}
 
       {secaoAtiva === "pessoas" && (
       <>
@@ -8837,7 +9131,7 @@ export default function App() {
           <>
             {tab === "inicio" && <Home teams={teamsInscritos} matches={matches} setTab={setTab} config={config} totalPessoas={totalPessoas} />}
             {tab === "inscricao" && (
-              <Inscricao teams={teams} saveTeams={saveTeams} sessao={sessao} avaliacoes={avaliacoes} saveAvaliacoes={saveAvaliacoes} />
+              <Inscricao teams={teams} saveTeams={saveTeams} sessao={sessao} avaliacoes={avaliacoes} saveAvaliacoes={saveAvaliacoes} config={config} />
             )}
             {tab === "sorteio" && (
               <Sorteio teams={teamsInscritos} sorteio={sorteio} saveSorteio={saveSorteio} matches={matches} saveMatches={saveMatches} sessao={sessao} />
@@ -8862,6 +9156,9 @@ export default function App() {
                 avaliacoes={avaliacoes}
                 saveAvaliacoes={saveAvaliacoes}
                 sorteio={sorteio}
+                saveSorteio={saveSorteio}
+                posts={posts}
+                savePosts={savePosts}
               />
             )}
           </>
