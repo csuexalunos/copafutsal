@@ -8073,6 +8073,27 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   const [subAbaPessoas, setSubAbaPessoas] = useState("inscritos");
   const [subAbaTimes, setSubAbaTimes] = useState("elencos");
 
+  // Ao abrir um card do hub, já cai direto na sub-aba que tem a
+  // pendência — em vez de abrir sempre na primeira sub-aba e deixar a
+  // pessoa procurar onde está a novidade.
+  const abrirSecaoOrganizacao = (chave) => {
+    setSecaoAtiva(chave);
+    if (chave === "pessoas") {
+      const temInscritoNovo = perfis.some((p) => p.status === "pendente" && !p.visualizado);
+      const temSolicitacao = souSuperAdmin && adminRequests.some((r) => r.status === "pendente");
+      setSubAbaPessoas(temInscritoNovo ? "inscritos" : temSolicitacao ? "admins" : "inscritos");
+    }
+    if (chave === "times") {
+      const temTimeNovo = teams.some(
+        (t) =>
+          t.inscritoEm &&
+          (!config?.ultimaVisualizacaoTimes || new Date(t.inscritoEm) > new Date(config.ultimaVisualizacaoTimes))
+      );
+      const temIrregularidade = avaliacoes.some((a) => a.status === "pendente");
+      setSubAbaTimes(temTimeNovo ? "pagamentos" : temIrregularidade ? "irregularidades" : "elencos");
+    }
+  };
+
   // Marca "visto" os times novos ~4s depois de abrir a sub-aba
   // "Pagamentos" (onde os times novos realmente aparecem pra revisão) —
   // mesmo padrão usado pros inscritos novos. Antes disparava assim que
@@ -8504,7 +8525,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
       {!secaoAtiva && (
         <HubOrganizacao
           souSuperAdmin={souSuperAdmin}
-          onAbrir={setSecaoAtiva}
+          onAbrir={abrirSecaoOrganizacao}
           badges={{
             pessoas:
               perfis.filter((p) => p.status === "pendente" && !p.visualizado).length +
