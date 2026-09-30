@@ -79,8 +79,8 @@ const COLORS = {
   zebra: "#182036",
 };
 
-const EDITION = 8;
-const EDITION_ROMAN = "VIII";
+const EDITION = 9;
+const EDITION_ROMAN = "IX";
 
 // Brasão oficial "Santa Úrsula Jogos Ex-Alunos", em base64 (comprimido)
 // para não depender de link externo dentro do artifact.
@@ -671,17 +671,57 @@ function mensagemConfirmacaoPagamento(nomeTime, quantidadeAtletas, formaPagament
 
 // Regras de horário dos jogos — 2 tempos de 10min (20min de jogo) + 5min
 // de intervalo entre um confronto e outro = 25min entre um início e outro.
+// Essas datas são só o valor padrão de segurança — o que vale de verdade é
+// o que estiver salvo em config.horariosJogos / config.inscricao (editável
+// pelo super admin em Organização → Nova temporada, sem precisar de
+// código). Veja horariosDoConfig() e inscricaoAberta() logo abaixo.
 const DURACAO_SLOT_MIN = 25;
-const INICIO_SEXTA = new Date(2026, 10, 6, 19, 0, 0); // sexta 6/nov às 19h
 const JOGOS_SEXTA = 8;
-const INICIO_SABADO = new Date(2026, 10, 7, 8, 0, 0); // sábado 7/nov às 8h
-const INICIO_DOMINGO = new Date(2026, 10, 8, 8, 0, 0); // domingo 8/nov às 8h
-// Datas de verdade — usadas pra travar a aba de Inscrição fora do período.
-const INSCRICAO_INICIO = new Date(2026, 0, 1, 0, 0, 0); // liberada desde já
-const INSCRICAO_FIM = new Date(2026, 8, 30, 23, 59, 59); // 30 de setembro (último dia do mês)
-function inscricaoAberta() {
+const INICIO_SEXTA_PADRAO = new Date(2026, 10, 6, 19, 0, 0); // sexta 6/nov às 19h
+const INICIO_SABADO_PADRAO = new Date(2026, 10, 7, 8, 0, 0); // sábado 7/nov às 8h
+const INICIO_DOMINGO_PADRAO = new Date(2026, 10, 8, 8, 0, 0); // domingo 8/nov às 8h
+const INSCRICAO_INICIO_PADRAO = new Date(2026, 0, 1, 0, 0, 0); // liberada desde já
+const INSCRICAO_FIM_PADRAO = new Date(2026, 8, 30, 23, 59, 59); // 30 de setembro (último dia do mês)
+
+function parseDataConfig(valor, padrao) {
+  if (!valor) return padrao;
+  const d = new Date(valor);
+  return isNaN(d.getTime()) ? padrao : d;
+}
+
+// Conversão entre Date e o formato que o <input type="datetime-local">
+// espera/devolve ("AAAA-MM-DDTHH:mm", sempre no horário local — sem Z,
+// sem fuso). Usado só nos formulários de edição de data da Organização.
+function paraDatetimeLocal(date) {
+  if (!date || isNaN(date.getTime())) return "";
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function deDatetimeLocal(valor) {
+  if (!valor) return null;
+  const d = new Date(valor);
+  return isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+// Lê os horários dos jogos configurados pelo super admin (config.horariosJogos),
+// caindo pros valores padrão acima quando ainda não foi definido.
+function horariosDoConfig(config) {
+  const h = (config && config.horariosJogos) || {};
+  return {
+    inicioSexta: parseDataConfig(h.inicioSexta, INICIO_SEXTA_PADRAO),
+    inicioSabado: parseDataConfig(h.inicioSabado, INICIO_SABADO_PADRAO),
+    inicioDomingo: parseDataConfig(h.inicioDomingo, INICIO_DOMINGO_PADRAO),
+  };
+}
+
+// Mesma ideia pro período de inscrição (config.inscricao).
+function inscricaoAberta(config) {
+  const i = (config && config.inscricao) || {};
+  const inicio = parseDataConfig(i.inicio, INSCRICAO_INICIO_PADRAO);
+  const fim = parseDataConfig(i.fim, INSCRICAO_FIM_PADRAO);
   const agora = new Date();
-  return agora >= INSCRICAO_INICIO && agora <= INSCRICAO_FIM;
+  return agora >= inicio && agora <= fim;
 }
 
 // Times mais bem colocados da última edição (7ª, VII Copa) — usados pra
@@ -731,7 +771,7 @@ function anoConclusaoRegular(anoConclusao, turmaTime) {
 // Edições disponíveis para marcar uma foto/vídeo — a atual mais as
 // edições anteriores já registradas no Hall da Fama.
 const EDICOES_DISPONIVEIS = [
-  `${EDITION_ROMAN} — atual (8ª edição)`,
+  `${EDITION_ROMAN} — atual (${EDITION}ª edição)`,
   ...HALL_DA_FAMA.campeoes.map((c) => c.edicao).reverse(),
 ];
 
@@ -2107,7 +2147,7 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes, confi
     );
   }
 
-  if (!inscricaoAberta()) {
+  if (!inscricaoAberta(config)) {
     return (
       <div>
         <SectionLabel eyebrow="Participe" title="Inscrição de time" />
@@ -2469,7 +2509,7 @@ function MatchCard({ match, teamsById }) {
 // os eventos (gols/assistências/cartões) já registrados. Só quem está
 // logado como admin vê os controles pra editar — pros demais é só
 // leitura, mas já mostra tudo em tempo real.
-function MatchCardExpansivel({ match, teams, sessao, saveMatches, matches }) {
+function MatchCardExpansivel({ match, teams, sessao, saveMatches, matches, config }) {
   const [expanded, setExpanded] = useState(false);
   const isAdmin = sessao && sessao.tipo === "admin";
   const timeA = teams.find((t) => t.id === match.timeA);
@@ -2483,7 +2523,7 @@ function MatchCardExpansivel({ match, teams, sessao, saveMatches, matches }) {
   if (isAdmin && saveMatches) {
     const onUpdate = async (updated) => {
       const atualizado = matches.map((m) => (m.id === updated.id ? updated : m));
-      await saveMatches(gerarMataMataAutomatico(atualizado, teams));
+      await saveMatches(gerarMataMataAutomatico(atualizado, teams, horariosDoConfig(config)));
     };
     return (
       <div className="w-72 shrink-0">
@@ -2579,7 +2619,7 @@ function MatchCardExpansivel({ match, teams, sessao, saveMatches, matches }) {
   );
 }
 
-function Chaveamento({ matches, teams, sessao, saveMatches }) {
+function Chaveamento({ matches, teams, sessao, saveMatches, config }) {
   const faseRank = (f) => {
     if (f.startsWith("Grupo")) return 0;
     const ordem = ["Oitavas", "Quartas", "Semifinal", "3º Lugar", "Final"];
@@ -2643,7 +2683,7 @@ function Chaveamento({ matches, teams, sessao, saveMatches }) {
                           {jogosDoGrupo
                             .filter((m) => (m.rodada || 1) === r)
                             .map((m) => (
-                              <MatchCardExpansivel key={m.id} match={m} teams={teams} sessao={sessao} saveMatches={saveMatches} matches={matches} />
+                              <MatchCardExpansivel key={m.id} match={m} teams={teams} sessao={sessao} saveMatches={saveMatches} matches={matches} config={config} />
                             ))}
                         </div>
                       </div>
@@ -2668,7 +2708,7 @@ function Chaveamento({ matches, teams, sessao, saveMatches }) {
                     {matches
                       .filter((m) => m.fase === fase)
                       .map((m) => (
-                        <MatchCardExpansivel key={m.id} match={m} teams={teams} sessao={sessao} saveMatches={saveMatches} matches={matches} />
+                        <MatchCardExpansivel key={m.id} match={m} teams={teams} sessao={sessao} saveMatches={saveMatches} matches={matches} config={config} />
                       ))}
                   </div>
                 </div>
@@ -5183,12 +5223,11 @@ function EditorHallDaFama({ config, saveConfig }) {
 // 2) lança o campeão (e opcionalmente o melhor jogador) no Hall da Fama;
 // 3) limpa times/jogos/sorteio/fotos/avaliações pra começar a próxima
 //    edição do zero.
-// A data e o prazo de inscrição exibidos no site também ficam editáveis
-// aqui (config.dataEvento / config.prazoInscricao), pra não depender de
-// mudar código toda edição. O número/algarismo romano da edição (ex: VIII)
-// e as datas que travam o período de inscrição e os horários dos jogos
-// continuam fixos no código — é rápido ajustar quando chegar a hora, é só
-// avisar qual o número e as datas da próxima edição.
+// A data e o prazo exibidos no site, o período real de inscrição e os
+// horários dos jogos gerados também ficam editáveis aqui (config.dataEvento,
+// config.prazoInscricao, config.inscricao, config.horariosJogos), pra não
+// depender de mudar código toda edição. Só o número/algarismo romano da
+// edição (ex: IX) continua fixo no código — é rápido ajustar, é só avisar.
 // ---------------------------------------------------------------------------
 function EncerrarTemporada({ teams, matches, sorteio, posts, avaliacoes, config, saveConfig, saveTeams, saveMatches, saveSorteio, savePosts, saveAvaliacoes }) {
   const nomeTime = (id) => (teams.find((t) => t.id === id) || {}).nome || "";
@@ -5206,18 +5245,44 @@ function EncerrarTemporada({ teams, matches, sorteio, posts, avaliacoes, config,
 
   const [dataEvento, setDataEvento] = useState((config && config.dataEvento) || DATA_EVENTO);
   const [prazoInscricao, setPrazoInscricao] = useState((config && config.prazoInscricao) || PRAZO_INSCRICAO);
+
+  const horariosAtuais = horariosDoConfig(config);
+  const inscricaoAtual = (config && config.inscricao) || {};
+  const [inscricaoInicio, setInscricaoInicio] = useState(
+    paraDatetimeLocal(parseDataConfig(inscricaoAtual.inicio, INSCRICAO_INICIO_PADRAO))
+  );
+  const [inscricaoFim, setInscricaoFim] = useState(paraDatetimeLocal(parseDataConfig(inscricaoAtual.fim, INSCRICAO_FIM_PADRAO)));
+  const [horaSexta, setHoraSexta] = useState(paraDatetimeLocal(horariosAtuais.inicioSexta));
+  const [horaSabado, setHoraSabado] = useState(paraDatetimeLocal(horariosAtuais.inicioSabado));
+  const [horaDomingo, setHoraDomingo] = useState(paraDatetimeLocal(horariosAtuais.inicioDomingo));
+
   const [salvandoDatas, setSalvandoDatas] = useState(false);
   const [datasSalvas, setDatasSalvas] = useState(false);
+  const [erroDatas, setErroDatas] = useState(null);
 
   const salvarDatas = async () => {
     setSalvandoDatas(true);
+    setErroDatas(null);
     try {
-      await saveConfig((atual) => ({ ...(atual || {}), dataEvento: dataEvento.trim(), prazoInscricao: prazoInscricao.trim() }));
+      await saveConfig((atual) => ({
+        ...(atual || {}),
+        dataEvento: dataEvento.trim(),
+        prazoInscricao: prazoInscricao.trim(),
+        inscricao: {
+          inicio: deDatetimeLocal(inscricaoInicio),
+          fim: deDatetimeLocal(inscricaoFim),
+        },
+        horariosJogos: {
+          inicioSexta: deDatetimeLocal(horaSexta),
+          inicioSabado: deDatetimeLocal(horaSabado),
+          inicioDomingo: deDatetimeLocal(horaDomingo),
+        },
+      }));
       setDatasSalvas(true);
       setTimeout(() => setDatasSalvas(false), 2000);
     } catch (e) {
       console.error("Falha ao salvar datas", e);
-      alert("Não consegui salvar as datas: " + e.message);
+      setErroDatas(e.message);
     } finally {
       setSalvandoDatas(false);
     }
@@ -5303,8 +5368,9 @@ function EncerrarTemporada({ teams, matches, sorteio, posts, avaliacoes, config,
           próxima edição. O Hall da Fama já foi atualizado — confira em "Conteúdo do site".
         </p>
         <p className="text-xs mt-2" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-          Pra trocar o número da edição (ex: de VIII pra IX) e as datas que travam inscrição e
-          jogos, me chama com o número e as datas novas que eu atualizo no código.
+          As datas da próxima edição (inscrição e horário dos jogos) você ajusta logo abaixo,
+          sem precisar de mim. Só o número/algarismo da edição (ex: IX) ainda depende de uma
+          mudança de código — me avisa quando for bater outra.
         </p>
       </div>
     );
@@ -5394,12 +5460,17 @@ function EncerrarTemporada({ teams, matches, sorteio, posts, avaliacoes, config,
 
       <div className="mt-6 pt-5" style={{ borderTop: `1px solid ${COLORS.border}` }}>
         <h4 className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-          Data e prazo exibidos no site
+          Datas da próxima edição
         </h4>
-        <div className="grid sm:grid-cols-2 gap-2 mb-3">
+        <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+          Tudo aqui embaixo você edita direto, sem precisar de mim. Os textos mudam o que aparece
+          no site; as datas abaixo deles são as que valem de verdade (travam o período de
+          inscrição e definem o horário de cada jogo gerado).
+        </p>
+        <div className="grid sm:grid-cols-2 gap-2 mb-4">
           <div>
             <label className="block text-xs font-semibold mb-1" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
-              Data da competição
+              Texto — data da competição
             </label>
             <input
               type="text"
@@ -5412,7 +5483,7 @@ function EncerrarTemporada({ teams, matches, sorteio, posts, avaliacoes, config,
           </div>
           <div>
             <label className="block text-xs font-semibold mb-1" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
-              Prazo de inscrição (texto)
+              Texto — prazo de inscrição
             </label>
             <input
               type="text"
@@ -5424,10 +5495,75 @@ function EncerrarTemporada({ teams, matches, sorteio, posts, avaliacoes, config,
             />
           </div>
         </div>
+
+        <div className="grid sm:grid-cols-2 gap-2 mb-2">
+          <div>
+            <label className="block text-xs font-semibold mb-1" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+              Inscrição abre em
+            </label>
+            <input
+              type="datetime-local"
+              value={inscricaoInicio}
+              onChange={(e) => setInscricaoInicio(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl text-sm"
+              style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+              Inscrição fecha em
+            </label>
+            <input
+              type="datetime-local"
+              value={inscricaoFim}
+              onChange={(e) => setInscricaoFim(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl text-sm"
+              style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+            />
+          </div>
+        </div>
+
+        <div className="grid sm:grid-cols-3 gap-2 mb-3">
+          <div>
+            <label className="block text-xs font-semibold mb-1" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+              Sexta — início dos jogos
+            </label>
+            <input
+              type="datetime-local"
+              value={horaSexta}
+              onChange={(e) => setHoraSexta(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl text-sm"
+              style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+              Sábado — início dos jogos
+            </label>
+            <input
+              type="datetime-local"
+              value={horaSabado}
+              onChange={(e) => setHoraSabado(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl text-sm"
+              style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+              Domingo — início dos jogos
+            </label>
+            <input
+              type="datetime-local"
+              value={horaDomingo}
+              onChange={(e) => setHoraDomingo(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl text-sm"
+              style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+            />
+          </div>
+        </div>
         <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-          Isso muda só o texto exibido na Início e na Inscrição. A data que realmente trava o
-          período de inscrição e os horários dos jogos gerados continuam fixos no código — me
-          avisa as datas novas que eu atualizo.
+          Jogos de fase de grupos usam sexta e sábado (8 jogos sexta, o resto sábado, 25min entre
+          um e outro); mata-mata inteiro entra domingo a partir do horário acima.
         </p>
         <button
           type="button"
@@ -5436,12 +5572,17 @@ function EncerrarTemporada({ teams, matches, sorteio, posts, avaliacoes, config,
           className="px-4 py-2 rounded-xl text-sm font-semibold disabled:opacity-60"
           style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}
         >
-          {salvandoDatas ? "Salvando..." : "Salvar data e prazo"}
+          {salvandoDatas ? "Salvando..." : "Salvar datas da temporada"}
         </button>
         {datasSalvas && (
           <span className="ml-3 text-sm" style={{ color: "#16A34A", fontFamily: "'Inter', sans-serif" }}>
             Salvo!
           </span>
+        )}
+        {erroDatas && (
+          <p className="text-xs mt-2" style={{ color: "#EF4444", fontFamily: "'Inter', sans-serif" }}>
+            Não consegui salvar: {erroDatas}
+          </p>
         )}
       </div>
     </div>
@@ -6786,20 +6927,21 @@ function gerarJogosDosGrupos(grupos) {
 // da fase de grupos entram sexta às 19h (8 jogos) e continuam sábado às
 // 8h; jogos de mata-mata entram domingo às 8h. 25min entre um início e
 // outro (20min de jogo + 5min de intervalo).
-function agendarHorarios(listaJogos) {
+function agendarHorarios(listaJogos, horarios) {
+  const h = horarios || horariosDoConfig(null);
   const grupos = listaJogos.filter((m) => (m.fase || "").startsWith("Grupo"));
   const mataMata = listaJogos.filter((m) => !(m.fase || "").startsWith("Grupo"));
 
   const comHorarioGrupos = grupos.map((m, i) => {
     const slot = i < JOGOS_SEXTA ? i : JOGOS_SEXTA + (i - JOGOS_SEXTA);
-    const base = i < JOGOS_SEXTA ? INICIO_SEXTA : INICIO_SABADO;
+    const base = i < JOGOS_SEXTA ? h.inicioSexta : h.inicioSabado;
     const offsetSlots = i < JOGOS_SEXTA ? i : i - JOGOS_SEXTA;
     const horario = new Date(base.getTime() + offsetSlots * DURACAO_SLOT_MIN * 60000);
     return { ...m, horario: horario.toISOString() };
   });
 
   const comHorarioMataMata = mataMata.map((m, i) => {
-    const horario = new Date(INICIO_DOMINGO.getTime() + i * DURACAO_SLOT_MIN * 60000);
+    const horario = new Date(h.inicioDomingo.getTime() + i * DURACAO_SLOT_MIN * 60000);
     return { ...m, horario: horario.toISOString() };
   });
 
@@ -6920,7 +7062,8 @@ function novoJogoVazio(id, fase, timeA, timeB) {
 
 // Roda a cada atualização de placar — gera a próxima fase sozinho quando
 // a fase anterior estiver 100% decidida, sem precisar de ação manual.
-function gerarMataMataAutomatico(matches, teams) {
+function gerarMataMataAutomatico(matches, teams, horarios) {
+  const h = horarios || horariosDoConfig(null);
   let novos = [...matches];
   const temFase = (prefixo) => novos.some((m) => (m.fase || "").startsWith(prefixo));
 
@@ -6937,7 +7080,7 @@ function gerarMataMataAutomatico(matches, teams) {
         [2, 5],
       ];
       const quartas = pares.map(([i, j], idx) => novoJogoVazio(`jogo_qf${idx}_${Date.now()}`, "Quartas", geral[i].id, geral[j].id));
-      novos = agendarHorarios([...novos, ...quartas]);
+      novos = agendarHorarios([...novos, ...quartas], h);
     }
   }
 
@@ -6948,7 +7091,7 @@ function gerarMataMataAutomatico(matches, teams) {
       novoJogoVazio(`jogo_sf0_${Date.now()}`, "Semifinal", v[0], v[1]),
       novoJogoVazio(`jogo_sf1_${Date.now()}`, "Semifinal", v[2], v[3]),
     ];
-    novos = agendarHorarios([...novos, ...semis]);
+    novos = agendarHorarios([...novos, ...semis], h);
   }
 
   const semis = novos.filter((m) => (m.fase || "") === "Semifinal");
@@ -6957,13 +7100,13 @@ function gerarMataMataAutomatico(matches, teams) {
     const perdedores = semis.map(perdedorJogo);
     const final = novoJogoVazio(`jogo_final_${Date.now()}`, "Final", vencedores[0], vencedores[1]);
     const terceiro = novoJogoVazio(`jogo_3lugar_${Date.now()}`, "3º Lugar", perdedores[0], perdedores[1]);
-    novos = agendarHorarios([...novos, final, terceiro]);
+    novos = agendarHorarios([...novos, final, terceiro], h);
   }
 
   return novos;
 }
 
-function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao }) {
+function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao, config }) {
   const souSuperAdmin = sessao && sessao.tipo === "admin" && sessao.superAdmin;
   const [numGrupos, setNumGrupos] = useState(4);
   const potesSugeridos = useMemo(() => montarPotes(teams, numGrupos), [teams, numGrupos]);
@@ -7068,7 +7211,7 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao }) 
     }
     setGerandoTabela(true);
     const novosJogos = gerarJogosDosGrupos(sorteio.grupos);
-    const todosComHorario = agendarHorarios([...matches, ...novosJogos]);
+    const todosComHorario = agendarHorarios([...matches, ...novosJogos], horariosDoConfig(config));
     await saveMatches(todosComHorario);
     setGerandoTabela(false);
   };
@@ -7732,7 +7875,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
     }
     setGerandoTabelaOrg(true);
     const novosJogos = gerarJogosDosGrupos(sorteio.grupos);
-    const todosComHorario = agendarHorarios([...matches, ...novosJogos]);
+    const todosComHorario = agendarHorarios([...matches, ...novosJogos], horariosDoConfig(config));
     await saveMatches(todosComHorario);
     setGerandoTabelaOrg(false);
   };
@@ -7740,7 +7883,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   const verificarMataMataOrg = async () => {
     setVerificandoMataMata(true);
     try {
-      await saveMatches((atuais) => gerarMataMataAutomatico(atuais || [], teams));
+      await saveMatches((atuais) => gerarMataMataAutomatico(atuais || [], teams, horariosDoConfig(config)));
     } finally {
       setVerificandoMataMata(false);
     }
@@ -8020,7 +8163,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
 
   const updateMatch = async (updated) => {
     const atualizado = matches.map((m) => (m.id === updated.id ? updated : m));
-    const comMataMata = gerarMataMataAutomatico(atualizado, teams);
+    const comMataMata = gerarMataMataAutomatico(atualizado, teams, horariosDoConfig(config));
     await saveMatches(comMataMata);
   };
 
@@ -8040,7 +8183,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   const [reagendando, setReagendando] = useState(false);
   const reagendarHorarios = async () => {
     setReagendando(true);
-    await saveMatches(agendarHorarios(matches));
+    await saveMatches(agendarHorarios(matches, horariosDoConfig(config)));
     setReagendando(false);
   };
 
@@ -9134,10 +9277,10 @@ export default function App() {
               <Inscricao teams={teams} saveTeams={saveTeams} sessao={sessao} avaliacoes={avaliacoes} saveAvaliacoes={saveAvaliacoes} config={config} />
             )}
             {tab === "sorteio" && (
-              <Sorteio teams={teamsInscritos} sorteio={sorteio} saveSorteio={saveSorteio} matches={matches} saveMatches={saveMatches} sessao={sessao} />
+              <Sorteio teams={teamsInscritos} sorteio={sorteio} saveSorteio={saveSorteio} matches={matches} saveMatches={saveMatches} sessao={sessao} config={config} />
             )}
             {tab === "chaveamento" && (
-              <Chaveamento matches={matches} teams={teams} sessao={sessao} saveMatches={saveMatches} />
+              <Chaveamento matches={matches} teams={teams} sessao={sessao} saveMatches={saveMatches} config={config} />
             )}
             {tab === "classificacao" && <Classificacao matches={matches} teams={teamsInscritos} />}
             {tab === "comunidade" && <Comunidade posts={posts} savePosts={savePosts} />}
