@@ -5210,6 +5210,7 @@ function EditorHallDaFama({ config, saveConfig }) {
   const [dados, setDados] = useState((config && config.hallDaFama) || HALL_DA_FAMA);
   const [salvando, setSalvando] = useState(false);
   const [salvo, setSalvo] = useState(false);
+  const [secaoHall, setSecaoHall] = useState("campeoes");
 
   const atualizarSecao = (chave, novaLista) => setDados({ ...dados, [chave]: novaLista });
 
@@ -5235,7 +5236,18 @@ function EditorHallDaFama({ config, saveConfig }) {
         Muda direto aqui — sem precisar editar código. Aparece assim na aba Galeria pra qualquer
         visitante do site.
       </p>
-      <div className="space-y-5">
+      <SubAbasOrganizacao
+        abas={[
+          { chave: "campeoes", titulo: "Campeões por edição", contagem: 0 },
+          { chave: "melhorJogador", titulo: "Melhor jogador", contagem: 0 },
+          { chave: "artilheiro", titulo: "Artilheiro", contagem: 0 },
+          { chave: "melhorGoleiro", titulo: "Melhor goleiro", contagem: 0 },
+          { chave: "golMaisBonito", titulo: "Gol mais bonito", contagem: 0 },
+        ]}
+        ativa={secaoHall}
+        onMudar={setSecaoHall}
+      />
+      {secaoHall === "campeoes" && (
         <SecaoEditavelHallDaFama
           titulo="Campeões por edição"
           campos={[
@@ -5245,6 +5257,8 @@ function EditorHallDaFama({ config, saveConfig }) {
           itens={dados.campeoes}
           onChange={(v) => atualizarSecao("campeoes", v)}
         />
+      )}
+      {secaoHall === "melhorJogador" && (
         <SecaoEditavelHallDaFama
           titulo="Melhor jogador"
           campos={[
@@ -5255,6 +5269,8 @@ function EditorHallDaFama({ config, saveConfig }) {
           itens={dados.melhorJogador}
           onChange={(v) => atualizarSecao("melhorJogador", v)}
         />
+      )}
+      {secaoHall === "artilheiro" && (
         <SecaoEditavelHallDaFama
           titulo="Artilheiro"
           campos={[
@@ -5265,6 +5281,8 @@ function EditorHallDaFama({ config, saveConfig }) {
           itens={dados.artilheiro}
           onChange={(v) => atualizarSecao("artilheiro", v)}
         />
+      )}
+      {secaoHall === "melhorGoleiro" && (
         <SecaoEditavelHallDaFama
           titulo="Melhor goleiro"
           campos={[
@@ -5275,6 +5293,8 @@ function EditorHallDaFama({ config, saveConfig }) {
           itens={dados.melhorGoleiro}
           onChange={(v) => atualizarSecao("melhorGoleiro", v)}
         />
+      )}
+      {secaoHall === "golMaisBonito" && (
         <SecaoEditavelHallDaFama
           titulo="Gol mais bonito"
           campos={[
@@ -5285,7 +5305,7 @@ function EditorHallDaFama({ config, saveConfig }) {
           itens={dados.golMaisBonito}
           onChange={(v) => atualizarSecao("golMaisBonito", v)}
         />
-      </div>
+      )}
       <button
         type="button"
         onClick={salvar}
