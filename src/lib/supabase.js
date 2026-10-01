@@ -94,9 +94,11 @@ export async function atualizarPerfil(userId, campos) {
 }
 
 export async function souAdmin(userId) {
-  const { data, error } = await supabase.from("admins").select("super_admin").eq("user_id", userId).maybeSingle();
+  const { data, error } = await supabase.from("admins").select("super_admin, escopo").eq("user_id", userId).maybeSingle();
   if (error) throw error;
-  return data ? { admin: true, superAdmin: !!data.super_admin } : { admin: false, superAdmin: false };
+  return data
+    ? { admin: true, superAdmin: !!data.super_admin, escopo: data.escopo || "completo" }
+    : { admin: false, superAdmin: false, escopo: null };
 }
 
 export async function listarAdmins() {
@@ -105,8 +107,10 @@ export async function listarAdmins() {
   return data || [];
 }
 
-export async function promoverParaAdmin(userId, email) {
-  const { error } = await supabase.from("admins").insert({ user_id: userId, email, super_admin: false });
+// escopo: 'completo' (acesso total à Organização) ou 'jogos' (só
+// atualizar jogos/placar ao vivo — não vê inscritos, pagamentos, CPFs etc).
+export async function promoverParaAdmin(userId, email, escopo = "completo") {
+  const { error } = await supabase.from("admins").insert({ user_id: userId, email, super_admin: false, escopo });
   if (error) throw error;
 }
 

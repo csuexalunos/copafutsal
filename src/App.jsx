@@ -4707,6 +4707,9 @@ function PlanilhaInscricoes({ teams }) {
 }
 
 function DocumentosOrganizacao({ teams, matches }) {
+  const [secaoDoc, setSecaoDoc] = useState("fichas");
+  const timesPagos = teams.filter((t) => t.pago && jogadoresPendentesDePagamento(t).length === 0).length;
+
   return (
     <div className="rounded-2xl p-5 mt-8" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
       <h3 className="font-semibold mb-1 flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
@@ -4717,85 +4720,127 @@ function DocumentosOrganizacao({ teams, matches }) {
         navegador.
       </p>
 
-      <button
-        type="button"
-        onClick={() => baixarFichaTodosTimes(teams)}
-        disabled={teams.filter((t) => t.pago && jogadoresPendentesDePagamento(t).length === 0).length === 0}
-        className="px-4 py-2 rounded-xl text-sm font-semibold inline-flex items-center gap-1.5 disabled:opacity-50"
-        style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}
-      >
-        <Download size={14} /> Ficha de todos os times
-      </button>
+      <SubAbasOrganizacao
+        abas={[
+          { chave: "fichas", titulo: "Fichas dos times", contagem: 0 },
+          { chave: "financeiro", titulo: "Planilha financeira", contagem: 0 },
+          { chave: "sumulas", titulo: "Súmulas dos jogos", contagem: 0 },
+          { chave: "regulamento", titulo: "Regulamento", contagem: 0 },
+        ]}
+        ativa={secaoDoc}
+        onMudar={setSecaoDoc}
+      />
 
-      <div className="flex flex-wrap gap-2 mt-3 mb-5">
-        <button
-          type="button"
-          onClick={() => baixarPlanilhaInscricoes(teams)}
-          disabled={teams.length === 0}
-          className="px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-50"
-          style={{ border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
-        >
-          <Download size={12} /> Planilha de inscrições
-        </button>
+      {secaoDoc === "fichas" && (
+        <div>
+          <button
+            type="button"
+            onClick={() => baixarFichaTodosTimes(teams)}
+            disabled={timesPagos === 0}
+            className="px-4 py-2 rounded-xl text-sm font-semibold inline-flex items-center gap-1.5 disabled:opacity-50"
+            style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}
+          >
+            <Download size={14} /> Ficha de todos os times (um PDF só)
+          </button>
+          <p className="text-xs mt-2 mb-5" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Só entram os times totalmente pagos ({timesPagos} de {teams.length}), ordenados da turma
+            mais antiga pra mais nova.
+          </p>
+
+          {teams.length > 0 ? (
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                Ficha individual por time
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {teams.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => baixarFichaTime(t)}
+                    className="px-3 py-1.5 rounded-full text-xs font-medium inline-flex items-center gap-1"
+                    style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+                  >
+                    <Download size={12} /> {t.nome}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+              Nenhum time inscrito ainda.
+            </p>
+          )}
+        </div>
+      )}
+
+      {secaoDoc === "financeiro" && (
+        <div>
+          <div
+            className="rounded-xl p-4 flex items-center justify-between gap-3 flex-wrap"
+            style={{ backgroundColor: COLORS.zebra }}
+          >
+            <div>
+              <div className="text-sm font-semibold" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>
+                Planilha financeira (inscrições + pagamentos)
+              </div>
+              <p className="text-xs mt-0.5" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                Time, data, lote, valor por atleta, total e status de pagamento — a mesma que fica em
+                Financeiro, pronta pra imprimir ou salvar em PDF.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => baixarPlanilhaInscricoes(teams)}
+              disabled={teams.length === 0}
+              className="px-4 py-2 rounded-xl text-sm font-semibold inline-flex items-center gap-1.5 shrink-0 disabled:opacity-50"
+              style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}
+            >
+              <Download size={14} /> Baixar planilha
+            </button>
+          </div>
+          <PlanilhaInscricoes teams={teams} />
+        </div>
+      )}
+
+      {secaoDoc === "sumulas" && (
+        <div>
+          {matches.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {matches.map((m) => {
+                const timeA = teams.find((t) => t.id === m.timeA);
+                const timeB = teams.find((t) => t.id === m.timeB);
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => baixarSumula(m, teams)}
+                    className="px-3 py-1.5 rounded-full text-xs font-medium inline-flex items-center gap-1"
+                    style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+                  >
+                    <Download size={12} /> {timeA ? timeA.nome : "?"} x {timeB ? timeB.nome : "?"}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+              Nenhum jogo cadastrado ainda.
+            </p>
+          )}
+        </div>
+      )}
+
+      {secaoDoc === "regulamento" && (
         <a
           href="regulamento.pdf"
           target="_blank"
           rel="noreferrer"
-          className="px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5"
-          style={{ border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+          className="px-4 py-2 rounded-xl text-sm font-semibold inline-flex items-center gap-1.5"
+          style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}
         >
-          <Download size={12} /> Regulamento oficial (PDF)
+          <Download size={14} /> Regulamento oficial (PDF)
         </a>
-      </div>
-      <p className="text-xs mt-1.5 mb-5" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-        Só entram os times totalmente pagos ({teams.filter((t) => t.pago && jogadoresPendentesDePagamento(t).length === 0).length} de {teams.length}),
-        ordenados da turma mais antiga pra mais nova.
-      </p>
-
-      {teams.length > 0 && (
-        <div className="mb-5">
-          <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-            Ficha individual por time
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {teams.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => baixarFichaTime(t)}
-                className="px-3 py-1.5 rounded-full text-xs font-medium inline-flex items-center gap-1"
-                style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
-              >
-                <Download size={12} /> {t.nome}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {matches.length > 0 && (
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-            Súmula por confronto
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {matches.map((m) => {
-              const timeA = teams.find((t) => t.id === m.timeA);
-              const timeB = teams.find((t) => t.id === m.timeB);
-              return (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => baixarSumula(m, teams)}
-                  className="px-3 py-1.5 rounded-full text-xs font-medium inline-flex items-center gap-1"
-                  style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
-                >
-                  <Download size={12} /> {timeA ? timeA.nome : "?"} x {timeB ? timeB.nome : "?"}
-                </button>
-              );
-            })}
-          </div>
-        </div>
       )}
     </div>
   );
@@ -7714,7 +7759,7 @@ function LoginGate({ onLogin }) {
 
       const statusAdmin = await souAdmin(user.id);
       if (statusAdmin.admin) {
-        onLogin({ id: user.id, email: user.email, nome: user.email, tipo: "admin", superAdmin: statusAdmin.superAdmin });
+        onLogin({ id: user.id, email: user.email, nome: user.email, tipo: "admin", superAdmin: statusAdmin.superAdmin, escopo: statusAdmin.escopo });
         return;
       }
 
@@ -8064,6 +8109,10 @@ function HubOrganizacao({ souSuperAdmin, onAbrir, badges }) {
 function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, saveAdminRequests, sessao, config, saveConfig, avaliacoes, saveAvaliacoes, sorteio, saveSorteio, posts, savePosts, perfis, setPerfis }) {
   const souAdminLogado = sessao && sessao.tipo === "admin";
   const souSuperAdmin = souAdminLogado && sessao.superAdmin;
+  // Admin "só jogos": ajuda a atualizar placar/transmissão em tempo real,
+  // mas não deve ver inscritos, pagamentos, CPFs nem a lista de admins —
+  // cai direto (e só) na seção "Jogos", sem o hub com as outras seções.
+  const restritoAJogos = souAdminLogado && !souSuperAdmin && sessao.escopo === "jogos";
 
   const [gerandoTabelaOrg, setGerandoTabelaOrg] = useState(false);
   const [verificandoMataMata, setVerificandoMataMata] = useState(false);
@@ -8099,7 +8148,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   const [listaAdmins, setListaAdmins] = useState([]);
   const [carregandoPainel, setCarregandoPainel] = useState(true);
   const [buscaInscritos, setBuscaInscritos] = useState("");
-  const [secaoAtiva, setSecaoAtiva] = useState(null);
+  const [secaoAtiva, setSecaoAtiva] = useState(() => (restritoAJogos ? "jogos" : null));
   const [subAbaPessoas, setSubAbaPessoas] = useState("inscritos");
   const [subAbaTimes, setSubAbaTimes] = useState("elencos");
   const [subAbaFinanceiro, setSubAbaFinanceiro] = useState("pagamentos");
@@ -8250,13 +8299,16 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
     setReqEnviado(true);
   };
 
+  const [escopoPorSolicitacao, setEscopoPorSolicitacao] = useState({});
+
   const aprovarSolicitacao = async (req) => {
     const alvo = perfis.find((p) => (p.email || "").trim().toLowerCase() === req.email.trim().toLowerCase());
     if (!alvo) {
       alert("Essa pessoa ainda não criou conta pelo Cadastro do site — peça pra ela se cadastrar primeiro.");
       return;
     }
-    await promoverParaAdmin(alvo.id, alvo.email);
+    const escopo = escopoPorSolicitacao[req.id] || "completo";
+    await promoverParaAdmin(alvo.id, alvo.email, escopo);
     await saveAdminRequests(adminRequests.map((r) => (r.id === req.id ? { ...r, status: "aprovado" } : r)));
     setListaAdmins(await listarAdmins());
     setUltimaSenhaGerada(null);
@@ -8269,6 +8321,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   };
 
   const [emailNovoAdmin, setEmailNovoAdmin] = useState("");
+  const [escopoNovoAdmin, setEscopoNovoAdmin] = useState("completo");
   const [promovendo, setPromovendo] = useState(false);
 
   const promoverDireto = async (e) => {
@@ -8284,9 +8337,10 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
     }
     setPromovendo(true);
     try {
-      await promoverParaAdmin(alvo.id, alvo.email);
+      await promoverParaAdmin(alvo.id, alvo.email, escopoNovoAdmin);
       setListaAdmins(await listarAdmins());
       setEmailNovoAdmin("");
+      setEscopoNovoAdmin("completo");
       try {
         await enviarEmailNovoAdmin(alvo.email, alvo.nome);
         alert(`${alvo.nome || alvo.email} agora é admin. Um e-mail avisando foi enviado.`);
@@ -8530,7 +8584,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
     <div>
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          {secaoAtiva && (
+          {secaoAtiva && !restritoAJogos && (
             <button
               type="button"
               onClick={() => setSecaoAtiva(null)}
@@ -8549,6 +8603,17 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
           <Unlock size={14} /> liberado
         </div>
       </div>
+
+      {restritoAJogos && (
+        <div
+          className="rounded-xl px-4 py-3 mb-5 text-xs flex items-center gap-2"
+          style={{ backgroundColor: COLORS.chipSoft, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+        >
+          <Lock size={14} color={COLORS.accent} /> Seu acesso é só pra esta tela: link de transmissão,
+          gerar/editar jogos e atualizar placar ao vivo. Inscritos, pagamentos e outros dados ficam só
+          com a organização.
+        </div>
+      )}
 
       {!secaoAtiva && (
         <HubOrganizacao
@@ -8883,6 +8948,15 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
               className="flex-1 px-3 py-2 rounded-xl text-sm min-w-0"
               style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
             />
+            <select
+              value={escopoNovoAdmin}
+              onChange={(e) => setEscopoNovoAdmin(e.target.value)}
+              className="px-3 py-2 rounded-xl text-sm shrink-0"
+              style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+            >
+              <option value="completo">Acesso total</option>
+              <option value="jogos">Só jogos (placar ao vivo)</option>
+            </select>
             <button
               type="button"
               onClick={promoverDireto}
@@ -8893,6 +8967,10 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
               {promovendo ? "Tornando admin..." : "Tornar admin"}
             </button>
           </form>
+          <p className="text-xs mt-2" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            "Só jogos" serve pra quem vai ajudar a atualizar o placar em tempo real no dia dos jogos —
+            essa pessoa não vê inscritos, pagamentos, CPFs nem a lista de admins.
+          </p>
 
           {listaAdmins.length > 0 && (
             <div className="mt-5 pt-4" style={{ borderTop: `1px solid ${COLORS.border}` }}>
@@ -8914,7 +8992,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
                           {perfil?.nome || a.email} {souEu && <span style={{ color: COLORS.slate }}>(você)</span>}
                         </div>
                         <div className="text-xs truncate" style={{ color: COLORS.slate }}>
-                          {a.email} · {a.super_admin ? "Super admin" : "Admin"}
+                          {a.email} · {a.super_admin ? "Super admin" : a.escopo === "jogos" ? "Admin (só jogos)" : "Admin"}
                         </div>
                       </div>
                       {!souEu && (
@@ -8960,6 +9038,15 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
                   <span className="flex-1 min-w-0 truncate">
                     {r.nome} — {r.email} {r.motivo && `— ${r.motivo}`}
                   </span>
+                  <select
+                    value={escopoPorSolicitacao[r.id] || "completo"}
+                    onChange={(e) => setEscopoPorSolicitacao({ ...escopoPorSolicitacao, [r.id]: e.target.value })}
+                    className="px-2 py-1 rounded-lg text-xs shrink-0"
+                    style={{ border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+                  >
+                    <option value="completo">Acesso total</option>
+                    <option value="jogos">Só jogos</option>
+                  </select>
                   <button
                     type="button"
                     onClick={() => aprovarSolicitacao(r)}
@@ -9519,7 +9606,7 @@ export default function App() {
     try {
       const statusAdmin = await souAdmin(user.id);
       if (statusAdmin.admin) {
-        setSessao({ id: user.id, email: user.email, nome: user.email, tipo: "admin", superAdmin: statusAdmin.superAdmin });
+        setSessao({ id: user.id, email: user.email, nome: user.email, tipo: "admin", superAdmin: statusAdmin.superAdmin, escopo: statusAdmin.escopo });
         return;
       }
       const perfil = await buscarPerfil(user.id);
