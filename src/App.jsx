@@ -34,6 +34,7 @@ import {
   RotateCcw,
   Share2,
   MousePointerClick,
+  Wallet,
 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import {
@@ -7886,7 +7887,8 @@ function LoginGate({ onLogin }) {
 const GRUPOS_ORGANIZACAO = [
   { chave: "comunicacao", titulo: "Comunicação", subtitulo: "E-mails de aprovação e lembrete", icone: Mail },
   { chave: "pessoas", titulo: "Pessoas e acesso", subtitulo: "Inscritos, representantes, avaliações", icone: Users },
-  { chave: "times", titulo: "Times e elencos", subtitulo: "Elencos, irregularidades, CPFs, planilha", icone: ShieldCheck },
+  { chave: "times", titulo: "Times e elencos", subtitulo: "Elencos, irregularidades, CPFs, contatos", icone: ShieldCheck },
+  { chave: "financeiro", titulo: "Financeiro", subtitulo: "Pagamentos e planilha de inscrições", icone: Wallet },
   { chave: "jogos", titulo: "Jogos", subtitulo: "Transmissão, mata-mata, tabela", icone: Swords },
   { chave: "documentos", titulo: "Documentos", subtitulo: "Fichas e súmulas pra imprimir", icone: Download },
   { chave: "conteudo", titulo: "Conteúdo do site", subtitulo: "Hall da Fama (super admin)", icone: Trophy, soSuperAdmin: true },
@@ -8080,6 +8082,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   const [secaoAtiva, setSecaoAtiva] = useState(null);
   const [subAbaPessoas, setSubAbaPessoas] = useState("inscritos");
   const [subAbaTimes, setSubAbaTimes] = useState("elencos");
+  const [subAbaFinanceiro, setSubAbaFinanceiro] = useState("pagamentos");
 
   // Ao abrir um card do hub, já cai direto na sub-aba que tem a
   // pendência — em vez de abrir sempre na primeira sub-aba e deixar a
@@ -8092,30 +8095,26 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
       setSubAbaPessoas(temInscritoNovo ? "inscritos" : temSolicitacao ? "admins" : "inscritos");
     }
     if (chave === "times") {
-      const temTimeNovo = teams.some(
-        (t) =>
-          t.inscritoEm &&
-          (!config?.ultimaVisualizacaoTimes || new Date(t.inscritoEm) > new Date(config.ultimaVisualizacaoTimes))
-      );
       const temIrregularidade = avaliacoes.some((a) => a.status === "pendente");
-      setSubAbaTimes(temTimeNovo ? "pagamentos" : temIrregularidade ? "irregularidades" : "elencos");
+      setSubAbaTimes(temIrregularidade ? "irregularidades" : "elencos");
+    }
+    if (chave === "financeiro") {
+      setSubAbaFinanceiro("pagamentos");
     }
   };
 
   // Marca "visto" os times novos ~4s depois de abrir a sub-aba
-  // "Pagamentos" (onde os times novos realmente aparecem pra revisão) —
-  // mesmo padrão usado pros inscritos novos. Antes disparava assim que
-  // abria "Times e elencos" de um jeito geral, então o selinho sumia sem
-  // a pessoa nem chegar a ver o time novo. Guarda a data em config
-  // (compartilhado), já que times não têm um campo individual de
-  // "visualizado" como os perfis têm.
+  // "Pagamentos" do Financeiro (onde os times novos realmente aparecem
+  // pra revisão) — mesmo padrão usado pros inscritos novos. Guarda a
+  // data em config (compartilhado), já que times não têm um campo
+  // individual de "visualizado" como os perfis têm.
   useEffect(() => {
-    if (secaoAtiva !== "times" || subAbaTimes !== "pagamentos") return;
+    if (secaoAtiva !== "financeiro" || subAbaFinanceiro !== "pagamentos") return;
     const t = setTimeout(() => {
       saveConfig((atual) => ({ ...(atual || {}), ultimaVisualizacaoTimes: new Date().toISOString() }));
     }, 4000);
     return () => clearTimeout(t);
-  }, [secaoAtiva, subAbaTimes]);
+  }, [secaoAtiva, subAbaFinanceiro]);
   const [verRecusadosInscritos, setVerRecusadosInscritos] = useState(false);
   const [verPendentesAntigos, setVerPendentesAntigos] = useState(false);
   const [acessos, setAcessos] = useState(null);
@@ -8539,13 +8538,12 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
             pessoas:
               perfis.filter((p) => p.status !== "aprovado" && p.status !== "recusado" && !p.visualizado).length +
               (souSuperAdmin ? adminRequests.filter((r) => r.status === "pendente").length : 0),
-            times:
-              avaliacoes.filter((a) => a.status === "pendente").length +
-              teams.filter(
-                (t) =>
-                  t.inscritoEm &&
-                  (!config?.ultimaVisualizacaoTimes || new Date(t.inscritoEm) > new Date(config.ultimaVisualizacaoTimes))
-              ).length,
+            times: avaliacoes.filter((a) => a.status === "pendente").length,
+            financeiro: teams.filter(
+              (t) =>
+                t.inscritoEm &&
+                (!config?.ultimaVisualizacaoTimes || new Date(t.inscritoEm) > new Date(config.ultimaVisualizacaoTimes))
+            ).length,
           }}
         />
       )}
@@ -9184,29 +9182,18 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
             abas={[
               { chave: "elencos", titulo: "Elencos", contagem: 0 },
               {
-                chave: "pagamentos",
-                titulo: "Pagamentos",
-                contagem: teams.filter(
-                  (t) =>
-                    t.inscritoEm &&
-                    (!config?.ultimaVisualizacaoTimes || new Date(t.inscritoEm) > new Date(config.ultimaVisualizacaoTimes))
-                ).length,
-              },
-              {
                 chave: "irregularidades",
                 titulo: "Irregularidades",
                 contagem: avaliacoes.filter((a) => a.status === "pendente").length,
               },
               { chave: "confirmacao", titulo: "Confirmação colégio", contagem: 0 },
               { chave: "cpfs", titulo: "CPFs", contagem: 0 },
-              { chave: "planilha", titulo: "Planilha", contagem: 0 },
               { chave: "contatos", titulo: "Contatos", contagem: 0 },
             ]}
             ativa={subAbaTimes}
             onMudar={setSubAbaTimes}
           />
           {subAbaTimes === "elencos" && <GerenciarElencos teams={teams} saveTeams={saveTeams} />}
-          {subAbaTimes === "pagamentos" && <StatusAprovacaoPagamento teams={teams} saveTeams={saveTeams} />}
           {subAbaTimes === "irregularidades" && (
             <DiagnosticoIrregularidades
               teams={teams}
@@ -9217,7 +9204,29 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
           )}
           {subAbaTimes === "confirmacao" && <ConfirmacaoAlunosColegio teams={teams} saveTeams={saveTeams} />}
           {subAbaTimes === "cpfs" && <ImportarCpfsPlanilha teams={teams} />}
-          {subAbaTimes === "planilha" && <PlanilhaInscricoes teams={teams} />}
+        </>
+      )}
+
+      {secaoAtiva === "financeiro" && (
+        <>
+          <SubAbasOrganizacao
+            abas={[
+              {
+                chave: "pagamentos",
+                titulo: "Pagamentos",
+                contagem: teams.filter(
+                  (t) =>
+                    t.inscritoEm &&
+                    (!config?.ultimaVisualizacaoTimes || new Date(t.inscritoEm) > new Date(config.ultimaVisualizacaoTimes))
+                ).length,
+              },
+              { chave: "planilha", titulo: "Planilha", contagem: 0 },
+            ]}
+            ativa={subAbaFinanceiro}
+            onMudar={setSubAbaFinanceiro}
+          />
+          {subAbaFinanceiro === "pagamentos" && <StatusAprovacaoPagamento teams={teams} saveTeams={saveTeams} />}
+          {subAbaFinanceiro === "planilha" && <PlanilhaInscricoes teams={teams} />}
         </>
       )}
 
