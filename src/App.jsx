@@ -84,8 +84,8 @@ const COLORS = {
   zebra: "#182036",
 };
 
-const EDITION = 9;
-const EDITION_ROMAN = "IX";
+const EDITION = 8;
+const EDITION_ROMAN = "VIII";
 
 // Brasão oficial "Santa Úrsula Jogos Ex-Alunos", em base64 (comprimido)
 // para não depender de link externo dentro do artifact.
@@ -10108,6 +10108,23 @@ export default function App() {
     );
   }
 
+  // Esconde da navegação o que já cumpriu seu papel: "Organização" só
+  // aparece pra quem é admin (o resto só via pra uma tela pedindo acesso);
+  // "Inscrição" e "Sorteio" somem pro público assim que o sorteio sai,
+  // porque a partir daí quem importa é Jogos ao Vivo/Classificação. A
+  // aba de Inscrição volta a aparecer sozinha se alguém ganhar uma
+  // liberação de prazo (Organização → Liberações) depois do sorteio.
+  const isAdminLogado = sessao.tipo === "admin";
+  const sorteioFeito = !!(sorteio && Array.isArray(sorteio.grupos) && sorteio.grupos.length > 0);
+  const mostrarAbaInscricao = isAdminLogado || !sorteioFeito || inscricaoAberta(config, sessao.turma);
+  const mostrarAbaSorteio = isAdminLogado || !sorteioFeito;
+  const tabsVisiveis = TABS.filter((t) => {
+    if (t.id === "organizacao") return isAdminLogado;
+    if (t.id === "inscricao") return mostrarAbaInscricao;
+    if (t.id === "sorteio") return mostrarAbaSorteio;
+    return true;
+  });
+
   return (
     <div style={{ backgroundColor: COLORS.bg, minHeight: "100vh" }}>
       <style>{`
@@ -10128,7 +10145,7 @@ export default function App() {
           </span>
         </div>
         <nav className="flex gap-1 overflow-x-auto items-center">
-          {TABS.map((t) => {
+          {tabsVisiveis.map((t) => {
             const Icon = t.icon;
             const active = tab === t.id;
             // Mesma soma usada nos cartões "Pessoas e acesso" e "Times e
