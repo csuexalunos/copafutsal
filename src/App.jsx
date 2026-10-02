@@ -3078,25 +3078,40 @@ function Galeria({ config }) {
 // só funciona pra quem está logado.
 function MidiaProtegida({ caminho, tipo, className, legenda }) {
   const [url, setUrl] = useState(null);
-  const [erro, setErro] = useState(false);
+  const [erro, setErro] = useState(null);
 
   useEffect(() => {
     let cancelado = false;
     setUrl(null);
-    setErro(false);
+    setErro(null);
     urlAssinada(caminho)
       .then((u) => {
         if (!cancelado) setUrl(u);
       })
-      .catch(() => {
-        if (!cancelado) setErro(true);
+      .catch((e) => {
+        console.error("Falha ao carregar mídia da comunidade:", caminho, e);
+        if (!cancelado) setErro(e?.message || "erro desconhecido");
       });
     return () => {
       cancelado = true;
     };
   }, [caminho]);
 
-  if (erro) return null;
+  // Antes sumia sem avisar nada quando o link assinado falhava — agora
+  // mostra que algo deu errado (em vez de um buraco em branco na tela),
+  // o que ajuda a perceber na hora que uma publicação "não pegou".
+  if (erro) {
+    return (
+      <div
+        className={className}
+        style={{ display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: COLORS.zebra, padding: "8px" }}
+      >
+        <span className="text-xs text-center" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+          Não consegui carregar {tipo === "video" ? "esse vídeo" : "essa foto"}.
+        </span>
+      </div>
+    );
+  }
   if (!url) {
     return (
       <div className={className} style={{ display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: COLORS.zebra }}>
@@ -3202,7 +3217,8 @@ function Comunidade({ posts, savePosts }) {
       const caminho = await subirArquivo(blob, file.name || "foto.jpg", "image/jpeg");
       await publicar({ fotoUrl: caminho });
     } catch (err) {
-      console.error(err);
+      console.error("Falha ao publicar foto:", err);
+      alert("Não consegui publicar essa foto: " + (err?.message || "erro desconhecido"));
     } finally {
       setCapturing(false);
     }
