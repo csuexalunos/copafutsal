@@ -3112,7 +3112,10 @@ function MidiaProtegida({ caminho, tipo, className, legenda }) {
 }
 
 function Comunidade({ posts, savePosts }) {
-  const [ano, setAno] = useState(EDICOES_DISPONIVEIS[0]);
+  // Antes dava pra escolher a edição ao publicar, mas na prática ninguém
+  // posta foto de edição passada — fica fixo na atual, e some a confusão
+  // de ter que escolher algo toda vez que for mandar uma foto/vídeo.
+  const ano = EDICOES_DISPONIVEIS[0];
   const [legenda, setLegenda] = useState("");
   const [videoStaged, setVideoStaged] = useState(null);
   const [videoErro, setVideoErro] = useState("");
@@ -3282,24 +3285,7 @@ function Comunidade({ posts, savePosts }) {
           {subindoVideo ? <Loader2 size={20} color={COLORS.gold} className="animate-spin" /> : <Video size={20} color={COLORS.gold} />}
         </button>
         <div className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-          Foto (câmera ou galeria) publica na hora. Vídeo (câmera ou galeria) — edição:{" "}
-          <select
-            value={ano}
-            onChange={(e) => setAno(e.target.value)}
-            className="px-2 py-1 rounded-lg text-xs inline-block align-middle"
-            style={{
-              backgroundColor: COLORS.card,
-              border: `1.5px solid ${COLORS.border}`,
-              color: COLORS.ink,
-              fontFamily: "'Inter', sans-serif",
-            }}
-          >
-            {EDICOES_DISPONIVEIS.map((a) => (
-              <option key={a} value={a}>
-                {a}
-              </option>
-            ))}
-          </select>
+          Foto (câmera ou galeria) publica na hora. Vídeo (câmera ou galeria) também.
         </div>
       </div>
 
