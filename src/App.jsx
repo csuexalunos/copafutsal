@@ -35,6 +35,7 @@ import {
   Share2,
   MousePointerClick,
   Wallet,
+  Clock,
 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import {
@@ -722,13 +723,30 @@ function horariosDoConfig(config) {
   };
 }
 
-// Mesma ideia pro período de inscrição (config.inscricao).
-function inscricaoAberta(config) {
+// Mesma ideia pro período de inscrição (config.inscricao). Quando passa uma
+// turma e o período geral já fechou, ainda confere se aquela turma tem uma
+// liberação extra ativa (config.liberacoesExtras) — dada pela organização
+// pra um representante específico mexer/se inscrever até uma data combinada,
+// mesmo com o prazo geral encerrado.
+function inscricaoAberta(config, turma) {
   const i = (config && config.inscricao) || {};
   const inicio = parseDataConfig(i.inicio, INSCRICAO_INICIO_PADRAO);
   const fim = parseDataConfig(i.fim, INSCRICAO_FIM_PADRAO);
   const agora = new Date();
-  return agora >= inicio && agora <= fim;
+  if (agora >= inicio && agora <= fim) return true;
+  if (turma && turma.trim()) {
+    const liberacoes = (config && config.liberacoesExtras) || [];
+    return liberacoes.some((l) => {
+      const ateQuando = l.ateQuando ? new Date(l.ateQuando) : null;
+      return (
+        (l.turma || "").trim().toLowerCase() === turma.trim().toLowerCase() &&
+        ateQuando &&
+        !isNaN(ateQuando.getTime()) &&
+        agora <= ateQuando
+      );
+    });
+  }
+  return false;
 }
 
 // Times mais bem colocados da última edição (7ª, VII Copa) — usados pra
@@ -2183,7 +2201,7 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes, confi
     );
   }
 
-  if (!inscricaoAberta(config)) {
+  if (!inscricaoAberta(config, turmaFixa)) {
     return (
       <div>
         <SectionLabel eyebrow="Participe" title="Inscrição de time" />
@@ -7952,6 +7970,7 @@ function LoginGate({ onLogin }) {
 const GRUPOS_ORGANIZACAO = [
   { chave: "comunicacao", titulo: "Comunicação", subtitulo: "E-mails de aprovação e lembrete", icone: Mail },
   { chave: "pessoas", titulo: "Pessoas e acesso", subtitulo: "Inscritos, representantes, avaliações", icone: Users },
+  { chave: "liberacoes", titulo: "Liberações", subtitulo: "Libere uma turma até uma data, fora do prazo geral", icone: Clock },
   { chave: "times", titulo: "Times e elencos", subtitulo: "Elencos, irregularidades, CPFs, contatos", icone: ShieldCheck },
   { chave: "financeiro", titulo: "Financeiro", subtitulo: "Pagamentos e planilha de inscrições", icone: Wallet },
   { chave: "jogos", titulo: "Jogos", subtitulo: "Transmissão, mata-mata, tabela", icone: Swords },
@@ -8054,6 +8073,169 @@ function RankingMetricas({ titulo, icone: Icone, itens, rotular, vazio }) {
           {total.toLocaleString("pt-BR")} no total
         </p>
       )}
+    </div>
+  );
+}
+
+function LiberacoesInscricao({ config, saveConfig }) {
+  const liberacoes = (config && config.liberacoesExtras) || [];
+  const [turmaNova, setTurmaNova] = useState("");
+  const [ateQuandoNova, setAteQuandoNova] = useState("");
+  const [nota, setNota] = useState("");
+  const [salvando, setSalvando] = useState(false);
+
+  const agora = new Date();
+  const ativas = liberacoes.filter((l) => l.ateQuando && new Date(l.ateQuando) > agora);
+  const expiradas = liberacoes.filter((l) => !l.ateQuando || new Date(l.ateQuando) <= agora);
+
+  const adicionar = async (e) => {
+    e.preventDefault();
+    if (!turmaNova || !ateQuandoNova) return;
+    setSalvando(true);
+    try {
+      const nova = {
+        id: `lib_${Date.now()}`,
+        turma: turmaNova,
+        ateQuando: deDatetimeLocal(ateQuandoNova),
+        nota: nota.trim(),
+        criadoEm: new Date().toISOString(),
+      };
+      await saveConfig((atual) => ({
+        ...(atual || {}),
+        liberacoesExtras: [...((atual && atual.liberacoesExtras) || []), nova],
+      }));
+      setTurmaNova("");
+      setAteQuandoNova("");
+      setNota("");
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const remover = async (id) => {
+    await saveConfig((atual) => ({
+      ...(atual || {}),
+      liberacoesExtras: ((atual && atual.liberacoesExtras) || []).filter((l) => l.id !== id),
+    }));
+  };
+
+  return (
+    <div className="max-w-xl">
+      <div className="rounded-2xl p-5" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+        <h3 className="font-semibold mb-1 flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+          <Clock size={18} color={COLORS.accent} /> Liberar uma turma fora do prazo
+        </h3>
+        <p className="text-xs mb-4" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+          Dá pra deixar o representante de uma turma específica ainda editar ou completar a
+          inscrição (ou se inscrever) mesmo com o prazo geral encerrado — só até a data que você
+          escolher aqui. As outras turmas continuam vendo o prazo normal.
+        </p>
+
+        <form onSubmit={adicionar} className="space-y-3 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <select
+              value={turmaNova}
+              onChange={(e) => setTurmaNova(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl text-sm"
+              style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+            >
+              <option value="">Selecione a turma</option>
+              {TURMAS_HISTORICAS_ORDENADAS.map((t) => (
+                <option key={t.turma} value={t.turma}>
+                  {t.turma}
+                </option>
+              ))}
+            </select>
+            <input
+              type="datetime-local"
+              value={ateQuandoNova}
+              onChange={(e) => setAteQuandoNova(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl text-sm"
+              style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+            />
+          </div>
+          <input
+            type="text"
+            value={nota}
+            onChange={(e) => setNota(e.target.value)}
+            placeholder="Nota (opcional) — ex: faltou confirmar 2 jogadores"
+            className="w-full px-3 py-2 rounded-xl text-sm"
+            style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+          />
+          <button
+            type="submit"
+            disabled={!turmaNova || !ateQuandoNova || salvando}
+            className="px-4 py-2 rounded-xl text-sm font-semibold disabled:opacity-50"
+            style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}
+          >
+            {salvando ? "Liberando..." : "Liberar"}
+          </button>
+        </form>
+
+        <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+          Liberações ativas ({ativas.length})
+        </div>
+        {ativas.length === 0 ? (
+          <p className="text-sm mb-5" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Nenhuma agora — todo mundo segue o prazo geral.
+          </p>
+        ) : (
+          <ul className="space-y-2 mb-5">
+            {ativas.map((l) => (
+              <li
+                key={l.id}
+                className="flex items-center justify-between gap-3 text-sm px-3 py-2 rounded-lg"
+                style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+              >
+                <div className="min-w-0">
+                  <div className="font-medium">Turma {l.turma}</div>
+                  <div className="text-xs truncate" style={{ color: COLORS.slate }}>
+                    Até {new Date(l.ateQuando).toLocaleString("pt-BR")} {l.nota && `· ${l.nota}`}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => remover(l.id)}
+                  className="text-xs font-semibold shrink-0"
+                  style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+                >
+                  Remover
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {expiradas.length > 0 && (
+          <details>
+            <summary
+              className="text-xs font-semibold uppercase tracking-wide cursor-pointer"
+              style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+            >
+              Expiradas ({expiradas.length})
+            </summary>
+            <ul className="space-y-2 mt-2">
+              {expiradas.map((l) => (
+                <li
+                  key={l.id}
+                  className="flex items-center justify-between gap-3 text-sm px-3 py-2 rounded-lg"
+                  style={{ backgroundColor: COLORS.zebra, color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+                >
+                  <div className="min-w-0">
+                    <div className="font-medium">Turma {l.turma}</div>
+                    <div className="text-xs truncate">
+                      Expirou em {new Date(l.ateQuando).toLocaleString("pt-BR")} {l.nota && `· ${l.nota}`}
+                    </div>
+                  </div>
+                  <button type="button" onClick={() => remover(l.id)} className="text-xs font-semibold shrink-0">
+                    Remover
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
+      </div>
     </div>
   );
 }
@@ -8657,6 +8839,8 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
           saveAvaliacoes={saveAvaliacoes}
         />
       )}
+
+      {secaoAtiva === "liberacoes" && <LiberacoesInscricao config={config} saveConfig={saveConfig} />}
 
       {secaoAtiva === "pessoas" && (
       <>
