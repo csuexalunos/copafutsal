@@ -106,6 +106,7 @@ const TURMAS_HISTORICAS = [
   { turma: "2013", apelido: "Intensidade da Roça" },
   { turma: "2001/02", apelido: "A Malandragem Clássica" },
   { turma: "2022.2", apelido: "Uchôa na Linha" },
+  { turma: "2022.3", apelido: "" },
   { turma: "2015", apelido: "Estilo Estudiantes" },
   { turma: "2003/04", apelido: "Memória e Artilharia" },
   { turma: "2019", apelido: "Confiança de Brasília" },
