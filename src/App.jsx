@@ -8078,7 +8078,14 @@ function RankingMetricas({ titulo, icone: Icone, itens, rotular, vazio }) {
   );
 }
 
-function LiberacoesInscricao({ config, saveConfig }) {
+// Acha o representante aprovado daquela turma (mesmo critério usado pra
+// mandar e-mail pro representante do time) — só pra mostrar o nome dele
+// na lista de liberações, não muda quem de fato está liberado.
+function representanteDaTurma(turma, perfis) {
+  return (perfis || []).find((p) => p.status === "aprovado" && (p.turma || "").trim() === (turma || "").trim());
+}
+
+function LiberacoesInscricao({ config, saveConfig, perfis }) {
   const liberacoes = (config && config.liberacoesExtras) || [];
   const [turmaNova, setTurmaNova] = useState("");
   const [ateQuandoNova, setAteQuandoNova] = useState("");
@@ -8088,6 +8095,7 @@ function LiberacoesInscricao({ config, saveConfig }) {
   const agora = new Date();
   const ativas = liberacoes.filter((l) => l.ateQuando && new Date(l.ateQuando) > agora);
   const expiradas = liberacoes.filter((l) => !l.ateQuando || new Date(l.ateQuando) <= agora);
+  const representanteSelecionado = turmaNova ? representanteDaTurma(turmaNova, perfis) : null;
 
   const adicionar = async (e) => {
     e.preventDefault();
@@ -8155,6 +8163,13 @@ function LiberacoesInscricao({ config, saveConfig }) {
               style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
             />
           </div>
+          {turmaNova && (
+            <p className="text-xs -mt-1" style={{ color: representanteSelecionado ? COLORS.slate : "#c0392b", fontFamily: "'Inter', sans-serif" }}>
+              {representanteSelecionado
+                ? `Representante dessa turma: ${representanteSelecionado.nome || representanteSelecionado.email}`
+                : "Essa turma ainda não tem representante aprovado."}
+            </p>
+          )}
           <input
             type="text"
             value={nota}
@@ -8182,28 +8197,41 @@ function LiberacoesInscricao({ config, saveConfig }) {
           </p>
         ) : (
           <ul className="space-y-2 mb-5">
-            {ativas.map((l) => (
-              <li
-                key={l.id}
-                className="flex items-center justify-between gap-3 text-sm px-3 py-2 rounded-lg"
-                style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
-              >
-                <div className="min-w-0">
-                  <div className="font-medium">Turma {l.turma}</div>
-                  <div className="text-xs truncate" style={{ color: COLORS.slate }}>
-                    Até {new Date(l.ateQuando).toLocaleString("pt-BR")} {l.nota && `· ${l.nota}`}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => remover(l.id)}
-                  className="text-xs font-semibold shrink-0"
-                  style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+            {ativas.map((l) => {
+              const rep = representanteDaTurma(l.turma, perfis);
+              return (
+                <li
+                  key={l.id}
+                  className="flex items-center justify-between gap-3 text-sm px-3 py-2 rounded-lg"
+                  style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
                 >
-                  Remover
-                </button>
-              </li>
-            ))}
+                  <div className="min-w-0">
+                    <div className="font-medium">
+                      Turma {l.turma}
+                      {rep && (
+                        <span className="font-normal" style={{ color: COLORS.slate }}>
+                          {" "}
+                          · {rep.nome || rep.email}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs truncate" style={{ color: COLORS.slate }}>
+                      {rep && rep.email && rep.nome ? `${rep.email} · ` : ""}
+                      Até {new Date(l.ateQuando).toLocaleString("pt-BR")} {l.nota && `· ${l.nota}`}
+                      {!rep && " · sem representante aprovado ainda"}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => remover(l.id)}
+                    className="text-xs font-semibold shrink-0"
+                    style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+                  >
+                    Remover
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
 
@@ -8216,23 +8244,29 @@ function LiberacoesInscricao({ config, saveConfig }) {
               Expiradas ({expiradas.length})
             </summary>
             <ul className="space-y-2 mt-2">
-              {expiradas.map((l) => (
-                <li
-                  key={l.id}
-                  className="flex items-center justify-between gap-3 text-sm px-3 py-2 rounded-lg"
-                  style={{ backgroundColor: COLORS.zebra, color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
-                >
-                  <div className="min-w-0">
-                    <div className="font-medium">Turma {l.turma}</div>
-                    <div className="text-xs truncate">
-                      Expirou em {new Date(l.ateQuando).toLocaleString("pt-BR")} {l.nota && `· ${l.nota}`}
+              {expiradas.map((l) => {
+                const rep = representanteDaTurma(l.turma, perfis);
+                return (
+                  <li
+                    key={l.id}
+                    className="flex items-center justify-between gap-3 text-sm px-3 py-2 rounded-lg"
+                    style={{ backgroundColor: COLORS.zebra, color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+                  >
+                    <div className="min-w-0">
+                      <div className="font-medium">
+                        Turma {l.turma}
+                        {rep && ` · ${rep.nome || rep.email}`}
+                      </div>
+                      <div className="text-xs truncate">
+                        Expirou em {new Date(l.ateQuando).toLocaleString("pt-BR")} {l.nota && `· ${l.nota}`}
+                      </div>
                     </div>
-                  </div>
-                  <button type="button" onClick={() => remover(l.id)} className="text-xs font-semibold shrink-0">
-                    Remover
-                  </button>
-                </li>
-              ))}
+                    <button type="button" onClick={() => remover(l.id)} className="text-xs font-semibold shrink-0">
+                      Remover
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           </details>
         )}
@@ -8841,7 +8875,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
         />
       )}
 
-      {secaoAtiva === "liberacoes" && <LiberacoesInscricao config={config} saveConfig={saveConfig} />}
+      {secaoAtiva === "liberacoes" && <LiberacoesInscricao config={config} saveConfig={saveConfig} perfis={perfis} />}
 
       {secaoAtiva === "pessoas" && (
       <>
