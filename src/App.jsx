@@ -853,6 +853,17 @@ function compressImageFile(file, maxSize = 1080, quality = 0.72) {
 // Mesma compressão, mas devolve um Blob de verdade em vez de base64 — pra
 // subir pro Supabase Storage (fotos/vídeos da Comunidade), em vez de
 // guardar a imagem inteira como texto dentro do banco.
+// Numa conexão ruim (sinal fraco no estádio, por exemplo) uma promessa
+// de upload pode ficar pendurada pra sempre sem erro nenhum — do ponto
+// de vista de quem está usando, "não vai e não aparece nada". Isso dá um
+// prazo máximo e força uma falha com mensagem clara se estourar.
+function comTimeout(promessa, ms, mensagem) {
+  return Promise.race([
+    promessa,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(mensagem)), ms)),
+  ]);
+}
+
 function compressImageToBlob(file, maxSize = 1280, quality = 0.75) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -3133,6 +3144,7 @@ function Comunidade({ posts, savePosts }) {
   const ano = EDICOES_DISPONIVEIS[0];
   const [legenda, setLegenda] = useState("");
   const [videoStaged, setVideoStaged] = useState(null);
+  const [fotoStaged, setFotoStaged] = useState(null);
   const [videoErro, setVideoErro] = useState("");
   const [saving, setSaving] = useState(false);
   const [sent, setSent] = useState(false);
@@ -3190,21 +3202,28 @@ function Comunidade({ posts, savePosts }) {
 
   const publicar = async (extra) => {
     setSaving(true);
-    const novo = {
-      id: `post_${Date.now()}`,
-      ano,
-      fotoUrl: "",
-      videoUrl: "",
-      legenda: legenda.trim(),
-      criadoEm: new Date().toISOString(),
-      ...extra,
-    };
-    await savePosts([...posts, novo]);
-    setSaving(false);
-    setSent(true);
-    setLegenda("");
-    setVideoStaged(null);
-    setTimeout(() => setSent(false), 3000);
+    try {
+      const novo = {
+        id: `post_${Date.now()}`,
+        ano,
+        fotoUrl: "",
+        videoUrl: "",
+        legenda: legenda.trim(),
+        criadoEm: new Date().toISOString(),
+        ...extra,
+      };
+      await comTimeout(savePosts([...posts, novo]), 20000, "Demorou demais pra publicar (conexão fraca?). Tenta de novo.");
+      setSent(true);
+      setLegenda("");
+      setVideoStaged(null);
+      setFotoStaged(null);
+      setTimeout(() => setSent(false), 3000);
+    } catch (err) {
+      console.error("Falha ao publicar:", err);
+      alert("Não consegui publicar: " + (err?.message || "erro desconhecido"));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleFotoFile = async (e) => {
@@ -3213,15 +3232,25 @@ function Comunidade({ posts, savePosts }) {
     if (!file) return;
     setCapturing(true);
     try {
-      const blob = await compressImageToBlob(file);
-      const caminho = await subirArquivo(blob, file.name || "foto.jpg", "image/jpeg");
-      await publicar({ fotoUrl: caminho });
+      const blob = await comTimeout(compressImageToBlob(file), 15000, "Demorou demais pra processar a foto. Tenta de novo.");
+      const caminho = await comTimeout(
+        subirArquivo(blob, file.name || "foto.jpg", "image/jpeg"),
+        30000,
+        "A conexão está lenta e o envio travou. Tenta de novo com um sinal melhor."
+      );
+      const url = await comTimeout(urlAssinada(caminho), 15000, "Enviei a foto, mas demorou pra confirmar. Tenta de novo.");
+      setFotoStaged({ caminho, url });
     } catch (err) {
-      console.error("Falha ao publicar foto:", err);
-      alert("Não consegui publicar essa foto: " + (err?.message || "erro desconhecido"));
+      console.error("Falha ao preparar foto:", err);
+      alert("Não consegui enviar essa foto: " + (err?.message || "erro desconhecido"));
     } finally {
       setCapturing(false);
     }
+  };
+
+  const publicarFoto = async () => {
+    if (!fotoStaged) return;
+    await publicar({ fotoUrl: fotoStaged.caminho });
   };
 
   const handleVideoFile = async (e) => {
@@ -3235,8 +3264,12 @@ function Comunidade({ posts, savePosts }) {
     }
     setSubindoVideo(true);
     try {
-      const caminho = await subirArquivo(file, file.name || "video.mp4", file.type);
-      const url = await urlAssinada(caminho);
+      const caminho = await comTimeout(
+        subirArquivo(file, file.name || "video.mp4", file.type),
+        45000,
+        "A conexão está lenta e o envio travou. Tenta de novo com um sinal melhor."
+      );
+      const url = await comTimeout(urlAssinada(caminho), 15000, "Enviei o vídeo, mas demorou pra confirmar. Tenta de novo.");
       setVideoStaged({ caminho, url });
     } catch (err) {
       setVideoErro("Falha ao subir o vídeo: " + err.message);
@@ -3301,13 +3334,50 @@ function Comunidade({ posts, savePosts }) {
           {subindoVideo ? <Loader2 size={20} color={COLORS.gold} className="animate-spin" /> : <Video size={20} color={COLORS.gold} />}
         </button>
         <div className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-          Foto (câmera ou galeria) publica na hora. Vídeo (câmera ou galeria) também.
+          Foto ou vídeo (câmera ou galeria): você escolhe a legenda antes de publicar.
         </div>
       </div>
 
       {videoErro && (
         <div className="text-sm mb-3" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
           {videoErro}
+        </div>
+      )}
+
+      {fotoStaged && (
+        <div
+          className="rounded-2xl p-4 mb-8 space-y-3"
+          style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
+        >
+          <img src={fotoStaged.url} alt="" className="w-full rounded-xl max-h-64 object-cover" />
+          <input
+            type="text"
+            placeholder="Legenda (opcional)"
+            value={legenda}
+            onChange={(e) => setLegenda(e.target.value)}
+            className="w-full px-3 py-2 rounded-xl text-sm"
+            style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+          />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={publicarFoto}
+              disabled={saving}
+              className="px-5 py-2.5 rounded-xl font-semibold text-sm inline-flex items-center gap-2 disabled:opacity-60"
+              style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+            >
+              {saving && <Loader2 size={16} className="animate-spin" />}
+              Publicar foto
+            </button>
+            <button
+              type="button"
+              onClick={() => setFotoStaged(null)}
+              className="px-4 py-2.5 rounded-xl text-sm"
+              style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+            >
+              Cancelar
+            </button>
+          </div>
         </div>
       )}
 
