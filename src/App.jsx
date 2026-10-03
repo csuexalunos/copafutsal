@@ -116,6 +116,8 @@ const TURMAS_HISTORICAS = [
   { turma: "2012", apelido: "O Talento que Evapora" },
   { turma: "2016", apelido: "" },
   { turma: "2008", apelido: "" },
+  { turma: "2024", apelido: "" },
+  { turma: "2025", apelido: "" },
 ];
 
 // Elencos inscritos na edição de 2025 (fonte: PDF de inscrições enviado).
