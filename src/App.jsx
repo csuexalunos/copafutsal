@@ -8565,6 +8565,173 @@ function EscudosTimes({ teams, escudosCustom, saveEscudosCustom }) {
   );
 }
 
+// Versões em alta resolução (PNG, fundo transparente) guardadas em
+// public/escudos/. Só existem para as turmas cujo arquivo original foi
+// enviado; as demais só têm o tamanho em que o escudo já está no app.
+const ESCUDOS_HD = {
+  "2008": { arquivo: "2008.png", w: 3131, h: 3223 },
+  "2022.3": { arquivo: "2022.3.png", w: 970, h: 1016 },
+  "2024": { arquivo: "2024.png", w: 1032, h: 1199 },
+  "2025": { arquivo: "2025.png", w: 1050, h: 1197 },
+};
+
+function nomeArquivoEscudo(turma) {
+  return "escudo-" + String(turma).replace(/[^a-zA-Z0-9._-]/g, "-") + ".png";
+}
+
+function dispararDownload(blob, nome) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nome;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+// Devolve um Blob PNG (fundo transparente) do escudo da turma: o arquivo HD
+// se existir (e não houver escudo personalizado por cima), senão converte a
+// imagem embutida no app para PNG, no tamanho original dela.
+async function blobDoEscudo(turma, escudosCustom) {
+  const hd = ESCUDOS_HD[turma];
+  const temCustom = escudosCustom && escudosCustom[turma];
+  if (hd && !temCustom) {
+    const r = await fetch(`${import.meta.env.BASE_URL}escudos/${hd.arquivo}`);
+    if (!r.ok) throw new Error("arquivo HD não encontrado");
+    return await r.blob();
+  }
+  const src = ESCUDOS_TIMES[turma];
+  if (!src) throw new Error("sem escudo");
+  const img = await new Promise((resolve, reject) => {
+    const i = new Image();
+    i.onload = () => resolve(i);
+    i.onerror = () => reject(new Error("imagem inválida"));
+    i.src = src;
+  });
+  const canvas = document.createElement("canvas");
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  canvas.getContext("2d").drawImage(img, 0, 0);
+  return await new Promise((resolve, reject) =>
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("falha ao gerar PNG"))), "image/png")
+  );
+}
+
+function BaixarEscudos({ escudosCustom }) {
+  const [ocupado, setOcupado] = useState("");
+  const custom = escudosCustom || {};
+  const ordem = TURMAS_HISTORICAS_ORDENADAS.map((t) => t.turma);
+  const turmas = Object.keys(ESCUDOS_TIMES).sort((a, b) => {
+    const ia = ordem.indexOf(a);
+    const ib = ordem.indexOf(b);
+    return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+  });
+
+  const infoResolucao = (turma) => {
+    const hd = ESCUDOS_HD[turma];
+    if (hd && !custom[turma]) return { texto: `${hd.w}×${hd.h}px · alta definição`, hd: true };
+    return { texto: "tamanho original do app (baixa resolução)", hd: false };
+  };
+
+  const baixarUm = async (turma) => {
+    setOcupado(turma);
+    try {
+      dispararDownload(await blobDoEscudo(turma, custom), nomeArquivoEscudo(turma));
+    } catch (err) {
+      alert("Não consegui baixar esse escudo: " + err.message);
+    } finally {
+      setOcupado("");
+    }
+  };
+
+  const baixarTodos = async () => {
+    setOcupado("__todos__");
+    try {
+      const { default: JSZip } = await import("jszip");
+      const zip = new JSZip();
+      for (const turma of turmas) {
+        try {
+          zip.file(nomeArquivoEscudo(turma), await blobDoEscudo(turma, custom));
+        } catch (err) {
+          console.error("Escudo ignorado no ZIP:", turma, err);
+        }
+      }
+      dispararDownload(await zip.generateAsync({ type: "blob" }), "escudos-copa-csu.zip");
+    } catch (err) {
+      alert("Não consegui montar o ZIP: " + err.message);
+    } finally {
+      setOcupado("");
+    }
+  };
+
+  return (
+    <div className="rounded-2xl p-5 mt-4" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+      <div className="flex items-start justify-between gap-3 mb-1">
+        <h3 className="font-semibold flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+          <Download size={18} color={COLORS.accent} /> Baixar escudos
+        </h3>
+        <button
+          type="button"
+          onClick={baixarTodos}
+          disabled={!!ocupado}
+          className="px-3 py-2 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 shrink-0 disabled:opacity-60"
+          style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}
+        >
+          {ocupado === "__todos__" ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+          Baixar todos (ZIP)
+        </button>
+      </div>
+      <p className="text-xs mb-4" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+        PNG com fundo transparente. Os marcados como alta definição são os arquivos grandes originais;
+        os outros só existem no tamanho pequeno em que já estão no app — pra ter em alta, é só enviar a
+        imagem original na área acima.
+      </p>
+      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {turmas.map((turma) => {
+          const info = infoResolucao(turma);
+          return (
+            <li
+              key={turma}
+              className="flex items-center gap-3 px-3 py-2 rounded-lg"
+              style={{ backgroundColor: COLORS.zebra, fontFamily: "'Inter', sans-serif" }}
+            >
+              <div
+                className="w-14 h-14 rounded-md shrink-0 flex items-center justify-center"
+                style={{
+                  backgroundColor: "#fff",
+                  backgroundImage:
+                    "linear-gradient(45deg,#d9d9d9 25%,transparent 25%,transparent 75%,#d9d9d9 75%),linear-gradient(45deg,#d9d9d9 25%,transparent 25%,transparent 75%,#d9d9d9 75%)",
+                  backgroundSize: "12px 12px",
+                  backgroundPosition: "0 0,6px 6px",
+                }}
+              >
+                <img src={ESCUDOS_TIMES[turma]} alt={`Escudo ${turma}`} className="max-w-full max-h-full object-contain" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-semibold truncate" style={{ color: COLORS.ink }}>{turma}</div>
+                <div className="text-[11px] leading-tight" style={{ color: info.hd ? COLORS.accent : COLORS.slate }}>
+                  {info.texto}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => baixarUm(turma)}
+                disabled={!!ocupado}
+                aria-label={`Baixar escudo ${turma}`}
+                className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 disabled:opacity-60"
+                style={{ backgroundColor: COLORS.navy }}
+              >
+                {ocupado === turma ? <Loader2 size={15} color={COLORS.gold} className="animate-spin" /> : <Download size={15} color={COLORS.gold} />}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, saveAdminRequests, sessao, config, saveConfig, avaliacoes, saveAvaliacoes, sorteio, saveSorteio, posts, savePosts, perfis, setPerfis, escudosCustom, saveEscudosCustom }) {
   const souAdminLogado = sessao && sessao.tipo === "admin";
   const souSuperAdmin = souAdminLogado && sessao.superAdmin;
@@ -9774,7 +9941,10 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
           {subAbaTimes === "confirmacao" && <ConfirmacaoAlunosColegio teams={teams} saveTeams={saveTeams} />}
           {subAbaTimes === "cpfs" && <ImportarCpfsPlanilha teams={teams} />}
           {subAbaTimes === "escudos" && (
-            <EscudosTimes teams={teams} escudosCustom={escudosCustom} saveEscudosCustom={saveEscudosCustom} />
+            <>
+              <EscudosTimes teams={teams} escudosCustom={escudosCustom} saveEscudosCustom={saveEscudosCustom} />
+              <BaixarEscudos escudosCustom={escudosCustom} />
+            </>
           )}
         </>
       )}
