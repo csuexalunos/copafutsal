@@ -8680,7 +8680,7 @@ function BaixarEscudos({ escudosCustom }) {
   };
 
   return (
-    <div className="rounded-2xl p-5 mt-4" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+    <div className="rounded-2xl p-5" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
       <div className="flex items-start justify-between gap-3 mb-1">
         <h3 className="font-semibold flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
           <Download size={18} color={COLORS.accent} /> Baixar escudos
@@ -8791,6 +8791,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   const [secaoAtiva, setSecaoAtiva] = useState(() => (restritoAJogos ? "jogos" : null));
   const [subAbaPessoas, setSubAbaPessoas] = useState("inscritos");
   const [subAbaTimes, setSubAbaTimes] = useState("elencos");
+  const [subAbaDownloads, setSubAbaDownloads] = useState("documentos");
   const [subAbaFinanceiro, setSubAbaFinanceiro] = useState("pagamentos");
 
   // Ao abrir um card do hub, já cai direto na sub-aba que tem a
@@ -9992,8 +9993,16 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
 
       {secaoAtiva === "documentos" && (
         <>
-          <DocumentosOrganizacao teams={teams} matches={matches} />
-          <BaixarEscudos escudosCustom={escudosCustom} />
+          <SubAbasOrganizacao
+            abas={[
+              { chave: "documentos", titulo: "Documentos pra imprimir", contagem: 0 },
+              { chave: "escudos", titulo: "Escudos dos times", contagem: 0 },
+            ]}
+            ativa={subAbaDownloads}
+            onMudar={setSubAbaDownloads}
+          />
+          {subAbaDownloads === "documentos" && <DocumentosOrganizacao teams={teams} matches={matches} />}
+          {subAbaDownloads === "escudos" && <BaixarEscudos escudosCustom={escudosCustom} />}
         </>
       )}
 
