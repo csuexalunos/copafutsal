@@ -3089,7 +3089,7 @@ function Galeria({ config }) {
 // Mostra uma foto ou vídeo guardado no bucket privado — como não existe
 // mais link fixo, pede um link temporário (assinado) na hora de exibir,
 // só funciona pra quem está logado.
-function MidiaProtegida({ caminho, tipo, className, legenda }) {
+function MidiaProtegida({ caminho, tipo, className, legenda, aoClicar }) {
   const [url, setUrl] = useState(null);
   const [erro, setErro] = useState(null);
 
@@ -3135,11 +3135,33 @@ function MidiaProtegida({ caminho, tipo, className, legenda }) {
   return tipo === "video" ? (
     <video src={url} controls className={className} />
   ) : (
-    <img src={url} alt={legenda || ""} className={className} />
+    <img
+      src={url}
+      alt={legenda || ""}
+      className={className}
+      onClick={aoClicar}
+      style={aoClicar ? { cursor: "zoom-in" } : undefined}
+    />
   );
 }
 
-function Comunidade({ posts, savePosts }) {
+// Aprovar ou recusar uma publicação da Comunidade (só a organização).
+// Recusar apaga a publicação da lista; aprovar libera pra todo mundo ver.
+async function moderarPost(savePosts, id, acao) {
+  await savePosts((atuais) =>
+    acao === "aprovar"
+      ? (atuais || []).map((p) => (p.id === id ? { ...p, status: "aprovado", aprovadoEm: new Date().toISOString() } : p))
+      : (atuais || []).filter((p) => p.id !== id)
+  );
+}
+
+function postPendente(p) {
+  return p.status === "pendente";
+}
+
+function Comunidade({ posts, savePosts, sessao }) {
+  const podeModerar = !!(sessao && sessao.tipo === "admin" && sessao.escopo !== "jogos");
+  const [fotoAberta, setFotoAberta] = useState(null);
   // Antes dava pra escolher a edição ao publicar, mas na prática ninguém
   // posta foto de edição passada — fica fixo na atual, e some a confusão
   // de ter que escolher algo toda vez que for mandar uma foto/vídeo.
@@ -3212,9 +3234,17 @@ function Comunidade({ posts, savePosts }) {
         videoUrl: "",
         legenda: legenda.trim(),
         criadoEm: new Date().toISOString(),
+        // Quem enviou + aprovação: tudo que a galera manda fica pendente
+        // até a organização liberar (a organização publica direto).
+        autor: sessao ? { id: sessao.id, nome: sessao.nome || sessao.email || "", turma: sessao.turma || "" } : null,
+        status: podeModerar ? "aprovado" : "pendente",
         ...extra,
       };
-      await comTimeout(savePosts([...posts, novo]), 20000, "Demorou demais pra publicar (conexão fraca?). Tenta de novo.");
+      await comTimeout(
+        savePosts((atuais) => [...(atuais || []), novo]),
+        20000,
+        "Demorou demais pra publicar (conexão fraca?). Tenta de novo."
+      );
       setSent(true);
       setLegenda("");
       setVideoStaged(null);
@@ -3285,15 +3315,20 @@ function Comunidade({ posts, savePosts }) {
     await publicar({ videoUrl: videoStaged.caminho });
   };
 
-  const anos = ["Todos", ...Array.from(new Set(posts.map((p) => p.ano).filter(Boolean)))];
-  const postsFiltrados = filtroAno === "Todos" ? posts : posts.filter((p) => p.ano === filtroAno);
+  // Pendentes só aparecem pra organização e pra quem enviou.
+  const postsVisiveis = posts.filter(
+    (p) => !postPendente(p) || podeModerar || (p.autor && sessao && p.autor.id === sessao.id)
+  );
+  const anos = ["Todos", ...Array.from(new Set(postsVisiveis.map((p) => p.ano).filter(Boolean)))];
+  const postsFiltrados = filtroAno === "Todos" ? postsVisiveis : postsVisiveis.filter((p) => p.ano === filtroAno);
 
   return (
     <div>
       <SectionLabel eyebrow="Comunidade" title="Fotos e vídeos" />
       <p className="text-sm mb-6 max-w-xl" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
         Espaço aberto pra quem estiver no app compartilhar fotos e vídeos da Copa — direto
-        da câmera ou da galeria do celular, sem link. Qualquer pessoa pode curtir e comentar.
+        da câmera ou da galeria do celular, sem link. Toque numa foto pra ver inteira. As publicações
+        aparecem pra todo mundo depois que a organização aprovar.
       </p>
 
       <div className="flex items-center gap-3 mb-3 flex-wrap">
@@ -3425,7 +3460,7 @@ function Comunidade({ posts, savePosts }) {
           className="flex items-center gap-2 text-sm font-medium px-4 py-3 rounded-xl mb-6"
           style={{ backgroundColor: COLORS.accentSoft, color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}
         >
-          <Check size={16} /> Publicado!
+          <Check size={16} /> {podeModerar ? "Publicado!" : "Enviado! Aparece pra todo mundo assim que a organização aprovar."}
         </div>
       )}
 
@@ -3466,7 +3501,13 @@ function Comunidade({ posts, savePosts }) {
                   <MidiaProtegida caminho={p.videoUrl} tipo="video" className="w-full max-h-64 bg-black" />
                 ) : (
                   p.fotoUrl && (
-                    <MidiaProtegida caminho={p.fotoUrl} tipo="foto" className="w-full h-48 object-cover" legenda={p.legenda} />
+                    <MidiaProtegida
+                      caminho={p.fotoUrl}
+                      tipo="foto"
+                      className="w-full h-48 object-cover"
+                      legenda={p.legenda}
+                      aoClicar={() => setFotoAberta(p)}
+                    />
                   )
                 )}
                 <div className="p-3">
@@ -3474,7 +3515,47 @@ function Comunidade({ posts, savePosts }) {
                     <span className="text-xs font-semibold" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
                       {p.ano || "Comunidade"}
                     </span>
+                    {postPendente(p) && (
+                      <span
+                        className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
+                        style={{ backgroundColor: COLORS.chipSoft, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+                      >
+                        Aguardando aprovação
+                      </span>
+                    )}
                   </div>
+                  {p.autor && p.autor.nome && (
+                    <p className="text-xs mt-1" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                      Enviada por <span className="font-semibold">{p.autor.nome}</span>
+                      {p.autor.turma ? ` · turma ${p.autor.turma}` : ""}
+                    </p>
+                  )}
+                  {podeModerar && (
+                    <div className="flex gap-2 mt-2">
+                      {postPendente(p) && (
+                        <button
+                          type="button"
+                          onClick={() => moderarPost(savePosts, p.id, "aprovar")}
+                          className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+                          style={{ backgroundColor: "#16A34A", color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+                        >
+                          Aprovar
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm(postPendente(p) ? "Recusar e apagar essa publicação?" : "Remover essa publicação do mural?")) {
+                            moderarPost(savePosts, p.id, "recusar");
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+                        style={{ color: COLORS.slate, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+                      >
+                        {postPendente(p) ? "Recusar" : "Remover"}
+                      </button>
+                    </div>
+                  )}
                   {p.legenda && (
                     <p className="text-sm mt-1" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
                       {p.legenda}
@@ -3555,6 +3636,45 @@ function Comunidade({ posts, savePosts }) {
                 </div>
               </div>
             ))}
+        </div>
+      )}
+
+      {fotoAberta && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4"
+          style={{ backgroundColor: "rgba(0,0,0,0.92)" }}
+          onClick={() => setFotoAberta(null)}
+          role="dialog"
+          aria-label="Foto ampliada"
+        >
+          <button
+            type="button"
+            onClick={() => setFotoAberta(null)}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center"
+            style={{ backgroundColor: "rgba(255,255,255,0.15)" }}
+            aria-label="Fechar"
+          >
+            <X size={20} color="#FFFFFF" />
+          </button>
+          <div onClick={(e) => e.stopPropagation()} className="flex flex-col items-center max-w-full">
+            <MidiaProtegida
+              caminho={fotoAberta.fotoUrl}
+              tipo="foto"
+              className="max-w-full max-h-[78vh] object-contain rounded-lg"
+              legenda={fotoAberta.legenda}
+            />
+            {(fotoAberta.legenda || (fotoAberta.autor && fotoAberta.autor.nome)) && (
+              <div className="mt-3 text-center max-w-md" style={{ fontFamily: "'Inter', sans-serif" }}>
+                {fotoAberta.legenda && <p className="text-sm text-white">{fotoAberta.legenda}</p>}
+                {fotoAberta.autor && fotoAberta.autor.nome && (
+                  <p className="text-xs mt-1" style={{ color: "rgba(255,255,255,0.7)" }}>
+                    Enviada por {fotoAberta.autor.nome}
+                    {fotoAberta.autor.turma ? ` · turma ${fotoAberta.autor.turma}` : ""}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -8063,6 +8183,7 @@ function LoginGate({ onLogin }) {
 const GRUPOS_ORGANIZACAO = [
   { chave: "comunicacao", titulo: "Comunicação", subtitulo: "E-mails de aprovação e lembrete", icone: Mail },
   { chave: "pessoas", titulo: "Pessoas e acesso", subtitulo: "Inscritos, representantes, avaliações", icone: Users },
+  { chave: "fotos", titulo: "Fotos e vídeos", subtitulo: "Aprovar o que a galera enviou pra Comunidade", icone: Camera },
   { chave: "liberacoes", titulo: "Liberações", subtitulo: "Libere uma turma até uma data, fora do prazo geral", icone: Clock },
   { chave: "times", titulo: "Times e elencos", subtitulo: "Elencos, irregularidades, CPFs, contatos", icone: ShieldCheck },
   { chave: "financeiro", titulo: "Financeiro", subtitulo: "Pagamentos e planilha de inscrições", icone: Wallet },
@@ -8746,6 +8867,83 @@ function BaixarEscudos({ escudosCustom }) {
   );
 }
 
+function ModeracaoFotos({ posts, savePosts }) {
+  const pendentes = (posts || []).filter(postPendente).slice().reverse();
+  const [ocupado, setOcupado] = useState("");
+
+  const agir = async (id, acao) => {
+    if (acao === "recusar" && !window.confirm("Recusar e apagar essa publicação?")) return;
+    setOcupado(id);
+    try {
+      await moderarPost(savePosts, id, acao);
+    } catch (err) {
+      alert("Não consegui salvar: " + (err?.message || "erro desconhecido"));
+    } finally {
+      setOcupado("");
+    }
+  };
+
+  return (
+    <div className="rounded-2xl p-5" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+      <h3 className="font-semibold mb-1 flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+        <Camera size={18} color={COLORS.accent} /> Aguardando aprovação ({pendentes.length})
+      </h3>
+      <p className="text-xs mb-4" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+        Tudo que as pessoas enviam pra Comunidade fica aqui até você liberar. Aprovou, aparece pra todo
+        mundo; recusou, a publicação é apagada. O que a organização posta já sai aprovado.
+      </p>
+      {pendentes.length === 0 ? (
+        <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+          Nada esperando aprovação agora.
+        </p>
+      ) : (
+        <div className="grid sm:grid-cols-2 gap-4">
+          {pendentes.map((p) => (
+            <div key={p.id} className="rounded-xl overflow-hidden" style={{ border: `1px solid ${COLORS.border}` }}>
+              {p.videoUrl ? (
+                <MidiaProtegida caminho={p.videoUrl} tipo="video" className="w-full max-h-64 bg-black" />
+              ) : (
+                p.fotoUrl && <MidiaProtegida caminho={p.fotoUrl} tipo="foto" className="w-full max-h-72 object-contain bg-black" legenda={p.legenda} />
+              )}
+              <div className="p-3" style={{ fontFamily: "'Inter', sans-serif" }}>
+                <p className="text-xs" style={{ color: COLORS.slate }}>
+                  Enviada por <span className="font-semibold">{(p.autor && p.autor.nome) || "autor desconhecido"}</span>
+                  {p.autor && p.autor.turma ? ` · turma ${p.autor.turma}` : ""}
+                </p>
+                {p.legenda && (
+                  <p className="text-sm mt-1" style={{ color: COLORS.ink }}>
+                    {p.legenda}
+                  </p>
+                )}
+                <div className="flex gap-2 mt-3">
+                  <button
+                    type="button"
+                    disabled={ocupado === p.id}
+                    onClick={() => agir(p.id, "aprovar")}
+                    className="px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-60"
+                    style={{ backgroundColor: "#16A34A", color: "#FFFFFF" }}
+                  >
+                    Aprovar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={ocupado === p.id}
+                    onClick={() => agir(p.id, "recusar")}
+                    className="px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-60"
+                    style={{ color: COLORS.slate, border: `1px solid ${COLORS.border}` }}
+                  >
+                    Recusar
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, saveAdminRequests, sessao, config, saveConfig, avaliacoes, saveAvaliacoes, sorteio, saveSorteio, posts, savePosts, perfis, setPerfis, escudosCustom, saveEscudosCustom }) {
   const souAdminLogado = sessao && sessao.tipo === "admin";
   const souSuperAdmin = souAdminLogado && sessao.superAdmin;
@@ -9265,6 +9463,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
               perfis.filter((p) => p.status !== "aprovado" && p.status !== "recusado" && !p.visualizado).length +
               (souSuperAdmin ? adminRequests.filter((r) => r.status === "pendente").length : 0),
             times: avaliacoes.filter((a) => a.status === "pendente").length,
+            fotos: (posts || []).filter(postPendente).length,
             financeiro: teams.filter(
               (t) =>
                 t.inscritoEm &&
@@ -9298,6 +9497,8 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
           saveAvaliacoes={saveAvaliacoes}
         />
       )}
+
+      {secaoAtiva === "fotos" && <ModeracaoFotos posts={posts} savePosts={savePosts} />}
 
       {secaoAtiva === "liberacoes" && <LiberacoesInscricao config={config} saveConfig={saveConfig} perfis={perfis} />}
 
@@ -10488,7 +10689,7 @@ export default function App() {
               <Chaveamento matches={matches} teams={teams} sessao={sessao} saveMatches={saveMatches} config={config} />
             )}
             {tab === "classificacao" && <Classificacao matches={matches} teams={teamsInscritos} />}
-            {tab === "comunidade" && <Comunidade posts={posts} savePosts={savePosts} />}
+            {tab === "comunidade" && <Comunidade posts={posts} savePosts={savePosts} sessao={sessao} />}
             {tab === "galeria" && <Galeria config={config} />}
             {tab === "organizacao" && (
               <Organizacao
