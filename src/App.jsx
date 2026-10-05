@@ -8067,7 +8067,7 @@ const GRUPOS_ORGANIZACAO = [
   { chave: "times", titulo: "Times e elencos", subtitulo: "Elencos, irregularidades, CPFs, contatos", icone: ShieldCheck },
   { chave: "financeiro", titulo: "Financeiro", subtitulo: "Pagamentos e planilha de inscrições", icone: Wallet },
   { chave: "jogos", titulo: "Jogos", subtitulo: "Transmissão, mata-mata, tabela", icone: Swords },
-  { chave: "documentos", titulo: "Documentos", subtitulo: "Fichas e súmulas pra imprimir", icone: Download },
+  { chave: "documentos", titulo: "Documentos e downloads", subtitulo: "Fichas, súmulas e escudos em HD", icone: Download },
   { chave: "conteudo", titulo: "Conteúdo do site", subtitulo: "Hall da Fama (super admin)", icone: Trophy, soSuperAdmin: true },
   { chave: "temporada", titulo: "Nova temporada", subtitulo: "Encerrar edição e recomeçar (super admin)", icone: RotateCcw, soSuperAdmin: true },
   { chave: "sistema", titulo: "Sistema", subtitulo: "Métricas de acesso ao app", icone: BarChart3 },
@@ -8569,7 +8569,21 @@ function EscudosTimes({ teams, escudosCustom, saveEscudosCustom }) {
 // public/escudos/. Só existem para as turmas cujo arquivo original foi
 // enviado; as demais só têm o tamanho em que o escudo já está no app.
 const ESCUDOS_HD = {
+  "2001/02": { arquivo: "2001-02.png", w: 1487, h: 3020 },
+  "2003/04": { arquivo: "2003-04.png", w: 2703, h: 3340 },
+  "2007/06": { arquivo: "2007-06.png", w: 2744, h: 3235 },
   "2008": { arquivo: "2008.png", w: 3131, h: 3223 },
+  "2009": { arquivo: "2009.png", w: 1700, h: 1699 },
+  "2012": { arquivo: "2012.png", w: 3375, h: 3375 },
+  "2013": { arquivo: "2013.png", w: 3115, h: 3116 },
+  "2014": { arquivo: "2014.png", w: 2405, h: 3375 },
+  "2015": { arquivo: "2015.png", w: 1721, h: 1510 },
+  "2018": { arquivo: "2018.png", w: 1691, h: 1592 },
+  "2019": { arquivo: "2019.png", w: 1352, h: 1733 },
+  "2020": { arquivo: "2020.png", w: 2199, h: 3039 },
+  "2021": { arquivo: "2021.png", w: 2912, h: 3179 },
+  "2022.1": { arquivo: "2022.1.png", w: 1142, h: 1593 },
+  "2022.2": { arquivo: "2022.2.png", w: 2315, h: 3088 },
   "2022.3": { arquivo: "2022.3.png", w: 970, h: 1016 },
   "2024": { arquivo: "2024.png", w: 1032, h: 1199 },
   "2025": { arquivo: "2025.png", w: 1050, h: 1197 },
@@ -8685,7 +8699,7 @@ function BaixarEscudos({ escudosCustom }) {
       <p className="text-xs mb-4" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
         PNG com fundo transparente. Os marcados como alta definição são os arquivos grandes originais;
         os outros só existem no tamanho pequeno em que já estão no app — pra ter em alta, é só enviar a
-        imagem original na área acima.
+        imagem original na aba Escudos (em Times e elencos).
       </p>
       <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         {turmas.map((turma) => {
@@ -9941,10 +9955,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
           {subAbaTimes === "confirmacao" && <ConfirmacaoAlunosColegio teams={teams} saveTeams={saveTeams} />}
           {subAbaTimes === "cpfs" && <ImportarCpfsPlanilha teams={teams} />}
           {subAbaTimes === "escudos" && (
-            <>
-              <EscudosTimes teams={teams} escudosCustom={escudosCustom} saveEscudosCustom={saveEscudosCustom} />
-              <BaixarEscudos escudosCustom={escudosCustom} />
-            </>
+            <EscudosTimes teams={teams} escudosCustom={escudosCustom} saveEscudosCustom={saveEscudosCustom} />
           )}
         </>
       )}
@@ -9979,7 +9990,12 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
         </>
       )}
 
-      {secaoAtiva === "documentos" && <DocumentosOrganizacao teams={teams} matches={matches} />}
+      {secaoAtiva === "documentos" && (
+        <>
+          <DocumentosOrganizacao teams={teams} matches={matches} />
+          <BaixarEscudos escudosCustom={escudosCustom} />
+        </>
+      )}
 
       {secaoAtiva === "times" && subAbaTimes === "contatos" && (
       <div
