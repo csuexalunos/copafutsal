@@ -7226,35 +7226,6 @@ function colocacaoUltimaEdicao(nomeTime) {
   return pos === -1 ? null : `${pos + 1}º`;
 }
 
-function sortearGrupos(potes, numGrupos) {
-  const nomesGrupo = Array.from({ length: numGrupos }, (_, i) => String.fromCharCode(65 + i)); // A, B, C...
-  const grupos = {};
-  nomesGrupo.forEach((g) => (grupos[g] = []));
-  const nomeCampeao = HALL_DA_FAMA.campeoes[HALL_DA_FAMA.campeoes.length - 1]?.turma;
-
-  potes.forEach((pote, potIdx) => {
-    let restante = [...pote];
-
-    // Regra do sorteio: o campeão da última edição é sempre o cabeça de
-    // chave do Grupo A (só vale pro pote 1, onde ele está).
-    if (potIdx === 0 && nomesGrupo.includes("A")) {
-      const campeao = restante.find((t) => t.nome === nomeCampeao);
-      if (campeao) {
-        grupos.A.push(campeao);
-        restante = restante.filter((t) => t.id !== campeao.id);
-      }
-    }
-
-    const embaralhado = restante.sort(() => Math.random() - 0.5);
-    const gruposComVaga = nomesGrupo.filter((g) => grupos[g].length <= potIdx);
-    embaralhado.forEach((time, i) => {
-      const alvo = gruposComVaga[i % gruposComVaga.length] || nomesGrupo[i % nomesGrupo.length];
-      grupos[alvo].push(time);
-    });
-  });
-  return grupos;
-}
-
 // Gera a tabela de jogos (todos-contra-todos dentro de cada grupo) a
 // partir do resultado do sorteio.
 // Método do círculo — divide os confrontos de um grupo em rodadas de
@@ -7491,6 +7462,437 @@ function gerarMataMataAutomatico(matches, teams, horarios) {
   return novos;
 }
 
+// ---------------------------------------------------------------------------
+// Sorteio ao vivo, um time por vez: roleta com os times que ainda estão no
+// pote, o sorteado cresce na tela e voa até a vaga dele no grupo. O
+// andamento fica salvo em sorteio.andamento.ordem = [{ id, grupo, pote }],
+// então dá pra fechar a tela e continuar depois, e quem está só olhando vê
+// os grupos se enchendo (a tela atualiza sozinha).
+// ---------------------------------------------------------------------------
+const ROLETA_CORES = ["#F26B3A", "#1E3A8A", "#D99A00", "#15803D", "#7C3AED", "#0E7490", "#BE185D", "#475569"];
+const ROLETA_DURACAO_MS = 5200;
+
+function sorteioInt(n) {
+  if (n <= 1) return 0;
+  try {
+    const buf = new Uint32Array(1);
+    crypto.getRandomValues(buf);
+    return buf[0] % n;
+  } catch (e) {
+    return Math.floor(Math.random() * n);
+  }
+}
+
+function esperar(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function nomesDosGrupos(numGrupos) {
+  return Array.from({ length: numGrupos }, (_, i) => String.fromCharCode(65 + i));
+}
+
+// Qual é o próximo sorteio: sempre o primeiro pote que ainda tem time.
+// Pote completo (um time pra cada grupo): o time sorteado entra no próximo
+// grupo da fila (A, B, C...). Pote incompleto (ex: poucos times novos): o
+// grupo também é sorteado, pra não encher sempre o A primeiro.
+function calcularProximoPasso(potes, numGrupos, ordem, sortearGrupoAgora) {
+  const nomes = nomesDosGrupos(numGrupos);
+  const colocados = new Set(ordem.map((o) => o.id));
+  const contagem = {};
+  nomes.forEach((g) => (contagem[g] = 0));
+  ordem.forEach((o) => {
+    if (contagem[o.grupo] != null) contagem[o.grupo] += 1;
+  });
+  for (let p = 0; p < potes.length; p++) {
+    const restantes = potes[p].filter((t) => !colocados.has(t.id));
+    if (restantes.length === 0) continue;
+    const gruposDoPote = new Set(ordem.filter((o) => o.pote === p).map((o) => o.grupo));
+    let vagas = nomes.filter((g) => !gruposDoPote.has(g));
+    if (vagas.length === 0) {
+      const menor = Math.min(...nomes.map((g) => contagem[g]));
+      vagas = nomes.filter((g) => contagem[g] === menor);
+    }
+    const incompleto = potes[p].length < numGrupos;
+    let grupo = vagas[0];
+    if (incompleto) grupo = sortearGrupoAgora ? vagas[sorteioInt(vagas.length)] : null;
+    return { poteIdx: p, grupo, restantes, grupoSorteado: incompleto };
+  }
+  return null;
+}
+
+function gruposDoAndamento(ordem, teams, numGrupos) {
+  const grupos = {};
+  nomesDosGrupos(numGrupos).forEach((g) => (grupos[g] = []));
+  [...ordem]
+    .sort((a, b) => a.pote - b.pote)
+    .forEach((o) => {
+      const t = teams.find((x) => x.id === o.id);
+      if (t && grupos[o.grupo]) grupos[o.grupo].push(t);
+    });
+  return grupos;
+}
+
+function RegrasDoSorteio({ numGrupos, numPotes, nomeCampeao }) {
+  const itens = [
+    `Os times são separados em ${numPotes} pote${numPotes > 1 ? "s" : ""} pelo ranking da última edição: o Pote 1 tem os mais bem colocados e os times novos entram sempre no último pote.`,
+    `Cada pote tem, no máximo, um time pra cada um dos ${numGrupos} grupos — ou seja, cada grupo recebe exatamente um time de cada pote.`,
+    nomeCampeao
+      ? `O campeão da última edição (${nomeCampeao}) já é o cabeça de chave do Grupo A, definido antes do sorteio — ele não entra na roleta.`
+      : "O campeão da última edição, se estiver inscrito, já é o cabeça de chave do Grupo A, definido antes do sorteio.",
+    "O sorteio é um time por vez, pote por pote, começando pelo Pote 1. A cada clique a roleta gira só com os times que ainda estão no pote da vez, e o time sorteado cresce na tela e vai pro grupo da fila (A, B, C…). Se um pote tiver menos times que grupos, o grupo também é sorteado.",
+    "Quando o último time for sorteado, a organização confere e confirma os grupos — só então a classificação e a tabela de jogos passam a valer.",
+  ];
+  return (
+    <ol className="space-y-3">
+      {itens.map((t, i) => (
+        <li key={i} className="flex gap-3 text-sm" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+          <span
+            className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+            style={{ backgroundColor: COLORS.accent, color: "#FFFFFF" }}
+          >
+            {i + 1}
+          </span>
+          <span>{t}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function RoletaSVG({ times, rot, animar }) {
+  const n = times.length;
+  const cx = 150;
+  const cy = 150;
+  const R = 146;
+  const a = 360 / Math.max(n, 1);
+  const pt = (ang, r) => {
+    const rad = ((ang - 90) * Math.PI) / 180;
+    return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)];
+  };
+  return (
+    <svg viewBox="-10 -26 320 336" className="w-full h-full" style={{ overflow: "visible" }}>
+      <circle cx={cx} cy={cy} r={R + 5} fill={COLORS.navy} />
+      <g
+        style={{
+          transformOrigin: `${cx}px ${cy}px`,
+          transform: `rotate(${rot}deg)`,
+          transition: animar ? `transform ${ROLETA_DURACAO_MS}ms cubic-bezier(0.14, 0.7, 0.08, 1)` : "none",
+        }}
+      >
+        {times.map((t, i) => {
+          const a0 = i * a;
+          const a1 = (i + 1) * a;
+          const [x0, y0] = pt(a0, R);
+          const [x1, y1] = pt(a1, R);
+          const d =
+            n === 1
+              ? `M ${cx} ${cy - R} A ${R} ${R} 0 1 1 ${cx - 0.01} ${cy - R} Z`
+              : `M ${cx} ${cy} L ${x0} ${y0} A ${R} ${R} 0 ${a > 180 ? 1 : 0} 1 ${x1} ${y1} Z`;
+          const meio = a0 + a / 2;
+          const [lx, ly] = pt(meio, R * 0.6);
+          const escudo = ESCUDOS_TIMES[t.nome];
+          const nome = String(t.nome || "");
+          return (
+            <g key={t.id}>
+              <path d={d} fill={ROLETA_CORES[i % ROLETA_CORES.length]} stroke="#FFFFFF" strokeWidth="2.5" />
+              <g transform={`rotate(${n === 1 ? 0 : meio} ${lx} ${ly})`}>
+                {escudo && <image href={escudo} x={lx - 19} y={ly - 40} width="38" height="38" preserveAspectRatio="xMidYMid meet" />}
+                <text
+                  x={lx}
+                  y={ly + 14}
+                  textAnchor="middle"
+                  fontSize={nome.length > 9 ? 12 : 15}
+                  fontWeight="700"
+                  fill="#FFFFFF"
+                  style={{ fontFamily: "'Sora', sans-serif" }}
+                >
+                  {nome}
+                </text>
+              </g>
+            </g>
+          );
+        })}
+      </g>
+      <circle cx={cx} cy={cy} r="20" fill={COLORS.navy} stroke={COLORS.gold} strokeWidth="4" />
+      <polygon points="150,12 134,-16 166,-16" fill={COLORS.gold} stroke={COLORS.navy} strokeWidth="3" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function PalcoSorteio({ potes, numGrupos, ordem, iniciado, nomeCampeao, onIniciar, onRegistrarPasso, onFechar }) {
+  const [verRegras, setVerRegras] = useState(!iniciado);
+  const [fase, setFase] = useState("idle"); // idle | girando | revelado | voando
+  const [rot, setRot] = useState(0);
+  const [animar, setAnimar] = useState(false);
+  const [timesDaRoleta, setTimesDaRoleta] = useState(null);
+  const [carta, setCarta] = useState(null); // { time, left, top, size, dx, dy, k }
+  const palcoRef = React.useRef(null);
+  const roletaRef = React.useRef(null);
+
+  const proximo = calcularProximoPasso(potes, numGrupos, ordem, false);
+  const total = potes.reduce((s, p) => s + p.length, 0);
+  const concluido = !proximo;
+  const nomes = nomesDosGrupos(numGrupos);
+  const roletaTimes = timesDaRoleta || (proximo ? proximo.restantes : []);
+  const ocupado = fase !== "idle";
+
+  const sortearProximo = async () => {
+    if (ocupado) return;
+    const passo = calcularProximoPasso(potes, numGrupos, ordem, true);
+    if (!passo) return;
+    const idx = sorteioInt(passo.restantes.length);
+    const vencedor = passo.restantes[idx];
+    try {
+      setTimesDaRoleta(passo.restantes);
+      setFase("girando");
+      setAnimar(false);
+      setRot(0);
+      await esperar(80);
+      const a = 360 / passo.restantes.length;
+      const centro = (idx + 0.5) * a;
+      const folga = (Math.random() - 0.5) * a * 0.6;
+      setAnimar(true);
+      setRot(360 * 6 + (360 - centro) + folga);
+      await esperar(ROLETA_DURACAO_MS + 300);
+
+      const rc = roletaRef.current.getBoundingClientRect();
+      const tamanho = Math.min(rc.width * 0.78, 250);
+      const left = rc.left + rc.width / 2 - tamanho / 2;
+      const top = rc.top + rc.height / 2 - tamanho / 2;
+      setCarta({ time: vencedor, left, top, size: tamanho, dx: 0, dy: 0, k: 1, poteIdx: passo.poteIdx, grupo: passo.grupo });
+      setFase("revelado");
+      await esperar(2200);
+
+      const slot = palcoRef.current && palcoRef.current.querySelector(`[data-slot="${passo.grupo}-${passo.poteIdx}"]`);
+      if (slot) {
+        const rs = slot.getBoundingClientRect();
+        const dx = rs.left + rs.width / 2 - (left + tamanho / 2);
+        const dy = rs.top + rs.height / 2 - (top + tamanho / 2);
+        const k = Math.max(0.1, Math.min(rs.height / tamanho, 0.4));
+        setCarta((c) => ({ ...c, dx, dy, k }));
+      }
+      setFase("voando");
+      await esperar(1100);
+      await onRegistrarPasso({ id: vencedor.id, grupo: passo.grupo, pote: passo.poteIdx });
+    } catch (err) {
+      console.error("Falha no sorteio:", err);
+      alert("Não consegui registrar esse sorteio: " + (err?.message || "erro desconhecido"));
+    } finally {
+      setCarta(null);
+      setTimesDaRoleta(null);
+      setFase("idle");
+    }
+  };
+
+  const comecar = async () => {
+    await onIniciar();
+    setVerRegras(false);
+  };
+
+  return (
+    <div
+      ref={palcoRef}
+      className="fixed inset-0 z-50 overflow-y-auto"
+      style={{ backgroundColor: COLORS.bg }}
+      role="dialog"
+      aria-label="Sorteio dos grupos"
+    >
+      <style>{`@keyframes popCarta{0%{transform:scale(.15);opacity:0}55%{transform:scale(1.14);opacity:1}100%{transform:scale(1);opacity:1}}`}</style>
+      <div className="max-w-3xl mx-auto px-4 py-4 min-h-full flex flex-col">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
+              Rumo à {EDITION_ROMAN} Copa
+            </div>
+            <div className="text-lg font-bold" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>
+              Sorteio dos grupos
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {iniciado && (
+              <button
+                type="button"
+                onClick={() => setVerRegras((v) => !v)}
+                className="px-3 py-2 rounded-lg text-xs font-semibold"
+                style={{ border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+              >
+                {verRegras ? "Voltar ao sorteio" : "Regras"}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onFechar}
+              disabled={ocupado}
+              className="w-10 h-10 rounded-full flex items-center justify-center disabled:opacity-40"
+              style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
+              aria-label="Fechar"
+            >
+              <X size={18} color={COLORS.ink} />
+            </button>
+          </div>
+        </div>
+
+        {verRegras ? (
+          <div className="rounded-2xl p-5" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+            <div className="text-base font-bold mb-4" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>
+              Como funciona o sorteio
+            </div>
+            <RegrasDoSorteio numGrupos={numGrupos} numPotes={potes.length} nomeCampeao={nomeCampeao} />
+            {!iniciado && (
+              <button
+                type="button"
+                onClick={comecar}
+                className="mt-6 w-full px-5 py-3.5 rounded-xl font-semibold text-base inline-flex items-center justify-center gap-2"
+                style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+              >
+                <Dices size={18} /> Começar o sorteio
+              </button>
+            )}
+          </div>
+        ) : (
+          <>
+            <div className="text-center mb-2" style={{ fontFamily: "'Inter', sans-serif" }}>
+              {concluido ? (
+                <div className="text-base font-bold" style={{ color: "#16A34A" }}>
+                  Sorteio concluído! {total} times sorteados.
+                </div>
+              ) : (
+                <>
+                  <div className="text-sm font-semibold" style={{ color: COLORS.ink }}>
+                    Pote {proximo.poteIdx + 1} de {potes.length} ·{" "}
+                    {proximo.grupo ? `vaga do Grupo ${proximo.grupo}` : "o grupo também será sorteado"}
+                  </div>
+                  <div className="text-xs" style={{ color: COLORS.slate }}>
+                    {ordem.length} de {total} times sorteados · {proximo.restantes.length} na roleta
+                  </div>
+                </>
+              )}
+            </div>
+
+            {!concluido && (
+              <div
+                ref={roletaRef}
+                className="mx-auto my-2"
+                style={{ width: "min(76vw, 34vh, 330px)", aspectRatio: "1 / 1" }}
+              >
+                <RoletaSVG times={roletaTimes} rot={rot} animar={animar} />
+              </div>
+            )}
+
+            <div className="flex justify-center mb-4 mt-2">
+              {concluido ? (
+                <button
+                  type="button"
+                  onClick={onFechar}
+                  className="px-6 py-3 rounded-xl font-semibold text-sm"
+                  style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+                >
+                  Ver os grupos
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={sortearProximo}
+                  disabled={ocupado}
+                  className="px-6 py-3 rounded-xl font-semibold text-base inline-flex items-center gap-2 disabled:opacity-60"
+                  style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+                >
+                  {ocupado ? <Loader2 size={18} className="animate-spin" /> : <Dices size={18} />}
+                  {ocupado ? "Sorteando..." : "Sortear próximo time"}
+                </button>
+              )}
+            </div>
+
+            <div
+              className="grid gap-2 pb-6"
+              style={{ gridTemplateColumns: `repeat(${Math.min(numGrupos, 4)}, minmax(0, 1fr))` }}
+            >
+              {nomes.map((g) => (
+                <div key={g} className="rounded-xl p-2" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+                  <div className="text-xs font-bold mb-1.5 text-center" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>
+                    Grupo {g}
+                  </div>
+                  <div className="space-y-1">
+                    {potes.map((_, p) => {
+                      const nesses = ordem
+                        .filter((o) => o.grupo === g && o.pote === p)
+                        .map((o) => potes[p].find((t) => t.id === o.id))
+                        .filter(Boolean);
+                      return (
+                        <div
+                          key={p}
+                          data-slot={`${g}-${p}`}
+                          className="rounded-md px-1.5 flex flex-col justify-center"
+                          style={{
+                            minHeight: 28,
+                            backgroundColor: nesses.length ? COLORS.chipSoft : "transparent",
+                            border: nesses.length ? `1px solid ${COLORS.border}` : `1px dashed ${COLORS.border}`,
+                          }}
+                        >
+                          {nesses.length === 0 ? (
+                            <span className="text-[10px] text-center" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                              Pote {p + 1}
+                            </span>
+                          ) : (
+                            nesses.map((t) => (
+                              <div key={t.id} className="flex items-center gap-1 py-0.5" style={{ fontFamily: "'Inter', sans-serif" }}>
+                                {ESCUDOS_TIMES[t.nome] && <img src={ESCUDOS_TIMES[t.nome]} alt="" className="w-4 h-4 object-contain shrink-0" />}
+                                <span className="text-[11px] font-semibold truncate" style={{ color: COLORS.ink }}>
+                                  {t.nome}
+                                </span>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      {carta && (
+        <div
+          style={{
+            position: "fixed",
+            left: carta.left,
+            top: carta.top,
+            width: carta.size,
+            height: carta.size,
+            zIndex: 60,
+            pointerEvents: "none",
+            transform: fase === "voando" ? `translate(${carta.dx}px, ${carta.dy}px) scale(${carta.k})` : "none",
+            transition: fase === "voando" ? "transform 1050ms cubic-bezier(0.55, 0, 0.2, 1)" : "none",
+          }}
+        >
+          <div
+            className="w-full h-full rounded-3xl flex flex-col items-center justify-center text-center p-4"
+            style={{
+              backgroundColor: COLORS.card,
+              border: `4px solid ${COLORS.gold}`,
+              boxShadow: "0 24px 60px rgba(0,0,0,0.55)",
+              animation: "popCarta 650ms ease-out",
+            }}
+          >
+            {ESCUDOS_TIMES[carta.time.nome] && (
+              <img src={ESCUDOS_TIMES[carta.time.nome]} alt="" className="object-contain" style={{ width: "58%", height: "58%" }} />
+            )}
+            <div className="font-extrabold mt-1" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif", fontSize: carta.size * 0.12 }}>
+              {carta.time.nome}
+            </div>
+            <div className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+              Pote {carta.poteIdx + 1} → Grupo {carta.grupo}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao, config }) {
   const souSuperAdmin = sessao && sessao.tipo === "admin" && sessao.superAdmin;
   const [numGrupos, setNumGrupos] = useState(4);
@@ -7498,10 +7900,30 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao, co
   const [atribuicoes, setAtribuicoes] = useState({}); // teamId -> índice do pote (0-based)
   const [timeSelecionado, setTimeSelecionado] = useState(null);
   const [confirmandoPotes, setConfirmandoPotes] = useState(false);
-  const [sorteandoGrupos, setSorteandoGrupos] = useState(false);
+  const [palcoAberto, setPalcoAberto] = useState(false);
   const [gruposEditados, setGruposEditados] = useState(null); // null = ainda não sorteado/editado nesta sessão
 
   const potesConfirmados = !!(sorteio && sorteio.potesConfirmadosEm);
+
+  // Sorteio um time por vez: o andamento fica salvo (sorteio.andamento) e só
+  // vira "grupos" de verdade quando a organização confirma no final.
+  const andamento = sorteio && sorteio.andamento;
+  const ordemAndamento = (andamento && andamento.ordem) || [];
+  const numGruposSorteio = potesConfirmados && sorteio.numGrupos ? sorteio.numGrupos : numGrupos;
+  const potesDoSorteio = useMemo(
+    () =>
+      potesConfirmados
+        ? (sorteio.potes || []).map((ids) => ids.map((id) => teams.find((t) => t.id === id)).filter(Boolean))
+        : [],
+    [potesConfirmados, sorteio, teams]
+  );
+  const totalSorteavel = potesDoSorteio.reduce((soma, pote) => soma + pote.length, 0);
+  const sorteioCompleto = !!andamento && totalSorteavel > 0 && ordemAndamento.length >= totalSorteavel;
+  const gruposAndamento = useMemo(
+    () => (andamento ? gruposDoAndamento(ordemAndamento, teams, numGruposSorteio) : null),
+    [andamento, ordemAndamento, teams, numGruposSorteio]
+  );
+  const nomeCampeao = HALL_DA_FAMA.campeoes[HALL_DA_FAMA.campeoes.length - 1]?.turma;
 
   // Toda vez que o número de grupos mudar (ou times mudarem), recomeça a
   // sugestão automática — o super admin pode ajustar time por time depois.
@@ -7554,24 +7976,62 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao, co
   };
 
   const desfazerConfirmacaoPotes = async () => {
+    if (ordemAndamento.length > 0 && !window.confirm("Reabrir os potes apaga o sorteio em andamento. Continuar?")) return;
+    setGruposEditados(null);
     await saveSorteio((atual) => {
-      const { potesConfirmadosEm, ...resto } = atual || {};
+      const { potesConfirmadosEm, andamento: _andamento, ...resto } = atual || {};
       return resto;
     });
   };
 
-  const realizarSorteio = async () => {
-    setSorteandoGrupos(true);
-    const grupos = sortearGrupos(potes, numGrupos);
-    setGruposEditados(grupos);
-    setSorteandoGrupos(false);
+  const iniciarSorteio = async () => {
+    const campeao = potesDoSorteio[0] && potesDoSorteio[0].find((t) => t.nome === nomeCampeao);
+    const ordemInicial = campeao ? [{ id: campeao.id, grupo: "A", pote: 0, fixo: true }] : [];
+    await saveSorteio((atual) => {
+      const base = atual || {};
+      if (base.andamento) return base;
+      return { ...base, andamento: { iniciadoEm: new Date().toISOString(), ordem: ordemInicial } };
+    });
   };
 
-  const gruposParaMostrar = gruposEditados || (sorteio && sorteio.grupos) || null;
+  const registrarPasso = async (passo) => {
+    await saveSorteio((atual) => {
+      const base = atual || {};
+      const ordem = (base.andamento && base.andamento.ordem) || [];
+      if (ordem.some((o) => o.id === passo.id)) return base;
+      return { ...base, andamento: { ...(base.andamento || {}), ordem: [...ordem, passo] } };
+    });
+  };
+
+  // Cancela o sorteio (grupos já confirmados ou em andamento) e apaga a
+  // tabela de jogos que saiu dele — os potes continuam confirmados, então
+  // dá pra sortear de novo na hora.
+  const cancelarSorteio = async () => {
+    const fasesDoSorteio = ["Grupo", "Oitavas", "Quartas", "Semifinal", "Final", "3º Lugar"];
+    const jogosDoSorteio = matches.filter((m) => fasesDoSorteio.some((f) => (m.fase || "").startsWith(f)));
+    const comPlacar = jogosDoSorteio.filter((m) => m.golsA != null && m.golsA !== "" && m.golsB != null && m.golsB !== "").length;
+    let aviso = "Cancelar o sorteio? Os grupos sorteados serão apagados e os potes continuam confirmados pra você sortear de novo.";
+    if (jogosDoSorteio.length > 0) {
+      aviso += `\n\nA tabela gerada a partir dele também será apagada: ${jogosDoSorteio.length} jogo(s)` +
+        (comPlacar > 0 ? `, sendo ${comPlacar} com placar já lançado` : "") + ".";
+    }
+    if (!window.confirm(aviso)) return;
+    await saveSorteio((atual) => {
+      const { grupos: _g, sorteadoEm: _s, andamento: _a, ...resto } = atual || {};
+      return resto;
+    });
+    if (jogosDoSorteio.length > 0) {
+      await saveMatches(matches.filter((m) => !fasesDoSorteio.some((f) => (m.fase || "").startsWith(f))));
+    }
+    setGruposEditados(null);
+    setPalcoAberto(false);
+  };
+
+  const gruposParaMostrar = gruposEditados || (sorteio && sorteio.grupos) || (sorteioCompleto ? gruposAndamento : null);
 
   const moverTimeDeGrupo = (teamId, novoGrupoNome) => {
     setGruposEditados((atual) => {
-      const base = atual || (sorteio && sorteio.grupos) || {};
+      const base = atual || (sorteio && sorteio.grupos) || gruposAndamento || {};
       const copia = {};
       Object.keys(base).forEach((g) => (copia[g] = base[g].filter((t) => t.id !== teamId)));
       const timeMovido = teams.find((t) => t.id === teamId);
@@ -7582,7 +8042,10 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao, co
 
   const confirmarGrupos = async () => {
     if (!gruposParaMostrar) return;
-    await saveSorteio((atual) => ({ ...(atual || {}), grupos: gruposParaMostrar, numGrupos, sorteadoEm: new Date().toISOString() }));
+    await saveSorteio((atual) => {
+      const { andamento: _andamento, ...resto } = atual || {};
+      return { ...resto, grupos: gruposParaMostrar, numGrupos: numGruposSorteio, sorteadoEm: new Date().toISOString() };
+    });
     setGruposEditados(null);
   };
 
@@ -7718,40 +8181,34 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao, co
         </div>
       )}
 
-      <div
-        className="rounded-xl px-4 py-3.5 mb-8"
-        style={{ backgroundColor: COLORS.accentSoft }}
-      >
-        <div className="text-sm font-semibold mb-1" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
-          O sorteio dos grupos será feito presencialmente
+      <div className="rounded-xl px-4 py-4 mb-8" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+        <div className="text-sm font-bold mb-3" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>
+          Como funciona o sorteio
         </div>
-        <p className="text-xs" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
-          Data e local ainda serão definidos, com direito de presença do público e dos
-          representantes de cada time. Essa aba serve só pra deixar os potes organizados até
-          lá — assim que o sorteio acontecer, os grupos são atualizados aqui.
-        </p>
+        <RegrasDoSorteio numGrupos={numGruposSorteio} numPotes={Math.max(potesConfirmados ? potesDoSorteio.length : potes.length, 1)} nomeCampeao={nomeCampeao} />
       </div>
 
       {souSuperAdmin && potesConfirmados && (
         <div className="mb-8">
-          <SectionLabel eyebrow="Depois do sorteio presencial" title="Definir os grupos" />
+          <SectionLabel eyebrow="Ao vivo" title="Sortear os grupos" />
           <p className="text-xs mb-4 max-w-xl" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-            Clique em "Sortear agora" pra fazer o sorteio pela própria tela (respeitando os
-            potes e a regra do campeão cabeça de chave do Grupo A), ou ajuste manualmente time
-            por time se o resultado presencial saiu diferente. Só depois de "Confirmar grupos"
-            é que a classificação e os jogos passam a valer esse resultado.
+            O sorteio é um time por vez: a cada clique a roleta gira com os times que ainda estão no pote
+            da vez e o sorteado vai pro grupo dele. Dá pra fechar a tela e continuar depois — o andamento
+            fica salvo. No fim, confira os grupos (dá pra ajustar time por time) e clique em "Confirmar
+            grupos": só então a classificação e os jogos passam a valer.
           </p>
           <div className="flex items-center gap-3 flex-wrap mb-4">
-            <button
-              type="button"
-              onClick={realizarSorteio}
-              disabled={sorteandoGrupos}
-              className="px-4 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2 disabled:opacity-60"
-              style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}
-            >
-              {sorteandoGrupos && <Loader2 size={14} className="animate-spin" />}
-              <Dices size={14} /> {gruposParaMostrar ? "Sortear de novo" : "Sortear agora"}
-            </button>
+            {!(sorteio && sorteio.grupos) && !sorteioCompleto && (
+              <button
+                type="button"
+                onClick={() => setPalcoAberto(true)}
+                className="px-4 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2"
+                style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}
+              >
+                <Dices size={14} />{" "}
+                {andamento ? `Continuar o sorteio (${ordemAndamento.length} de ${totalSorteavel})` : "Abrir o sorteio ao vivo"}
+              </button>
+            )}
             {gruposParaMostrar && (
               <button
                 type="button"
@@ -7760,6 +8217,16 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao, co
                 style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
               >
                 <Check size={14} /> Confirmar grupos
+              </button>
+            )}
+            {(andamento || (sorteio && sorteio.grupos)) && (
+              <button
+                type="button"
+                onClick={cancelarSorteio}
+                className="px-4 py-2.5 rounded-xl text-sm font-semibold"
+                style={{ border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+              >
+                Cancelar sorteio
               </button>
             )}
           </div>
@@ -7795,6 +8262,36 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao, co
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {andamento && !(sorteio && sorteio.grupos) && !(souSuperAdmin && gruposParaMostrar) && gruposAndamento && (
+        <div className="mb-8">
+          <SectionLabel eyebrow="Ao vivo" title="Sorteio em andamento" />
+          <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            {ordemAndamento.length} de {totalSorteavel} times sorteados — a tela atualiza sozinha.
+          </p>
+          <div className="grid sm:grid-cols-2 gap-4">
+            {Object.entries(gruposAndamento).map(([nome, times]) => (
+              <div key={nome} className="rounded-xl p-4" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+                <div className="text-sm font-bold mb-2" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>
+                  Grupo {nome}
+                </div>
+                {times.length === 0 ? (
+                  <div className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>Aguardando sorteio</div>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {times.map((t) => (
+                      <li key={t.id} className="flex items-center gap-2 text-sm" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+                        {ESCUDOS_TIMES[t.nome] && <img src={ESCUDOS_TIMES[t.nome]} alt="" className="w-5 h-5 object-contain shrink-0" />}
+                        <span className="flex-1 truncate">{t.nome}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -7852,6 +8349,18 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao, co
             </button>
           )}
         </div>
+      )}
+      {palcoAberto && souSuperAdmin && potesConfirmados && (
+        <PalcoSorteio
+          potes={potesDoSorteio}
+          numGrupos={numGruposSorteio}
+          ordem={ordemAndamento}
+          iniciado={!!andamento}
+          nomeCampeao={nomeCampeao}
+          onIniciar={iniciarSorteio}
+          onRegistrarPasso={registrarPasso}
+          onFechar={() => setPalcoAberto(false)}
+        />
       )}
       <ModalElencoTime team={timeSelecionado} onClose={() => setTimeSelecionado(null)} />
     </div>
