@@ -705,7 +705,7 @@ function mensagemConfirmacaoPagamento(nomeTime, quantidadeAtletas, formaPagament
 // pelo super admin em Organização → Nova temporada, sem precisar de
 // código). Veja horariosDoConfig() e inscricaoAberta() logo abaixo.
 const DURACAO_SLOT_MIN = 25;
-const JOGOS_SEXTA = 8;
+const JOGOS_SEXTA = 10;
 const INICIO_SEXTA_PADRAO = new Date(2026, 10, 6, 19, 0, 0); // sexta 6/nov às 19h
 const INICIO_SABADO_PADRAO = new Date(2026, 10, 7, 8, 0, 0); // sábado 7/nov às 8h
 const INICIO_DOMINGO_PADRAO = new Date(2026, 10, 8, 8, 0, 0); // domingo 8/nov às 8h
@@ -6076,7 +6076,7 @@ function EncerrarTemporada({ teams, matches, sorteio, posts, avaliacoes, config,
           </div>
         </div>
         <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-          Jogos de fase de grupos usam sexta e sábado (8 jogos sexta, o resto sábado, 25min entre
+          Jogos de fase de grupos usam sexta e sábado (10 jogos sexta, o resto sábado, 25min entre
           um e outro); mata-mata inteiro entra domingo a partir do horário acima.
         </p>
         <button
@@ -7537,13 +7537,19 @@ function colocacaoUltimaEdicao(nomeTime) {
 // verdade: rodada 1 é todo mundo jogando uma vez, e assim por diante até
 // todos terem se enfrentado. Se o grupo tiver número ímpar de times, um
 // fica de folga (bye) em cada rodada.
+// "times" chega na ordem dos potes (pote 1, pote 2, ...). A 1ª rodada fica
+// sempre pote 1 x pote 2, pote 3 x pote 4, e assim por diante (com 5 times
+// o do pote 5 folga). As demais rodadas seguem o método do círculo.
 function gerarRodadasGrupo(times) {
-  const lista = [...times];
-  if (lista.length % 2 !== 0) lista.push(null); // bye
-  const n = lista.length;
-  if (n < 2) return [];
+  const n0 = times.length;
+  if (n0 < 2) return [];
+  const n = n0 % 2 === 0 ? n0 : n0 + 1; // com número ímpar entra uma folga (null)
+  const copia = new Array(n).fill(null);
+  for (let i = 0; i < n / 2; i++) {
+    copia[i] = times[2 * i] || null;
+    copia[n - 1 - i] = times[2 * i + 1] || null;
+  }
   const rodadas = [];
-  const copia = [...lista];
   for (let r = 0; r < n - 1; r++) {
     const confrontos = [];
     for (let i = 0; i < n / 2; i++) {
@@ -7557,16 +7563,38 @@ function gerarRodadasGrupo(times) {
   return rodadas;
 }
 
-function gerarJogosDosGrupos(grupos) {
+// Gera os jogos da fase de grupos já na ordem em que vão acontecer:
+// intercalados entre os grupos (jogo 1 do A, jogo 1 do B, jogo 1 do C...
+// depois o jogo 2 de cada um, e assim por diante, rodada por rodada), e
+// não "todos os jogos do A, depois todos os do B". O 1º jogo do campeonato
+// é sempre o do Grupo A: cabeça de chave (pote 1) x time do pote 2.
+// "potes" (sorteio.potes) serve pra ordenar os times de cada grupo por pote.
+function gerarJogosDosGrupos(grupos, potes) {
+  const poteDoTime = {};
+  (potes || []).forEach((ids, idxPote) => (ids || []).forEach((id) => (poteDoTime[id] = idxPote)));
+  const nomesGrupos = Object.keys(grupos).sort();
+  const porGrupo = {};
+  nomesGrupos.forEach((nomeGrupo) => {
+    const ordenados = [...grupos[nomeGrupo]]
+      .map((t, i) => ({ t, i }))
+      .sort((x, y) => (poteDoTime[x.t.id] ?? 99) - (poteDoTime[y.t.id] ?? 99) || x.i - y.i)
+      .map((x) => x.t);
+    porGrupo[nomeGrupo] = gerarRodadasGrupo(ordenados);
+  });
+  const maxRodadas = Math.max(0, ...nomesGrupos.map((g) => porGrupo[g].length));
   const jogos = [];
-  Object.entries(grupos).forEach(([nomeGrupo, times]) => {
-    const rodadas = gerarRodadasGrupo(times);
-    rodadas.forEach((confrontos, idxRodada) => {
-      confrontos.forEach(([timeA, timeB], idxJogo) => {
+  const carimbo = Date.now();
+  for (let r = 0; r < maxRodadas; r++) {
+    const maxJogos = Math.max(0, ...nomesGrupos.map((g) => (porGrupo[g][r] || []).length));
+    for (let k = 0; k < maxJogos; k++) {
+      nomesGrupos.forEach((nomeGrupo) => {
+        const confronto = (porGrupo[nomeGrupo][r] || [])[k];
+        if (!confronto) return;
+        const [timeA, timeB] = confronto;
         jogos.push({
-          id: `jogo_${Date.now()}_${nomeGrupo}_${idxRodada}_${idxJogo}_${Math.random().toString(36).slice(2, 6)}`,
+          id: `jogo_${carimbo}_${nomeGrupo}_${r}_${k}_${Math.random().toString(36).slice(2, 6)}`,
           fase: `Grupo ${nomeGrupo}`,
-          rodada: idxRodada + 1,
+          rodada: r + 1,
           timeA: timeA.id,
           timeB: timeB.id,
           golsA: null,
@@ -7579,14 +7607,14 @@ function gerarJogosDosGrupos(grupos) {
           horario: null,
         });
       });
-    });
-  });
+    }
+  }
   return jogos;
 }
 
 // Agenda os horários de todos os jogos, na ordem em que já estão: jogos
-// da fase de grupos entram sexta às 19h (8 jogos) e continuam sábado às
-// 8h; jogos de mata-mata entram domingo às 8h. 25min entre um início e
+// da fase de grupos entram sexta às 19h (10 jogos) e o resto continua
+// sábado às 8h; jogos de mata-mata entram domingo às 8h. 25min entre um início e
 // outro (20min de jogo + 5min de intervalo).
 function agendarHorarios(listaJogos, horarios) {
   const h = horarios || horariosDoConfig(null);
@@ -8477,7 +8505,7 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao, co
       return;
     }
     setGerandoTabela(true);
-    const novosJogos = gerarJogosDosGrupos(sorteio.grupos);
+    const novosJogos = gerarJogosDosGrupos(sorteio.grupos, sorteio.potes);
     const todosComHorario = agendarHorarios([...matches, ...novosJogos], horariosDoConfig(config));
     await saveMatches(todosComHorario);
     setGerandoTabela(false);
@@ -9904,7 +9932,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
       return;
     }
     setGerandoTabelaOrg(true);
-    const novosJogos = gerarJogosDosGrupos(sorteio.grupos);
+    const novosJogos = gerarJogosDosGrupos(sorteio.grupos, sorteio.potes);
     const todosComHorario = agendarHorarios([...matches, ...novosJogos], horariosDoConfig(config));
     await saveMatches(todosComHorario);
     setGerandoTabelaOrg(false);
