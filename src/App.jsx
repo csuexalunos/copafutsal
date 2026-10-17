@@ -8181,7 +8181,7 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao, co
         sorteio={sorteio}
         saveSorteio={saveSorteio}
         podeVer={!!(sessao && (sessao.tipo === "admin" || sessao.representanteAprovado))}
-        podeEditar={!!souSuperAdmin}
+        podeEditar={false}
       />
 
       {souSuperAdmin && (
@@ -8809,6 +8809,7 @@ const GRUPOS_ORGANIZACAO = [
   { chave: "times", titulo: "Times e elencos", subtitulo: "Elencos, irregularidades, CPFs, contatos", icone: ShieldCheck },
   { chave: "financeiro", titulo: "Financeiro", subtitulo: "Pagamentos e planilha de inscrições", icone: Wallet },
   { chave: "jogos", titulo: "Jogos", subtitulo: "Transmissão, mata-mata, tabela", icone: Swords },
+  { chave: "local_sorteio", titulo: "Local do sorteio", subtitulo: "Onde e quando é — só representantes veem", icone: MapPin },
   { chave: "documentos", titulo: "Documentos e downloads", subtitulo: "Fichas, súmulas e escudos em HD", icone: Download },
   { chave: "conteudo", titulo: "Conteúdo do site", subtitulo: "Hall da Fama (super admin)", icone: Trophy, soSuperAdmin: true },
   { chave: "temporada", titulo: "Nova temporada", subtitulo: "Encerrar edição e recomeçar (super admin)", icone: RotateCcw, soSuperAdmin: true },
@@ -10098,6 +10099,17 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
         <>
           <TestarEnvioEmail />
         </>
+      )}
+
+      {secaoAtiva === "local_sorteio" && (
+        <div className="mt-4 max-w-xl">
+          <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Defina o local e o horário do sorteio presencial. Quem tem time inscrito (representante aprovado) vê
+            na aba Sorteio, com um botão que abre no app de mapas. Quem não é representante não vê. Em outro
+            ano, é só trocar o local aqui.
+          </p>
+          <LocalDoSorteio sorteio={sorteio} saveSorteio={saveSorteio} podeVer={true} podeEditar={true} />
+        </div>
       )}
 
       {souSuperAdmin && secaoAtiva === "conteudo" && <EditorHallDaFama config={config} saveConfig={saveConfig} />}
