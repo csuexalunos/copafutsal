@@ -1710,7 +1710,7 @@ function RosterEditor({ team, onSave, autenticado = true }) {
       >
         Adicionar jogador — todos os campos são obrigatórios
       </div>
-      <AddPlayerForm onAdd={addJogador} />
+      <AddPlayerForm onAdd={addJogador} turma={team.nome} />
 
       <div className="space-y-1.5 max-h-96 overflow-y-auto mb-3">
         {jogadores.map((j) => (
@@ -1853,7 +1853,66 @@ function EditarMeuTime({ teams, saveTeams }) {
 // Formulário completo pra adicionar um jogador novo — nada de "só o nome":
 // exige apelido, número, nome completo, período, ano de conclusão, CPF e
 // data de nascimento, igual pede o regulamento.
-function AddPlayerForm({ onAdd }) {
+// ---------------------------------------------------------------------------
+// Banco de jogadores conhecidos — pra sugerir preenchimento automático ao
+// adicionar um jogador. Junta o elenco histórico (ELENCOS_2025), os
+// jogadores dos times atuais e, ao escolher alguém, busca o CPF nas
+// tabelas protegidas (só funciona com login).
+// ---------------------------------------------------------------------------
+const JogadoresConhecidosContext = React.createContext([]);
+
+function normalizarBusca(s) {
+  return String(s || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function montarBancoJogadores(teams) {
+  const mapa = new Map();
+  const juntar = (turma, j, extra) => {
+    if (!j || !j.nome) return;
+    const chave = normalizarBusca(j.nome) + "|" + normalizarBusca(turma);
+    const atual = mapa.get(chave) || { turma, teamId: null, jogadorId: null };
+    const novo = { ...atual };
+    ["nome", "apelido", "numero", "posicao", "nascimento", "periodo", "anoConclusao"].forEach((k) => {
+      const v = j[k];
+      if (v != null && String(v).trim() !== "") novo[k] = String(v);
+    });
+    if (extra) Object.assign(novo, extra);
+    mapa.set(chave, novo);
+  };
+  Object.keys(ELENCOS_2025).forEach((turma) => {
+    ELENCOS_2025[turma].forEach((j) => juntar(turma, j, null));
+  });
+  (teams || []).forEach((t) => {
+    (t.jogadores || []).forEach((j) => juntar(t.nome, j, { teamId: t.id, jogadorId: j.id }));
+  });
+  return Array.from(mapa.values());
+}
+
+// Completa o CPF de um jogador conhecido: primeiro na tabela do time atual
+// (se ele já esteve num time desta edição), depois no elenco histórico.
+async function buscarCpfDoJogadorConhecido(c) {
+  try {
+    if (c.teamId && c.jogadorId) {
+      const doTime = await buscarCpfsDoTime(c.teamId);
+      if (doTime[c.jogadorId]) return doTime[c.jogadorId];
+    }
+  } catch (e) {
+    console.error("Falha ao buscar CPF no time", e);
+  }
+  try {
+    const historico = await buscarCpfsDaTurma(c.turma);
+    return historico[c.nome] || (c.apelido && historico[c.apelido]) || "";
+  } catch (e) {
+    console.error("Falha ao buscar CPF no histórico", e);
+    return "";
+  }
+}
+
+function AddPlayerForm({ onAdd, turma }) {
   const vazio = {
     nome: "",
     apelido: "",
@@ -1866,8 +1925,50 @@ function AddPlayerForm({ onAdd }) {
   };
   const [novo, setNovo] = useState(vazio);
   const [erro, setErro] = useState("");
+  const [campoAtivo, setCampoAtivo] = useState("");
+  const [aviso, setAviso] = useState("");
+  const teamsConhecidos = React.useContext(JogadoresConhecidosContext);
+  const banco = useMemo(() => montarBancoJogadores(teamsConhecidos), [teamsConhecidos]);
 
-  const campo = (key, value) => setNovo({ ...novo, [key]: value });
+  const campo = (key, value) => {
+    setNovo({ ...novo, [key]: value });
+    setCampoAtivo(key);
+    setAviso("");
+  };
+
+  // Sugestões enquanto digita nome ou apelido (a partir de 2 letras).
+  const sugestoes = useMemo(() => {
+    if (campoAtivo !== "nome" && campoAtivo !== "apelido") return [];
+    const q = normalizarBusca(novo[campoAtivo]);
+    if (q.length < 2) return [];
+    const alvo = normalizarBusca(turma);
+    return banco
+      .filter((c) => normalizarBusca(c.nome).includes(q) || normalizarBusca(c.apelido).includes(q))
+      .sort((a, b) => (normalizarBusca(b.turma) === alvo) - (normalizarBusca(a.turma) === alvo))
+      .slice(0, 6);
+  }, [banco, campoAtivo, novo, turma]);
+
+  const escolherSugestao = async (c) => {
+    setCampoAtivo("");
+    setNovo((n) => ({
+      ...n,
+      nome: c.nome || n.nome,
+      apelido: c.apelido || n.apelido,
+      numero: c.numero || n.numero,
+      posicao: c.posicao || n.posicao,
+      nascimento: c.nascimento || n.nascimento,
+      periodo: c.periodo || n.periodo,
+      anoConclusao: c.anoConclusao || n.anoConclusao,
+    }));
+    setAviso(`Dados de ${c.apelido || c.nome} (turma ${c.turma}) preenchidos — buscando o CPF...`);
+    const cpf = await buscarCpfDoJogadorConhecido(c);
+    if (cpf) setNovo((n) => ({ ...n, cpf }));
+    setAviso(
+      `Dados de ${c.apelido || c.nome} (turma ${c.turma}) preenchidos` +
+        (cpf ? ", com CPF." : ". CPF não encontrado — digite.") +
+        " Confira o que faltar antes de adicionar."
+    );
+  };
 
   const adicionar = () => {
     const faltando = Object.entries(novo).some(([, v]) => !String(v).trim());
@@ -1927,13 +2028,41 @@ function AddPlayerForm({ onAdd }) {
                 placeholder={f.placeholder}
                 value={novo[f.key]}
                 onChange={(e) => campo(f.key, e.target.value)}
+                onFocus={() => setCampoAtivo(f.key)}
+                autoComplete="off"
                 className="w-full px-2.5 py-2 rounded-lg text-sm"
                 style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
               />
             )}
+            {campoAtivo === f.key && sugestoes.length > 0 && (f.key === "nome" || f.key === "apelido") && (
+              <div className="mt-1 rounded-lg overflow-hidden" style={{ backgroundColor: COLORS.zebra, border: `1px solid ${COLORS.accent}` }}>
+                <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
+                  Já está no banco de dados — toque pra preencher tudo
+                </div>
+                {sugestoes.map((c, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => escolherSugestao(c)}
+                    className="w-full text-left px-2.5 py-2 text-sm"
+                    style={{ color: COLORS.ink, borderTop: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+                  >
+                    <span className="font-semibold">{c.apelido || c.nome}</span>
+                    {c.apelido && <span style={{ color: COLORS.slate }}> · {c.nome}</span>}
+                    <span className="block text-xs" style={{ color: COLORS.slate }}>Turma {c.turma}{c.numero ? ` · camisa ${c.numero}` : ""}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         ))}
       </div>
+      {aviso && (
+        <div className="text-xs mt-2" style={{ color: "#16A34A", fontFamily: "'Inter', sans-serif" }}>
+          {aviso}
+        </div>
+      )}
       {erro && (
         <div className="text-xs font-medium mt-2" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
           {erro}
@@ -2433,7 +2562,7 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes, confi
                 >
                   Adicionar jogador — todos os campos são obrigatórios
                 </div>
-                <AddPlayerForm onAdd={addJogador} />
+                <AddPlayerForm onAdd={addJogador} turma={nomeTime} />
               </div>
             </>
           )}
@@ -11415,6 +11544,7 @@ export default function App() {
   });
 
   return (
+    <JogadoresConhecidosContext.Provider value={teams}>
     <div style={{ backgroundColor: COLORS.bg, minHeight: "100vh" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap');
@@ -11576,5 +11706,6 @@ export default function App() {
         </button>
       )}
     </div>
+    </JogadoresConhecidosContext.Provider>
   );
 }
