@@ -7955,6 +7955,15 @@ function LocalDoSorteio({ sorteio, saveSorteio, podeVer, podeEditar }) {
         <div style={{ fontFamily: "'Inter', sans-serif" }}>
           <div className="text-base font-semibold" style={{ color: COLORS.ink }}>{atual.texto}</div>
           {atual.quando && <div className="text-sm mt-1" style={{ color: COLORS.ink }}>{atual.quando}</div>}
+          <a
+            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(atual.texto)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 mt-3 px-3 py-2 rounded-lg text-xs font-semibold"
+            style={{ backgroundColor: COLORS.accent, color: "#fff" }}
+          >
+            <MapPin size={13} /> Abrir no mapa
+          </a>
           {atual.obs && <div className="text-xs mt-2" style={{ color: COLORS.slate }}>{atual.obs}</div>}
           {podeEditar && (
             <button type="button" onClick={() => setEditando(true)} className="mt-3 px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ backgroundColor: COLORS.chipSoft, color: COLORS.ink }}>
@@ -7969,7 +7978,7 @@ function LocalDoSorteio({ sorteio, saveSorteio, podeVer, podeEditar }) {
           <p className="text-xs" style={{ color: COLORS.slate }}>
             Aparece só para representantes de time e para a organização. O público em geral não vê.
           </p>
-          <input value={local} onChange={(e) => setLocal(e.target.value)} placeholder="Local (nome e endereço)" className="w-full px-3 py-2 rounded-lg outline-none text-sm" style={campo} />
+          <input value={local} onChange={(e) => setLocal(e.target.value)} placeholder="Local com endereço (ex: Nome do lugar, Rua X, 123, Bairro, Maceió)" className="w-full px-3 py-2 rounded-lg outline-none text-sm" style={campo} />
           <input value={quando} onChange={(e) => setQuando(e.target.value)} placeholder="Dia e horário (ex: sábado, 31/10, às 19h)" className="w-full px-3 py-2 rounded-lg outline-none text-sm" style={campo} />
           <input value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Observação (opcional)" className="w-full px-3 py-2 rounded-lg outline-none text-sm" style={campo} />
           <div className="flex gap-2 flex-wrap">
