@@ -7537,12 +7537,27 @@ function colocacaoUltimaEdicao(nomeTime) {
 // verdade: rodada 1 é todo mundo jogando uma vez, e assim por diante até
 // todos terem se enfrentado. Se o grupo tiver número ímpar de times, um
 // fica de folga (bye) em cada rodada.
-// "times" chega na ordem dos potes (pote 1, pote 2, ...). A 1ª rodada fica
-// sempre pote 1 x pote 2, pote 3 x pote 4, e assim por diante (com 5 times
-// o do pote 5 folga). As demais rodadas seguem o método do círculo.
+// "times" chega na ordem dos potes (pote 1, pote 2, ...). Grupo de 5 usa o
+// roteiro fixo logo abaixo; nos outros tamanhos a 1ª rodada fica pote 1 x
+// pote 2, pote 3 x pote 4... e as demais seguem o método do círculo.
+// Grupo de 5 times (o formato desta Copa) segue um roteiro fixo, pensado pela
+// organização: R1 pote 1x2 e 3x4 (pote 5 folga); R2 sempre o cabeça de chave
+// contra o time que folgou na R1; e na última rodada o cabeça de chave
+// descansa. Números = pote do time (1 a 5).
+const ROTEIRO_GRUPO_DE_5 = [
+  [[1, 2], [3, 4]], // folga: 5
+  [[1, 5], [2, 3]], // folga: 4
+  [[1, 3], [4, 5]], // folga: 2
+  [[1, 4], [2, 5]], // folga: 3
+  [[2, 4], [3, 5]], // folga: 1 (cabeça de chave descansa)
+];
+
 function gerarRodadasGrupo(times) {
   const n0 = times.length;
   if (n0 < 2) return [];
+  if (n0 === 5) {
+    return ROTEIRO_GRUPO_DE_5.map((rodada) => rodada.map(([a, b]) => [times[a - 1], times[b - 1]]));
+  }
   const n = n0 % 2 === 0 ? n0 : n0 + 1; // com número ímpar entra uma folga (null)
   const copia = new Array(n).fill(null);
   for (let i = 0; i < n / 2; i++) {
