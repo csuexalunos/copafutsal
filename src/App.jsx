@@ -6026,6 +6026,182 @@ function TestarEnvioEmail() {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Convite do sorteio — e-mail pros representantes com local, dia/horário e
+// botão "Como chegar". Os dados vêm de Organização → Local do sorteio.
+// ---------------------------------------------------------------------------
+async function enviarConviteSorteio(emailDestino, nomeDestino, local) {
+  const nomeLocal = escapeHtml(local.texto);
+  const quando = escapeHtml(local.quando || "");
+  const obs = local.obs ? escapeHtml(local.obs) : "";
+  const linkMapa = linkMapaDoLocal(local);
+  const assunto = `Sorteio da 8ª Copa de Ex-Alunos${local.quando ? ": " + local.quando : ""}`;
+  const htmlContent = envelopeHtmlEmail(`
+    <div style="font-family: Arial, Helvetica, sans-serif; color: #1a1a1a; font-size: 16px; line-height: 1.55; max-width: 560px; margin: 0 auto; padding: 24px 16px;">
+      <p>E aí, representante ⚽</p>
+      <p>Chegou a hora! Daqui a poucos dias a bola vai rolar de novo, e tudo começa com o sorteio da 8ª Copa de Ex-Alunos.</p>
+      <p>
+        <strong>Local:</strong> ${nomeLocal}<br />
+        ${quando ? `<strong>Dia e horário:</strong> ${quando}` : ""}
+      </p>
+      ${obs ? `<p>${obs}</p>` : ""}
+      <p style="text-align: center; margin: 24px 0;">
+        <a href="${linkMapa}"
+           style="background-color: #FF6B35; color: #FFFFFF; text-decoration: none; font-weight: bold; padding: 12px 24px; border-radius: 8px; display: inline-block;">
+          Como chegar
+        </a>
+      </p>
+      <p>O sorteio é um time por vez, ao vivo. Vai ser o momento de ver o seu time cair no grupo, vibrar, secar o rival e começar a sonhar com o título. 🏆</p>
+      <p>Vai ter cervejinha gelada por nossa conta, e cada um leva um petisco pra gente dividir. 🍻</p>
+      <p>Confirme sua presença no grupo de WhatsApp dos representantes e já avise qual petisco você vai levar. Faz muita diferença ter você lá.</p>
+      <p>Qualquer dúvida, é só chamar no grupo.</p>
+      <p>Um abraço, e nos vemos lá!</p>
+      <p>Comissão Organizadora da Copa Ex-Alunos CSU</p>
+    </div>
+  `);
+  const textContent =
+    `E aí, representante ⚽\n\n` +
+    `Chegou a hora! Daqui a poucos dias a bola vai rolar de novo, e tudo começa com o sorteio da 8ª Copa de Ex-Alunos.\n\n` +
+    `Local: ${local.texto}\n` +
+    (local.quando ? `Dia e horário: ${local.quando}\n` : "") +
+    (local.obs ? `${local.obs}\n` : "") +
+    `Como chegar: ${linkMapa}\n\n` +
+    `O sorteio é um time por vez, ao vivo. Vai ser o momento de ver o seu time cair no grupo, vibrar, secar o rival e começar a sonhar com o título.\n\n` +
+    `Vai ter cervejinha gelada por nossa conta, e cada um leva um petisco pra gente dividir.\n\n` +
+    `Confirme sua presença no grupo de WhatsApp dos representantes e já avise qual petisco você vai levar. Faz muita diferença ter você lá.\n\n` +
+    `Qualquer dúvida, é só chamar no grupo.\n\n` +
+    `Um abraço, e nos vemos lá!\n\n` +
+    `Comissão Organizadora da Copa Ex-Alunos CSU`;
+  return chamarEnvioDeEmail({
+    destinatarioEmail: emailDestino.trim(),
+    destinatarioNome: nomeDestino || "Representante",
+    assunto,
+    htmlContent,
+    textContent,
+  });
+}
+
+function ConviteSorteio({ perfis, sorteio }) {
+  const local = (sorteio && sorteio.local) || null;
+  const [enviando, setEnviando] = useState(false);
+  const [testando, setTestando] = useState(false);
+  const [resultado, setResultado] = useState(null);
+
+  // Um e-mail por pessoa: representantes aprovados que têm turma.
+  const destinatarios = useMemo(() => {
+    const vistos = new Set();
+    return (perfis || []).filter((p) => {
+      if (p.status !== "aprovado" || !p.turma || !p.email) return false;
+      const chave = p.email.trim().toLowerCase();
+      if (vistos.has(chave)) return false;
+      vistos.add(chave);
+      return true;
+    });
+  }, [perfis]);
+
+  const pronto = !!(local && local.texto);
+
+  const testar = async () => {
+    setTestando(true);
+    setResultado(null);
+    try {
+      await enviarConviteSorteio(EMAIL_TESTE_ORGANIZACAO, "Organização", local);
+      setResultado({ tipo: "teste" });
+    } catch (e) {
+      console.error("Falha no teste do convite do sorteio", e);
+      setResultado({ tipo: "erro", erro: e.message });
+    } finally {
+      setTestando(false);
+    }
+  };
+
+  const enviarTodos = async () => {
+    if (!window.confirm(`Enviar o convite do sorteio para ${destinatarios.length} representante(s)?`)) return;
+    setEnviando(true);
+    setResultado(null);
+    let ok = 0;
+    const falhas = [];
+    for (const p of destinatarios) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        await enviarConviteSorteio(p.email, p.nome, local);
+        ok += 1;
+      } catch (e) {
+        console.error("Falha ao enviar convite do sorteio", p.email, e);
+        falhas.push(`${p.nome || p.email}: ${e.message}`);
+      }
+    }
+    setResultado({ tipo: "envio", ok, falhas });
+    setEnviando(false);
+  };
+
+  return (
+    <div className="rounded-2xl p-5 mt-8" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+      <h3 className="font-semibold mb-1 flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+        <Mail size={18} color={COLORS.ink} /> Convite do sorteio ({destinatarios.length})
+      </h3>
+      <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+        Manda para todos os representantes aprovados o convite com local, dia e horário e um botão
+        "Como chegar" que abre no app de mapas, pedindo confirmação no grupo de WhatsApp e um petisco
+        pra cada um. As informações vêm de Organização → Local do sorteio.
+      </p>
+      {!pronto ? (
+        <p className="text-xs" style={{ color: "#F59E0B", fontFamily: "'Inter', sans-serif" }}>
+          Antes de enviar, preencha o local do sorteio em Organização → Local do sorteio.
+        </p>
+      ) : (
+        <>
+          <div className="rounded-lg px-3 py-2 mb-4 text-xs" style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+            <div><strong>Local:</strong> {local.texto}</div>
+            {local.quando && <div><strong>Dia e horário:</strong> {local.quando}</div>}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={enviarTodos}
+              disabled={enviando || testando || destinatarios.length === 0}
+              className="px-4 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2 disabled:opacity-60"
+              style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+            >
+              {enviando ? <Loader2 size={14} className="animate-spin" /> : <Mail size={14} />}
+              {enviando ? "Enviando..." : `Enviar para os representantes (${destinatarios.length})`}
+            </button>
+            <button
+              type="button"
+              onClick={testar}
+              disabled={enviando || testando}
+              title={`Manda esse e-mail pra ${EMAIL_TESTE_ORGANIZACAO} em vez dos representantes`}
+              className="px-4 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2 disabled:opacity-60"
+              style={{ border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+            >
+              {testando ? <Loader2 size={14} className="animate-spin" /> : null}
+              Testar (envia pra {EMAIL_TESTE_ORGANIZACAO})
+            </button>
+          </div>
+        </>
+      )}
+      {resultado && resultado.tipo === "teste" && (
+        <p className="text-xs mt-3" style={{ color: "#16A34A", fontFamily: "'Inter', sans-serif" }}>
+          Teste enviado para {EMAIL_TESTE_ORGANIZACAO}. Confira a caixa de entrada (e o spam) em alguns segundos.
+        </p>
+      )}
+      {resultado && resultado.tipo === "envio" && (
+        <div className="text-xs mt-3" style={{ fontFamily: "'Inter', sans-serif" }}>
+          <p style={{ color: "#16A34A" }}>{resultado.ok} e-mail(s) enviado(s).</p>
+          {resultado.falhas.length > 0 && (
+            <p style={{ color: "#EF4444" }}>Falhou para: {resultado.falhas.join("; ")}</p>
+          )}
+        </div>
+      )}
+      {resultado && resultado.tipo === "erro" && (
+        <p className="text-xs mt-3" style={{ color: "#EF4444", fontFamily: "'Inter', sans-serif" }}>
+          Erro: {resultado.erro}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function LembreteInscricao({ teams, perfis }) {
   const [enviando, setEnviando] = useState({});
   const [resultado, setResultado] = useState({});
@@ -7893,12 +8069,19 @@ function PalcoSorteio({ potes, numGrupos, ordem, iniciado, nomeCampeao, onInicia
   );
 }
 
+// Link do Google Maps que abre direto no app de navegação de quem clicar.
+function linkMapaDoLocal(local) {
+  const consulta = (local && (local.endereco || local.texto)) || "";
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(consulta)}`;
+}
+
 // Local e horário do sorteio presencial. Só quem representa um time (perfil
 // aprovado) e a organização enxergam; o público não vê. A organização
 // (super admin) preenche aqui mesmo e os representantes veem na hora.
 function LocalDoSorteio({ sorteio, saveSorteio, podeVer, podeEditar }) {
   const atual = (sorteio && sorteio.local) || {};
   const [local, setLocal] = useState(atual.texto || "");
+  const [endereco, setEndereco] = useState(atual.endereco || "");
   const [quando, setQuando] = useState(atual.quando || "");
   const [obs, setObs] = useState(atual.obs || "");
   const [salvando, setSalvando] = useState(false);
@@ -7907,10 +8090,11 @@ function LocalDoSorteio({ sorteio, saveSorteio, podeVer, podeEditar }) {
   useEffect(() => {
     if (!editando) {
       setLocal(atual.texto || "");
+      setEndereco(atual.endereco || "");
       setQuando(atual.quando || "");
       setObs(atual.obs || "");
     }
-  }, [atual.texto, atual.quando, atual.obs, editando]);
+  }, [atual.texto, atual.endereco, atual.quando, atual.obs, editando]);
 
   if (!podeVer) return null;
   const definido = !!atual.texto;
@@ -7921,7 +8105,7 @@ function LocalDoSorteio({ sorteio, saveSorteio, podeVer, podeEditar }) {
     try {
       await saveSorteio((s) => ({
         ...(s || {}),
-        local: { texto: local.trim(), quando: quando.trim(), obs: obs.trim(), atualizadoEm: new Date().toISOString() },
+        local: { texto: local.trim(), endereco: endereco.trim(), quando: quando.trim(), obs: obs.trim(), atualizadoEm: new Date().toISOString() },
       }));
       setEditando(false);
     } finally {
@@ -7956,7 +8140,7 @@ function LocalDoSorteio({ sorteio, saveSorteio, podeVer, podeEditar }) {
           <div className="text-base font-semibold" style={{ color: COLORS.ink }}>{atual.texto}</div>
           {atual.quando && <div className="text-sm mt-1" style={{ color: COLORS.ink }}>{atual.quando}</div>}
           <a
-            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(atual.texto)}`}
+            href={linkMapaDoLocal(atual)}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 mt-3 px-3 py-2 rounded-lg text-xs font-semibold"
@@ -7978,8 +8162,9 @@ function LocalDoSorteio({ sorteio, saveSorteio, podeVer, podeEditar }) {
           <p className="text-xs" style={{ color: COLORS.slate }}>
             Aparece só para representantes de time e para a organização. O público em geral não vê.
           </p>
-          <input value={local} onChange={(e) => setLocal(e.target.value)} placeholder="Local com endereço (ex: Nome do lugar, Rua X, 123, Bairro, Maceió)" className="w-full px-3 py-2 rounded-lg outline-none text-sm" style={campo} />
-          <input value={quando} onChange={(e) => setQuando(e.target.value)} placeholder="Dia e horário (ex: sábado, 31/10, às 19h)" className="w-full px-3 py-2 rounded-lg outline-none text-sm" style={campo} />
+          <input value={local} onChange={(e) => setLocal(e.target.value)} placeholder="Nome do local (ex: Residencial Vista do Mar)" className="w-full px-3 py-2 rounded-lg outline-none text-sm" style={campo} />
+          <input value={endereco} onChange={(e) => setEndereco(e.target.value)} placeholder="Endereço pro mapa (rua, CEP, cidade) — opcional" className="w-full px-3 py-2 rounded-lg outline-none text-sm" style={campo} />
+          <input value={quando} onChange={(e) => setQuando(e.target.value)} placeholder="Dia e horário (ex: quarta-feira, 21/10, às 20h)" className="w-full px-3 py-2 rounded-lg outline-none text-sm" style={campo} />
           <input value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Observação (opcional)" className="w-full px-3 py-2 rounded-lg outline-none text-sm" style={campo} />
           <div className="flex gap-2 flex-wrap">
             <button type="button" onClick={salvar} disabled={salvando || !local.trim()} className="px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50" style={{ backgroundColor: COLORS.accent, color: "#fff" }}>
@@ -10822,6 +11007,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
         <>
           <AprovacaoComissao teams={teams} saveTeams={saveTeams} perfis={perfis} />
           <LembreteInscricao teams={teams} perfis={perfis} />
+          <ConviteSorteio perfis={perfis} sorteio={sorteio} />
         </>
       )}
 
