@@ -7893,6 +7893,102 @@ function PalcoSorteio({ potes, numGrupos, ordem, iniciado, nomeCampeao, onInicia
   );
 }
 
+// Local e horário do sorteio presencial. Só quem representa um time (perfil
+// aprovado) e a organização enxergam; o público não vê. A organização
+// (super admin) preenche aqui mesmo e os representantes veem na hora.
+function LocalDoSorteio({ sorteio, saveSorteio, podeVer, podeEditar }) {
+  const atual = (sorteio && sorteio.local) || {};
+  const [local, setLocal] = useState(atual.texto || "");
+  const [quando, setQuando] = useState(atual.quando || "");
+  const [obs, setObs] = useState(atual.obs || "");
+  const [salvando, setSalvando] = useState(false);
+  const [editando, setEditando] = useState(false);
+
+  useEffect(() => {
+    if (!editando) {
+      setLocal(atual.texto || "");
+      setQuando(atual.quando || "");
+      setObs(atual.obs || "");
+    }
+  }, [atual.texto, atual.quando, atual.obs, editando]);
+
+  if (!podeVer) return null;
+  const definido = !!atual.texto;
+  if (!definido && !podeEditar) return null;
+
+  const salvar = async () => {
+    setSalvando(true);
+    try {
+      await saveSorteio((s) => ({
+        ...(s || {}),
+        local: { texto: local.trim(), quando: quando.trim(), obs: obs.trim(), atualizadoEm: new Date().toISOString() },
+      }));
+      setEditando(false);
+    } finally {
+      setSalvando(false);
+    }
+  };
+  const limpar = async () => {
+    if (!window.confirm("Remover o local do sorteio?")) return;
+    await saveSorteio((s) => {
+      const { local: _l, ...resto } = s || {};
+      return resto;
+    });
+    setEditando(false);
+  };
+
+  const campo = { backgroundColor: COLORS.bg, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" };
+  const mostrarForm = podeEditar && (editando || !definido);
+
+  return (
+    <div className="rounded-xl px-4 py-4 mb-6" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.gold}` }}>
+      <div className="flex items-start justify-between gap-3 mb-2">
+        <div className="text-sm font-bold flex items-center gap-2" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>
+          <MapPin size={16} color={COLORS.gold} /> Local do sorteio
+        </div>
+        <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-1 rounded-full shrink-0" style={{ backgroundColor: COLORS.goldSoft, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}>
+          Só representantes
+        </span>
+      </div>
+
+      {!mostrarForm && definido && (
+        <div style={{ fontFamily: "'Inter', sans-serif" }}>
+          <div className="text-base font-semibold" style={{ color: COLORS.ink }}>{atual.texto}</div>
+          {atual.quando && <div className="text-sm mt-1" style={{ color: COLORS.ink }}>{atual.quando}</div>}
+          {atual.obs && <div className="text-xs mt-2" style={{ color: COLORS.slate }}>{atual.obs}</div>}
+          {podeEditar && (
+            <button type="button" onClick={() => setEditando(true)} className="mt-3 px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ backgroundColor: COLORS.chipSoft, color: COLORS.ink }}>
+              Editar
+            </button>
+          )}
+        </div>
+      )}
+
+      {mostrarForm && (
+        <div className="grid gap-2" style={{ fontFamily: "'Inter', sans-serif" }}>
+          <p className="text-xs" style={{ color: COLORS.slate }}>
+            Aparece só para representantes de time e para a organização. O público em geral não vê.
+          </p>
+          <input value={local} onChange={(e) => setLocal(e.target.value)} placeholder="Local (nome e endereço)" className="w-full px-3 py-2 rounded-lg outline-none text-sm" style={campo} />
+          <input value={quando} onChange={(e) => setQuando(e.target.value)} placeholder="Dia e horário (ex: sábado, 31/10, às 19h)" className="w-full px-3 py-2 rounded-lg outline-none text-sm" style={campo} />
+          <input value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Observação (opcional)" className="w-full px-3 py-2 rounded-lg outline-none text-sm" style={campo} />
+          <div className="flex gap-2 flex-wrap">
+            <button type="button" onClick={salvar} disabled={salvando || !local.trim()} className="px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50" style={{ backgroundColor: COLORS.accent, color: "#fff" }}>
+              {salvando ? "Salvando..." : "Salvar local"}
+            </button>
+            {definido && (
+              <>
+                <button type="button" onClick={() => setEditando(false)} className="px-3 py-2 rounded-lg text-sm" style={{ backgroundColor: COLORS.chipSoft, color: COLORS.ink }}>Cancelar</button>
+                <button type="button" onClick={limpar} className="px-3 py-2 rounded-lg text-sm" style={{ color: "#ff8a80" }}>Remover</button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao, config }) {
   const souSuperAdmin = sessao && sessao.tipo === "admin" && sessao.superAdmin;
   const [numGrupos, setNumGrupos] = useState(4);
@@ -8071,6 +8167,13 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao, co
         Os potes seguem o ranking formado a partir da última edição. Times novos entram sempre
         no último pote.
       </p>
+
+      <LocalDoSorteio
+        sorteio={sorteio}
+        saveSorteio={saveSorteio}
+        podeVer={!!(sessao && (sessao.tipo === "admin" || sessao.representanteAprovado))}
+        podeEditar={!!souSuperAdmin}
+      />
 
       {souSuperAdmin && (
         <div className="flex flex-wrap items-center gap-4 mb-6">
