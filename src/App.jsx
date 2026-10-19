@@ -705,7 +705,7 @@ function mensagemConfirmacaoPagamento(nomeTime, quantidadeAtletas, formaPagament
 // pelo super admin em Organização → Nova temporada, sem precisar de
 // código). Veja horariosDoConfig() e inscricaoAberta() logo abaixo.
 const DURACAO_SLOT_MIN = 25;
-const JOGOS_SEXTA = 10;
+const JOGOS_SEXTA = 8;
 const INICIO_SEXTA_PADRAO = new Date(2026, 10, 6, 19, 0, 0); // sexta 6/nov às 19h
 const INICIO_SABADO_PADRAO = new Date(2026, 10, 7, 8, 0, 0); // sábado 7/nov às 8h
 const INICIO_DOMINGO_PADRAO = new Date(2026, 10, 8, 8, 0, 0); // domingo 8/nov às 8h
@@ -2861,6 +2861,16 @@ function Chaveamento({ matches, teams, sessao, saveMatches, config }) {
   return (
     <div>
       <SectionLabel eyebrow="Todos os confrontos" title="Jogos ao Vivo" />
+      {(() => {
+        const inicio = horariosDoConfig(config).inicioSexta;
+        const abertura = new Date(inicio.getTime() - 30 * 60000);
+        const hm = (d) => `${d.getHours()}h${String(d.getMinutes()).padStart(2, "0")}`;
+        return (
+          <p className="text-xs mb-4" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Sexta-feira, {inicio.getDate()}/{inicio.getMonth() + 1}: abertura às {hm(abertura)} e primeiro jogo às {hm(inicio)}.
+          </p>
+        );
+      })()}
       <a
         href={LOCAL_MAPS_LINK}
         target="_blank"
@@ -6076,8 +6086,9 @@ function EncerrarTemporada({ teams, matches, sorteio, posts, avaliacoes, config,
           </div>
         </div>
         <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-          Jogos de fase de grupos usam sexta e sábado (10 jogos sexta, o resto sábado, 25min entre
-          um e outro); mata-mata inteiro entra domingo a partir do horário acima.
+          Jogos de fase de grupos usam sexta e sábado (8 jogos sexta, o resto sábado, 25min entre
+          um e outro); mata-mata inteiro entra domingo a partir do horário acima. A abertura é 30min
+          antes do primeiro jogo de sexta.
         </p>
         <button
           type="button"
