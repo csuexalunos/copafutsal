@@ -2834,6 +2834,73 @@ function MatchCardExpansivel({ match, teams, sessao, saveMatches, matches, confi
   );
 }
 
+// Tabela prévia (antes do sorteio): mesma ordem e horários que o app vai gerar,
+// com A1 = cabeça de chave do Grupo A, A2 = time do pote 2, etc. Some sozinha
+// quando os jogos reais são gerados na confirmação do sorteio.
+function TabelaPrevia({ config }) {
+  const h = horariosDoConfig(config);
+  const grupos = {};
+  ["A", "B", "C", "D"].forEach((g) => {
+    grupos[g] = [1, 2, 3, 4, 5].map((n) => ({ id: `${g}${n}` }));
+  });
+  const jogos = agendarHorarios(gerarJogosDosGrupos(grupos, []), h);
+  const hora = (iso) => {
+    const d = new Date(iso);
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  };
+  const linhasGrupo = jogos.map((m, i) => ({ n: i + 1, iso: m.horario, fase: m.fase, a: m.timeA, b: m.timeB }));
+  const sexta = linhasGrupo.slice(0, JOGOS_SEXTA);
+  const sabado = linhasGrupo.slice(JOGOS_SEXTA);
+  const dom = [
+    ["Quartas", "1º × 8º"],
+    ["Quartas", "4º × 5º"],
+    ["Quartas", "2º × 7º"],
+    ["Quartas", "3º × 6º"],
+    ["Semifinal", "Venc. 41 × Venc. 42"],
+    ["Semifinal", "Venc. 43 × Venc. 44"],
+    ["3º e 4º lugar", "Perd. 45 × Perd. 46"],
+    ["Final", "Venc. 45 × Venc. 46"],
+  ].map(([fase, conf], i) => ({
+    n: linhasGrupo.length + i + 1,
+    iso: new Date(h.inicioDomingo.getTime() + i * DURACAO_SLOT_MIN * 60000).toISOString(),
+    fase,
+    conf,
+  }));
+  const dia = (iso) => formatarHorarioJogo(iso).split(" · ")[0];
+  const Bloco = ({ titulo, linhas }) => (
+    <div className="mb-8">
+      <div className="text-sm font-semibold mb-2" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>
+        {titulo}
+      </div>
+      <div className="overflow-x-auto rounded-2xl" style={{ border: `1px solid ${COLORS.border}` }}>
+        <table className="w-full text-sm" style={{ fontFamily: "'Inter', sans-serif" }}>
+          <tbody>
+            {linhas.map((l, idx) => (
+              <tr key={l.n} style={{ backgroundColor: idx % 2 === 0 ? COLORS.card : COLORS.zebra }}>
+                <td className="px-3 py-2 text-xs" style={{ color: COLORS.slate }}>{l.n}</td>
+                <td className="px-3 py-2 font-medium" style={{ color: COLORS.ink }}>{hora(l.iso)}</td>
+                <td className="px-3 py-2 text-xs" style={{ color: COLORS.slate }}>{l.fase}</td>
+                <td className="px-3 py-2" style={{ color: COLORS.ink }}>{l.conf || `${l.a} × ${l.b}`}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+  return (
+    <div>
+      <p className="text-xs mb-6" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+        Tabela prévia: 4 grupos de 5 times. A1 = cabeça de chave (pote 1) do Grupo A, A2 = time do pote 2, e assim por diante.
+        Os nomes dos times entram aqui assim que o sorteio for confirmado.
+      </p>
+      <Bloco titulo={`Sexta, ${dia(sexta[0].iso)} · abertura às ${hora(new Date(h.inicioSexta.getTime() - 30 * 60000).toISOString())}`} linhas={sexta} />
+      <Bloco titulo={`Sábado, ${dia(sabado[0].iso)} · resto da fase de grupos`} linhas={sabado} />
+      <Bloco titulo={`Domingo, ${dia(dom[0].iso)} · fase eliminatória`} linhas={dom} />
+    </div>
+  );
+}
+
 function Chaveamento({ matches, teams, sessao, saveMatches, config }) {
   const faseRank = (f) => {
     if (f.startsWith("Grupo")) return 0;
@@ -2881,9 +2948,7 @@ function Chaveamento({ matches, teams, sessao, saveMatches, config }) {
         <MapPin size={13} /> {LOCAL_NOME} — ver no mapa
       </a>
       {matches.length === 0 ? (
-        <EmptyState>
-          Nenhum jogo cadastrado ainda. A organização pode gerar a tabela na aba Sorteio.
-        </EmptyState>
+        <TabelaPrevia config={config} />
       ) : (
         <>
           {gruposDeGrupo.length > 0 && (
