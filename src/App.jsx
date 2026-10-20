@@ -527,7 +527,7 @@ const HALL_DA_FAMA = {
 
 // Data e prazo desta edição — atualizar quando a organização confirmar.
 const DATA_EVENTO = "6, 7 e 8 de novembro";
-const PRAZO_INSCRICAO = "aberta agora até 30 de setembro";
+const PRAZO_INSCRICAO = "de 01 a 30 de setembro";
 const VALOR_INSCRICAO_ATLETA = "R$ 110,00 a R$ 140,00 por atleta, conforme o lote";
 // Lotes de inscrição — o valor por atleta aumenta conforme a data em que
 // o time se inscreve (Art. 8º, Parágrafo 1º do regulamento).
