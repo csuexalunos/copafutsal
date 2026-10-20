@@ -708,7 +708,7 @@ const DURACAO_SLOT_MIN = 25;
 const JOGOS_SEXTA = 8;
 const INICIO_SEXTA_PADRAO = new Date(2026, 10, 6, 19, 0, 0); // sexta 6/nov às 19h
 const INICIO_SABADO_PADRAO = new Date(2026, 10, 7, 8, 0, 0); // sábado 7/nov às 8h
-const INICIO_DOMINGO_PADRAO = new Date(2026, 10, 8, 8, 0, 0); // domingo 8/nov às 8h
+const INICIO_DOMINGO_PADRAO = new Date(2026, 10, 8, 9, 0, 0); // domingo 8/nov às 9h
 const INSCRICAO_INICIO_PADRAO = new Date(2026, 0, 1, 0, 0, 0); // liberada desde já
 const INSCRICAO_FIM_PADRAO = new Date(2026, 8, 30, 23, 59, 59); // 30 de setembro (último dia do mês)
 
@@ -7640,7 +7640,7 @@ function gerarJogosDosGrupos(grupos, potes) {
 
 // Agenda os horários de todos os jogos, na ordem em que já estão: jogos
 // da fase de grupos entram sexta às 19h (10 jogos) e o resto continua
-// sábado às 8h; jogos de mata-mata entram domingo às 8h. 25min entre um início e
+// sábado às 8h; jogos de mata-mata entram domingo às 9h. 25min entre um início e
 // outro (20min de jogo + 5min de intervalo).
 function agendarHorarios(listaJogos, horarios) {
   const h = horarios || horariosDoConfig(null);
@@ -7786,42 +7786,18 @@ function gerarMataMataAutomatico(matches, teams, horarios) {
   const gruposCompletos = jogosGrupo.length > 0 && jogosGrupo.every((m) => jogoDecidido(m));
 
   if (gruposCompletos && !temFase("Quartas")) {
-    // Cruzamento por grupo (4 grupos A–D, passam os 2 primeiros de cada um):
-    // 1A x 2B, 1C x 2D, 1B x 2A, 1D x 2C. Se os grupos forem outros, cai no
-    // cruzamento pela classificação geral (1º x 8º, 4º x 5º, 2º x 7º, 3º x 6º).
-    const porGrupo = {};
-    jogosGrupo.forEach((m) => {
-      const nome = (m.fase || "").replace("Grupo ", "").trim();
-      (porGrupo[nome] = porGrupo[nome] || []).push(m);
-    });
-    const classif = {};
-    Object.keys(porGrupo).forEach((nome) => {
-      const ids = new Set();
-      porGrupo[nome].forEach((m) => {
-        ids.add(m.timeA);
-        ids.add(m.timeB);
-      });
-      classif[nome] = pontosPartida(porGrupo[nome], teams.filter((t) => ids.has(t.id)));
-    });
-    const temABCD = ["A", "B", "C", "D"].every((g) => classif[g] && classif[g].length >= 2) && Object.keys(classif).length === 4;
+    // Cruzamento pela classificação geral (só da fase de grupos), os 8 melhores:
+    // 1º x 8º, 4º x 5º, 2º x 7º, 3º x 6º. Semis: venc. jogo 1 x venc. jogo 2 e
+    // venc. jogo 3 x venc. jogo 4.
     let paresQuartas = null;
-    if (temABCD) {
+    const geral = calcularClassificacaoGeral(novos, teams).slice(0, 8);
+    if (geral.length === 8) {
       paresQuartas = [
-        [classif.A[0].id, classif.B[1].id],
-        [classif.C[0].id, classif.D[1].id],
-        [classif.B[0].id, classif.A[1].id],
-        [classif.D[0].id, classif.C[1].id],
-      ];
-    } else {
-      const geral = calcularClassificacaoGeral(novos, teams).slice(0, 8);
-      if (geral.length === 8) {
-        paresQuartas = [
-          [0, 7],
-          [3, 4],
-          [1, 6],
-          [2, 5],
-        ].map(([i, j]) => [geral[i].id, geral[j].id]);
-      }
+        [0, 7],
+        [3, 4],
+        [1, 6],
+        [2, 5],
+      ].map(([i, j]) => [geral[i].id, geral[j].id]);
     }
     if (paresQuartas) {
       const quartas = paresQuartas.map(([a, b], idx) => novoJogoVazio(`jogo_qf${idx}_${Date.now()}`, "Quartas", a, b));
