@@ -7786,15 +7786,45 @@ function gerarMataMataAutomatico(matches, teams, horarios) {
   const gruposCompletos = jogosGrupo.length > 0 && jogosGrupo.every((m) => jogoDecidido(m));
 
   if (gruposCompletos && !temFase("Quartas")) {
-    const geral = calcularClassificacaoGeral(novos, teams).slice(0, 8);
-    if (geral.length === 8) {
-      const pares = [
-        [0, 7],
-        [3, 4],
-        [1, 6],
-        [2, 5],
+    // Cruzamento por grupo (4 grupos A–D, passam os 2 primeiros de cada um):
+    // 1A x 2B, 1C x 2D, 1B x 2A, 1D x 2C. Se os grupos forem outros, cai no
+    // cruzamento pela classificação geral (1º x 8º, 4º x 5º, 2º x 7º, 3º x 6º).
+    const porGrupo = {};
+    jogosGrupo.forEach((m) => {
+      const nome = (m.fase || "").replace("Grupo ", "").trim();
+      (porGrupo[nome] = porGrupo[nome] || []).push(m);
+    });
+    const classif = {};
+    Object.keys(porGrupo).forEach((nome) => {
+      const ids = new Set();
+      porGrupo[nome].forEach((m) => {
+        ids.add(m.timeA);
+        ids.add(m.timeB);
+      });
+      classif[nome] = pontosPartida(porGrupo[nome], teams.filter((t) => ids.has(t.id)));
+    });
+    const temABCD = ["A", "B", "C", "D"].every((g) => classif[g] && classif[g].length >= 2) && Object.keys(classif).length === 4;
+    let paresQuartas = null;
+    if (temABCD) {
+      paresQuartas = [
+        [classif.A[0].id, classif.B[1].id],
+        [classif.C[0].id, classif.D[1].id],
+        [classif.B[0].id, classif.A[1].id],
+        [classif.D[0].id, classif.C[1].id],
       ];
-      const quartas = pares.map(([i, j], idx) => novoJogoVazio(`jogo_qf${idx}_${Date.now()}`, "Quartas", geral[i].id, geral[j].id));
+    } else {
+      const geral = calcularClassificacaoGeral(novos, teams).slice(0, 8);
+      if (geral.length === 8) {
+        paresQuartas = [
+          [0, 7],
+          [3, 4],
+          [1, 6],
+          [2, 5],
+        ].map(([i, j]) => [geral[i].id, geral[j].id]);
+      }
+    }
+    if (paresQuartas) {
+      const quartas = paresQuartas.map(([a, b], idx) => novoJogoVazio(`jogo_qf${idx}_${Date.now()}`, "Quartas", a, b));
       novos = agendarHorarios([...novos, ...quartas], h);
     }
   }
@@ -7815,7 +7845,8 @@ function gerarMataMataAutomatico(matches, teams, horarios) {
     const perdedores = semis.map(perdedorJogo);
     const final = novoJogoVazio(`jogo_final_${Date.now()}`, "Final", vencedores[0], vencedores[1]);
     const terceiro = novoJogoVazio(`jogo_3lugar_${Date.now()}`, "3º Lugar", perdedores[0], perdedores[1]);
-    novos = agendarHorarios([...novos, final, terceiro], h);
+    // 3º lugar primeiro, final por último.
+    novos = agendarHorarios([...novos, terceiro, final], h);
   }
 
   return novos;
