@@ -7592,8 +7592,7 @@ function gerarRodadasGrupo(times) {
 // Gera os jogos da fase de grupos já na ordem em que vão acontecer:
 // intercalados entre os grupos (jogo 1 do A, jogo 1 do B, jogo 1 do C...
 // depois o jogo 2 de cada um, e assim por diante, rodada por rodada), e
-// não "todos os jogos do A, depois todos os do B" — exceto na última
-// rodada, em que os jogos de cada grupo ficam juntos. O 1º jogo do campeonato
+// não "todos os jogos do A, depois todos os do B". O 1º jogo do campeonato
 // é sempre o do Grupo A: cabeça de chave (pote 1) x time do pote 2.
 // "potes" (sorteio.potes) serve pra ordenar os times de cada grupo por pote.
 function gerarJogosDosGrupos(grupos, potes) {
@@ -7611,37 +7610,28 @@ function gerarJogosDosGrupos(grupos, potes) {
   const maxRodadas = Math.max(0, ...nomesGrupos.map((g) => porGrupo[g].length));
   const jogos = [];
   const carimbo = Date.now();
-  const novoJogo = (nomeGrupo, r, k, [timeA, timeB]) => ({
-    id: `jogo_${carimbo}_${nomeGrupo}_${r}_${k}_${Math.random().toString(36).slice(2, 6)}`,
-    fase: `Grupo ${nomeGrupo}`,
-    rodada: r + 1,
-    timeA: timeA.id,
-    timeB: timeB.id,
-    golsA: null,
-    golsB: null,
-    status: "agendado",
-    tempoAtual: 1,
-    tempoIniciadoEm: null,
-    tempoAcumuladoMs: 0,
-    eventos: [],
-    horario: null,
-  });
   for (let r = 0; r < maxRodadas; r++) {
-    const ultimaRodada = r === maxRodadas - 1;
-    if (ultimaRodada) {
-      // Última rodada: os jogos de cada grupo ficam juntos, um logo depois do
-      // outro (A, A, B, B, C, C, D, D) — quem joga o segundo jogo do grupo
-      // quase não tem vantagem de saber o resultado do primeiro.
-      nomesGrupos.forEach((nomeGrupo) => {
-        (porGrupo[nomeGrupo][r] || []).forEach((confronto, k) => jogos.push(novoJogo(nomeGrupo, r, k, confronto)));
-      });
-      continue;
-    }
     const maxJogos = Math.max(0, ...nomesGrupos.map((g) => (porGrupo[g][r] || []).length));
     for (let k = 0; k < maxJogos; k++) {
       nomesGrupos.forEach((nomeGrupo) => {
         const confronto = (porGrupo[nomeGrupo][r] || [])[k];
-        if (confronto) jogos.push(novoJogo(nomeGrupo, r, k, confronto));
+        if (!confronto) return;
+        const [timeA, timeB] = confronto;
+        jogos.push({
+          id: `jogo_${carimbo}_${nomeGrupo}_${r}_${k}_${Math.random().toString(36).slice(2, 6)}`,
+          fase: `Grupo ${nomeGrupo}`,
+          rodada: r + 1,
+          timeA: timeA.id,
+          timeB: timeB.id,
+          golsA: null,
+          golsB: null,
+          status: "agendado",
+          tempoAtual: 1,
+          tempoIniciadoEm: null,
+          tempoAcumuladoMs: 0,
+          eventos: [],
+          horario: null,
+        });
       });
     }
   }
