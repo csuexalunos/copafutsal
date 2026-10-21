@@ -6961,9 +6961,69 @@ function diagnosticarTime(team) {
 function DiagnosticoIrregularidades({ teams, avaliacoes, aprovarExcecao, manterIrregularidade }) {
   const times = teams.map((t) => ({ time: t, problemas: diagnosticarTime(t) })).filter((x) => x.problemas.length > 0);
 
-  if (times.length === 0) return null;
+  // Pedidos de revisão pendentes que não aparecem dentro de nenhum time com
+  // irregularidade (ex.: o ano foi corrigido, ou o jogador/time foi removido).
+  // Sem isso o selo mostra "2" e a tela vem vazia.
+  const chavesMostradas = new Set();
+  times.forEach(({ time }) =>
+    (time.jogadores || []).forEach((j) => {
+      if (!j.excecaoAprovada && anoConclusaoRegular(j.anoConclusao, time.nome) === false) {
+        chavesMostradas.add(`${time.nome}::${j.id}`);
+      }
+    })
+  );
+  const pedidosSoltos = (avaliacoes || []).filter(
+    (a) => a.status === "pendente" && !chavesMostradas.has(`${a.timeNome}::${a.jogadorId}`)
+  );
+
+  if (times.length === 0 && pedidosSoltos.length === 0) {
+    return (
+      <div className="rounded-2xl p-5 mt-8 text-sm" style={{ backgroundColor: COLORS.card, color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+        Nenhuma irregularidade encontrada nos elencos.
+      </div>
+    );
+  }
 
   return (
+    <div>
+      {pedidosSoltos.length > 0 && (
+        <div className="rounded-2xl p-5 mt-8" style={{ backgroundColor: COLORS.card, border: `1.5px solid ${COLORS.accent}` }}>
+          <h3 className="font-semibold mb-1 flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+            <AlertTriangle size={18} color={COLORS.accent} /> Pedidos de revisão pendentes ({pedidosSoltos.length})
+          </h3>
+          <p className="text-xs mb-4" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Pedidos feitos pelos representantes. O diagnóstico automático não aponta problema atual
+            nesses jogadores (ou eles já não estão no elenco), mas o pedido continua aberto.
+          </p>
+          <div className="space-y-2">
+            {pedidosSoltos.map((a) => (
+              <div key={a.id} className="flex flex-wrap items-center gap-2 px-2.5 py-2 rounded-lg" style={{ backgroundColor: COLORS.zebra }}>
+                <span className="text-xs font-medium mr-auto" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+                  {a.timeNome} · {a.jogadorApelido || a.jogadorNome || "Jogador"}
+                  {a.anoConclusao ? ` · conclusão ${a.anoConclusao}` : ""}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => aprovarExcecao({ id: a.id, timeNome: a.timeNome, jogadorId: a.jogadorId })}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+                  style={{ backgroundColor: "#16A34A", color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+                >
+                  Aprovar exceção
+                </button>
+                <button
+                  type="button"
+                  onClick={() => manterIrregularidade({ id: a.id, timeNome: a.timeNome, jogadorId: a.jogadorId })}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+                  style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+                >
+                  Manter irregularidade
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {times.length > 0 && (
     <div
       className="rounded-2xl p-5 mt-8"
       style={{ backgroundColor: COLORS.card, border: `1.5px solid ${COLORS.accent}` }}
@@ -7058,6 +7118,8 @@ function DiagnosticoIrregularidades({ teams, avaliacoes, aprovarExcecao, manterI
           );
         })}
       </div>
+    </div>
+      )}
     </div>
   );
 }
