@@ -2230,10 +2230,14 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes, confi
       jogadorApelido: jogador.apelido,
       jogadorNome: jogador.nome,
       anoConclusao: jogador.anoConclusao,
+      // Dados do jogador no momento do pedido (sem CPF, que fica na tabela
+      // protegida) — assim a organização consegue incluí-lo no time ao aprovar,
+      // mesmo que o representante ainda não tenha salvado o elenco.
+      jogadorDados: (({ cpf, ...resto }) => resto)(jogador),
       status: "pendente",
       criadoEm: new Date().toISOString(),
     };
-    await saveAvaliacoes([...avaliacoes, caso]);
+    await saveAvaliacoes((atuais) => [...(atuais || avaliacoes), caso]);
     updateJogador({ ...jogador, avaliacaoPendente: true });
   };
 
@@ -6961,7 +6965,9 @@ function motivoIrregularidadeJogador(time, jogador, pedido) {
   }
   if (jogador && jogador.excecaoAprovada) motivo += " A exceção já foi aprovada.";
   if (pedido && !time) motivo += " Obs.: este time não está mais inscrito.";
-  else if (pedido && !jogador) motivo += " Obs.: o jogador já não está mais no elenco, então o pedido pode ser encerrado (aprovar ou manter não altera o elenco).";
+  else if (pedido && !jogador) {
+    motivo = `O representante solicitou a inclusão de ${pedido.jogadorApelido || pedido.jogadorNome || "um jogador"} no time ${nomeTime}, mas o jogador ainda não está no elenco. ${motivo}`;
+  }
   return { motivo, artigo };
 }
 
@@ -6982,7 +6988,7 @@ function diagnosticarTime(team) {
   return problemas;
 }
 
-function DiagnosticoIrregularidades({ teams, avaliacoes, aprovarExcecao, manterIrregularidade }) {
+function DiagnosticoIrregularidades({ teams, avaliacoes, aprovarExcecao, manterIrregularidade, recusarPedido }) {
   const times = teams.map((t) => ({ time: t, problemas: diagnosticarTime(t) })).filter((x) => x.problemas.length > 0);
 
   // Pedidos de revisão pendentes que não aparecem dentro de nenhum time com
@@ -7013,11 +7019,11 @@ function DiagnosticoIrregularidades({ teams, avaliacoes, aprovarExcecao, manterI
       {pedidosSoltos.length > 0 && (
         <div className="rounded-2xl p-5 mt-8" style={{ backgroundColor: COLORS.card, border: `1.5px solid ${COLORS.accent}` }}>
           <h3 className="font-semibold mb-1 flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
-            <AlertTriangle size={18} color={COLORS.accent} /> Pedidos de revisão pendentes ({pedidosSoltos.length})
+            <AlertTriangle size={18} color={COLORS.accent} /> Solicitações dos representantes ({pedidosSoltos.length})
           </h3>
           <p className="text-xs mb-4" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-            Pedidos feitos pelos representantes. O diagnóstico automático não aponta problema atual
-            nesses jogadores (ou eles já não estão no elenco), mas o pedido continua aberto.
+            Pedidos feitos pelos representantes para incluir ou avaliar jogadores com irregularidade.
+            Ao aprovar a inclusão, o jogador entra no elenco com a exceção aprovada; ao recusar, ele não entra.
           </p>
           <div className="space-y-2">
             {pedidosSoltos.map((a) => (
@@ -7046,19 +7052,26 @@ function DiagnosticoIrregularidades({ teams, avaliacoes, aprovarExcecao, manterI
                 </div>
                 <button
                   type="button"
-                  onClick={() => aprovarExcecao({ id: a.id, timeNome: a.timeNome, jogadorId: a.jogadorId })}
+                  onClick={() =>
+                    aprovarExcecao({
+                      id: a.id,
+                      timeNome: a.timeNome,
+                      jogadorId: a.jogadorId,
+                      jogadorDados: a.jogadorDados || { nome: a.jogadorNome, apelido: a.jogadorApelido, anoConclusao: a.anoConclusao },
+                    })
+                  }
                   className="px-3 py-1.5 rounded-lg text-xs font-semibold"
                   style={{ backgroundColor: "#16A34A", color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
                 >
-                  Aprovar exceção
+                  Aprovar inclusão
                 </button>
                 <button
                   type="button"
-                  onClick={() => manterIrregularidade({ id: a.id, timeNome: a.timeNome, jogadorId: a.jogadorId })}
+                  onClick={() => recusarPedido({ id: a.id, timeNome: a.timeNome, jogadorId: a.jogadorId })}
                   className="px-3 py-1.5 rounded-lg text-xs font-semibold"
                   style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
                 >
-                  Manter irregularidade
+                  Recusar
                 </button>
               </div>
             ))}
@@ -10431,7 +10444,17 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
     await saveTeams((atuais) =>
       (atuais || []).map((t) => {
         if (t.nome !== caso.timeNome) return t;
-        const jogadoresAtualizados = (t.jogadores || []).map((j) =>
+        const lista = t.jogadores || [];
+        const jaNoElenco = lista.some((j) => j.id === caso.jogadorId);
+        // Pedido de inclusão: o jogador ainda não está no time — entra agora,
+        // já com a exceção aprovada (o representante completa o CPF depois).
+        if (!jaNoElenco && caso.jogadorDados) {
+          return {
+            ...t,
+            jogadores: [...lista, { ...caso.jogadorDados, id: caso.jogadorId, excecaoAprovada: true, avaliacaoPendente: false }],
+          };
+        }
+        const jogadoresAtualizados = lista.map((j) =>
           j.id === caso.jogadorId ? { ...j, excecaoAprovada: true, avaliacaoPendente: false } : j
         );
         return { ...t, jogadores: jogadoresAtualizados };
@@ -10444,6 +10467,17 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
       (atuais || []).map((a) =>
         a.status === "pendente" && a.timeNome === caso.timeNome && a.jogadorId === caso.jogadorId
           ? { ...a, status: "aprovada" }
+          : a
+      )
+    );
+  };
+
+  // Recusa um pedido de inclusão: o jogador não entra no time e o pedido fecha.
+  const recusarPedido = async (caso) => {
+    await saveAvaliacoes((atuais) =>
+      (atuais || []).map((a) =>
+        a.status === "pendente" && a.timeNome === caso.timeNome && a.jogadorId === caso.jogadorId
+          ? { ...a, status: "recusada" }
           : a
       )
     );
@@ -11335,6 +11369,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
               avaliacoes={avaliacoes}
               aprovarExcecao={aprovarExcecao}
               manterIrregularidade={manterIrregularidade}
+              recusarPedido={recusarPedido}
             />
           )}
           {subAbaTimes === "confirmacao" && <ConfirmacaoAlunosColegio teams={teams} saveTeams={saveTeams} />}
