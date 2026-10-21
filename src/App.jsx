@@ -6941,6 +6941,32 @@ function AprovacaoComissao({ teams, saveTeams, perfis }) {
   );
 }
 
+// Motivo + artigo do regulamento para um jogador em situação irregular.
+const ARTIGO_ANO_CONCLUSAO = "Art. 9º, alínea a e §3º do Regulamento";
+function motivoIrregularidadeJogador(time, jogador, pedido) {
+  const ano = (jogador && jogador.anoConclusao) || (pedido && pedido.anoConclusao);
+  if (!time) {
+    return { motivo: "O time deste pedido não está mais inscrito.", artigo: null };
+  }
+  if (!jogador) {
+    return { motivo: `O jogador ${pedido?.jogadorApelido || pedido?.jogadorNome || ""} não está mais no elenco de ${time.nome}.`.replace("  ", " "), artigo: null };
+  }
+  const reg = anoConclusaoRegular(jogador.anoConclusao, time.nome);
+  if (reg === false) {
+    return {
+      motivo: `Ano de conclusão (${ano}) diferente da turma do time (${time.nome}). Só pode jogar neste time com aprovação prévia da Comissão Organizadora.`,
+      artigo: ARTIGO_ANO_CONCLUSAO,
+    };
+  }
+  if (jogador.excecaoAprovada) {
+    return { motivo: `Ano de conclusão (${ano}) fora da turma ${time.nome}, mas a exceção já foi aprovada.`, artigo: ARTIGO_ANO_CONCLUSAO };
+  }
+  return {
+    motivo: `O representante pediu avaliação deste jogador (ano de conclusão informado: ${ano || "não informado"}), mas hoje o ano bate com a turma ${time.nome}. Confirme se o pedido ainda é necessário (por exemplo, se ele cursou o mínimo de anos exigido).`,
+    artigo: "Art. 9º, alínea b e §1º do Regulamento",
+  };
+}
+
 function diagnosticarTime(team) {
   const problemas = [];
   const jogadores = Array.isArray(team.jogadores) ? team.jogadores : [];
@@ -6952,7 +6978,7 @@ function diagnosticarTime(team) {
   }
   jogadores.forEach((j) => {
     if (!j.excecaoAprovada && anoConclusaoRegular(j.anoConclusao, team.nome) === false) {
-      problemas.push(`${j.nome || "Jogador"}: ano de conclusão (${j.anoConclusao}) não bate com a turma ${team.nome} (Art. 9º).`);
+      problemas.push(`${j.nome || "Jogador"}: ano de conclusão (${j.anoConclusao}) não bate com a turma ${team.nome} (${ARTIGO_ANO_CONCLUSAO}).`);
     }
   });
   return problemas;
@@ -6998,10 +7024,28 @@ function DiagnosticoIrregularidades({ teams, avaliacoes, aprovarExcecao, manterI
           <div className="space-y-2">
             {pedidosSoltos.map((a) => (
               <div key={a.id} className="flex flex-wrap items-center gap-2 px-2.5 py-2 rounded-lg" style={{ backgroundColor: COLORS.zebra }}>
-                <span className="text-xs font-medium mr-auto" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
-                  {a.timeNome} · {a.jogadorApelido || a.jogadorNome || "Jogador"}
-                  {a.anoConclusao ? ` · conclusão ${a.anoConclusao}` : ""}
-                </span>
+                <div className="mr-auto" style={{ minWidth: 220, flex: "1 1 260px" }}>
+                  <div className="text-xs font-semibold" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+                    {a.timeNome} · {a.jogadorApelido || a.jogadorNome || "Jogador"}
+                    {a.anoConclusao ? ` · conclusão ${a.anoConclusao}` : ""}
+                  </div>
+                  {(() => {
+                    const t = teams.find((x) => x.nome === a.timeNome);
+                    const j = t && (t.jogadores || []).find((x) => x.id === a.jogadorId);
+                    const { motivo, artigo } = motivoIrregularidadeJogador(t, j, a);
+                    return (
+                      <div className="text-[11px] mt-0.5" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                        <strong>Motivo:</strong> {motivo}
+                        {artigo && (
+                          <>
+                            {" "}
+                            <strong>({artigo})</strong>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
                 <button
                   type="button"
                   onClick={() => aprovarExcecao({ id: a.id, timeNome: a.timeNome, jogadorId: a.jogadorId })}
@@ -7070,9 +7114,15 @@ function DiagnosticoIrregularidades({ teams, avaliacoes, aprovarExcecao, manterI
                       className="flex flex-wrap items-center gap-2 px-2.5 py-2 rounded-lg"
                       style={{ backgroundColor: COLORS.card }}
                     >
-                      <span className="text-xs font-medium" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
-                        {j.apelido || j.nome || "Jogador"}
-                      </span>
+                      <div style={{ flex: "1 1 100%" }}>
+                        <div className="text-xs font-medium" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+                          {j.apelido || j.nome || "Jogador"}
+                        </div>
+                        <div className="text-[11px] mt-0.5" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                          <strong>Motivo:</strong> {motivoIrregularidadeJogador(time, j).motivo}{" "}
+                          <strong>({motivoIrregularidadeJogador(time, j).artigo})</strong>
+                        </div>
+                      </div>
                       {pedidoPeloRepresentante && (
                         <span
                           className="text-[10px] font-semibold px-1.5 py-0.5 rounded mr-auto"
