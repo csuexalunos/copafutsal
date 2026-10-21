@@ -6944,27 +6944,25 @@ function AprovacaoComissao({ teams, saveTeams, perfis }) {
 // Motivo + artigo do regulamento para um jogador em situação irregular.
 const ARTIGO_ANO_CONCLUSAO = "Art. 9º, alínea a e §3º do Regulamento";
 function motivoIrregularidadeJogador(time, jogador, pedido) {
+  const nomeTime = (time && time.nome) || (pedido && pedido.timeNome) || "";
   const ano = (jogador && jogador.anoConclusao) || (pedido && pedido.anoConclusao);
-  if (!time) {
-    return { motivo: "O time deste pedido não está mais inscrito.", artigo: null };
-  }
-  if (!jogador) {
-    return { motivo: `O jogador ${pedido?.jogadorApelido || pedido?.jogadorNome || ""} não está mais no elenco de ${time.nome}.`.replace("  ", " "), artigo: null };
-  }
-  const reg = anoConclusaoRegular(jogador.anoConclusao, time.nome);
+  const reg = anoConclusaoRegular(ano, nomeTime);
+  const anosTurma = anosDaTurma(nomeTime).join("/");
+  let motivo;
+  let artigo = ARTIGO_ANO_CONCLUSAO;
   if (reg === false) {
-    return {
-      motivo: `Ano de conclusão (${ano}) diferente da turma do time (${time.nome}). Só pode jogar neste time com aprovação prévia da Comissão Organizadora.`,
-      artigo: ARTIGO_ANO_CONCLUSAO,
-    };
+    motivo = `Ano de conclusão (${ano}) diferente da turma do time (${nomeTime}${anosTurma ? `, conclusão ${anosTurma}` : ""}). Ex-alunos com anos de conclusão diferentes não podem jogar na mesma equipe, salvo aprovação prévia da Comissão Organizadora.`;
+  } else if (reg === true) {
+    motivo = `O ano de conclusão informado (${ano}) bate com a turma ${nomeTime}. O representante pediu avaliação mesmo assim; confirme se há outra dúvida (por exemplo, o mínimo de anos cursados).`;
+    artigo = "Art. 9º, alínea b e §1º do Regulamento";
+  } else {
+    motivo = `Faltam dados (ano de conclusão não informado) para conferir se este jogador pode jogar na turma ${nomeTime}.`;
+    artigo = "Art. 9º, alínea a do Regulamento";
   }
-  if (jogador.excecaoAprovada) {
-    return { motivo: `Ano de conclusão (${ano}) fora da turma ${time.nome}, mas a exceção já foi aprovada.`, artigo: ARTIGO_ANO_CONCLUSAO };
-  }
-  return {
-    motivo: `O representante pediu avaliação deste jogador (ano de conclusão informado: ${ano || "não informado"}), mas hoje o ano bate com a turma ${time.nome}. Confirme se o pedido ainda é necessário (por exemplo, se ele cursou o mínimo de anos exigido).`,
-    artigo: "Art. 9º, alínea b e §1º do Regulamento",
-  };
+  if (jogador && jogador.excecaoAprovada) motivo += " A exceção já foi aprovada.";
+  if (pedido && !time) motivo += " Obs.: este time não está mais inscrito.";
+  else if (pedido && !jogador) motivo += " Obs.: o jogador já não está mais no elenco, então o pedido pode ser encerrado (aprovar ou manter não altera o elenco).";
+  return { motivo, artigo };
 }
 
 function diagnosticarTime(team) {
