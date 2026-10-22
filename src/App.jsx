@@ -2745,7 +2745,7 @@ function MatchCardExpansivel({ match, teams, sessao, saveMatches, matches, confi
       await saveMatches(gerarMataMataAutomatico(atualizado, teams, horariosDoConfig(config)));
     };
     return (
-      <div className="w-72 shrink-0">
+      <div className="w-full">
         <MatchAdminRow match={match} teams={teams} onUpdate={onUpdate} />
       </div>
     );
@@ -2754,46 +2754,57 @@ function MatchCardExpansivel({ match, teams, sessao, saveMatches, matches, confi
   const rotuloEvento = (tipo) =>
     ({ gol: "⚽ Gol", assistencia: "🅰️ Assistência", cartao_amarelo: "🟨 Amarelo", cartao_vermelho: "🟥 Vermelho" }[tipo] || tipo);
 
-  return (
-    <div
-      className="rounded-xl overflow-hidden w-72 shrink-0"
-      style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
-    >
-      <button type="button" onClick={() => setExpanded((v) => !v)} className="w-full text-left px-4 py-3">
-        <div
-          className="text-[10px] uppercase tracking-widest mb-2 font-semibold flex items-center justify-between"
-          style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}
-        >
-          <span>{match.fase || "Fase"}</span>
-          {match.status && match.status !== "agendado" ? (
-            <MatchClock match={match} />
-          ) : (
-            match.horario && (
-              <span style={{ fontFamily: "'JetBrains Mono', monospace", color: COLORS.slate }}>
-                {formatarHorarioJogo(match.horario)}
-              </span>
-            )
-          )}
+  const status = match.status || "agendado";
+  const aoVivo = status === "ao_vivo";
+  const rotuloStatus =
+    status === "encerrado" ? "ENCERRADO" : status === "intervalo" ? "INTERVALO" : aoVivo ? "AO VIVO" : "AGENDADO";
+  const corStatus = aoVivo ? "#22C55E" : status === "intervalo" ? COLORS.accent : COLORS.slate;
+  const dh = match.horario ? new Date(match.horario) : null;
+  const diasLongos = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
+  const dataTxt = dh
+    ? `${diasLongos[dh.getDay()]}, ${String(dh.getDate()).padStart(2, "0")}/${String(dh.getMonth() + 1).padStart(2, "0")}/${dh.getFullYear()} · ${String(dh.getHours()).padStart(2, "0")}:${String(dh.getMinutes()).padStart(2, "0")}`
+    : null;
+  const lado = (nome, escudo) => (
+    <div className="flex flex-col items-center gap-1.5 w-[84px] shrink-0">
+      {escudo ? (
+        <img src={escudo} alt="" className="w-14 h-14 object-contain" />
+      ) : (
+        <div className="w-14 h-14 rounded-full flex items-center justify-center text-lg font-bold" style={{ backgroundColor: COLORS.border, color: COLORS.slate }}>
+          ?
         </div>
-        {[
-          ["A", nomeA, match.golsA, escudoA],
-          ["B", nomeB, match.golsB, escudoB],
-        ].map(([k, nome, gols, escudo]) => (
-          <div key={k} className="flex items-center justify-between py-0.5 gap-2">
-            <span className="flex items-center gap-1.5 min-w-0">
-              {escudo && <img src={escudo} alt="" className="w-5 h-5 object-contain shrink-0" />}
-              <span className="text-sm truncate" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
-                {nome}
-              </span>
-            </span>
+      )}
+      <span className="text-[11px] font-semibold text-center leading-tight break-words" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+        {nome}
+      </span>
+    </div>
+  );
+
+  return (
+    <div className="w-full" style={{ borderBottom: `1px solid ${COLORS.border}` }}>
+      <button type="button" onClick={() => setExpanded((v) => !v)} className="w-full text-center px-2 pt-4 pb-3">
+        <div className="text-[11px] font-bold uppercase tracking-widest mb-3" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
+          {match.fase || "Fase"}
+        </div>
+        <div className="flex items-start justify-between gap-1">
+          {lado(nomeA, escudoA)}
+          <div className="flex flex-col items-center gap-2 pt-1 min-w-0 flex-1">
             <span
-              className="text-sm font-bold w-6 text-right shrink-0"
-              style={{ fontFamily: "'JetBrains Mono', monospace", color: played ? COLORS.ink : COLORS.border }}
+              className="text-[10px] font-bold tracking-wider px-3 py-1 rounded-full"
+              style={{ color: corStatus, border: `1px solid ${corStatus}`, fontFamily: "'Inter', sans-serif" }}
             >
-              {played ? gols : "—"}
+              {rotuloStatus}
             </span>
+            <span className="text-3xl font-bold" style={{ fontFamily: "'JetBrains Mono', monospace", color: played ? COLORS.ink : COLORS.border }}>
+              {played ? `${match.golsA} : ${match.golsB}` : "– : –"}
+            </span>
+            {status !== "agendado" && status !== "encerrado" && <MatchClock match={match} />}
           </div>
-        ))}
+          {lado(nomeB, escudoB)}
+        </div>
+        <div className="text-[11px] mt-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+          {LOCAL_NOME}
+          {dataTxt ? ` · ${dataTxt}` : ""}
+        </div>
       </button>
 
       {expanded && (
@@ -2929,6 +2940,29 @@ function Chaveamento({ matches, teams, sessao, saveMatches, config }) {
     return Array.from(nomes).sort((a, b) => faseRank(a) - faseRank(b));
   }, [matches]);
 
+  const [faseSel, setFaseSel] = useState(null);
+  const [rodadaSel, setRodadaSel] = useState(null);
+  const rodadasGrupo = useMemo(
+    () => Array.from(new Set(matches.filter((m) => (m.fase || "").startsWith("Grupo")).map((m) => m.rodada || 1))).sort((a, b) => a - b),
+    [matches]
+  );
+  const opcoesFase = [
+    ...(gruposDeGrupo.length > 0 ? [{ id: "grupos", label: "Fase de grupos" }] : []),
+    ...fasesEliminatorias.map((f) => ({ id: f, label: f })),
+  ];
+  const emAndamento = matches.find((m) => m.status === "ao_vivo" || m.status === "intervalo");
+  const proximo = matches.find((m) => m.status !== "encerrado");
+  const alvo = emAndamento || proximo || matches[matches.length - 1];
+  const faseDoAlvo = alvo ? ((alvo.fase || "").startsWith("Grupo") ? "grupos" : alvo.fase) : null;
+  const faseAtual = opcoesFase.some((o) => o.id === faseSel) ? faseSel : opcoesFase.some((o) => o.id === faseDoAlvo) ? faseDoAlvo : opcoesFase[0]?.id;
+  const rodadaPadrao = alvo && (alvo.fase || "").startsWith("Grupo") ? alvo.rodada || 1 : rodadasGrupo[0];
+  const rodadaAtual = rodadasGrupo.includes(rodadaSel) ? rodadaSel : rodadaPadrao;
+  const jogosVisiveis = matches
+    .filter((m) =>
+      faseAtual === "grupos" ? (m.fase || "").startsWith("Grupo") && (m.rodada || 1) === rodadaAtual : m.fase === faseAtual
+    )
+    .sort((x, y) => String(x.horario || "").localeCompare(String(y.horario || "")));
+
   return (
     <div>
       <SectionLabel eyebrow="Todos os confrontos" title="Jogos ao Vivo" />
@@ -2955,60 +2989,57 @@ function Chaveamento({ matches, teams, sessao, saveMatches, config }) {
         <TabelaPrevia config={config} />
       ) : (
         <>
-          {gruposDeGrupo.length > 0 && (
-            <div className="mb-10">
-              <div className="text-xs font-semibold uppercase tracking-wide mb-4" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
-                Fase de grupos
-              </div>
-              {gruposDeGrupo.map((fase) => {
-                const jogosDoGrupo = matches.filter((m) => m.fase === fase);
-                const rodadas = Array.from(new Set(jogosDoGrupo.map((m) => m.rodada || 1))).sort((a, b) => a - b);
-                return (
-                  <div key={fase} className="mb-8">
-                    <div className="text-sm font-semibold mb-3" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>
-                      {fase}
-                    </div>
-                    {rodadas.map((r) => (
-                      <div key={r} className="mb-4">
-                        <div className="text-xs font-medium mb-2" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-                          Rodada {r}
-                        </div>
-                        <div className="flex gap-4 overflow-x-auto pb-2">
-                          {jogosDoGrupo
-                            .filter((m) => (m.rodada || 1) === r)
-                            .map((m) => (
-                              <MatchCardExpansivel key={m.id} match={m} teams={teams} sessao={sessao} saveMatches={saveMatches} matches={matches} config={config} />
-                            ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {fasesEliminatorias.length > 0 && (
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide mb-4" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
-                Fase eliminatória
-              </div>
-              {fasesEliminatorias.map((fase) => (
-                <div key={fase} className="mb-8">
-                  <div className="text-sm font-semibold mb-3" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>
-                    {fase}
-                  </div>
-                  <div className="flex gap-4 overflow-x-auto pb-2">
-                    {matches
-                      .filter((m) => m.fase === fase)
-                      .map((m) => (
-                        <MatchCardExpansivel key={m.id} match={m} teams={teams} sessao={sessao} saveMatches={saveMatches} matches={matches} config={config} />
-                      ))}
-                  </div>
-                </div>
+          <div className="flex gap-2 overflow-x-auto pb-2 mb-3">
+            {opcoesFase.map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                onClick={() => {
+                  setFaseSel(o.id);
+                  if (o.id === "grupos") setRodadaSel(rodadaPadrao);
+                }}
+                className="px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap shrink-0"
+                style={{
+                  backgroundColor: faseAtual === o.id ? COLORS.accent : "transparent",
+                  color: faseAtual === o.id ? "#0B1220" : COLORS.slate,
+                  border: `1px solid ${faseAtual === o.id ? COLORS.accent : COLORS.border}`,
+                  fontFamily: "'Inter', sans-serif",
+                }}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+          {faseAtual === "grupos" && rodadasGrupo.length > 0 && (
+            <div className="flex gap-2 overflow-x-auto pb-2 mb-2">
+              {rodadasGrupo.map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setRodadaSel(r)}
+                  className="px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap shrink-0"
+                  style={{
+                    backgroundColor: rodadaAtual === r ? COLORS.card : "transparent",
+                    color: rodadaAtual === r ? COLORS.accent : COLORS.slate,
+                    border: `1px solid ${rodadaAtual === r ? COLORS.accent : COLORS.border}`,
+                    fontFamily: "'Inter', sans-serif",
+                  }}
+                >
+                  {r}ª Rodada
+                </button>
               ))}
             </div>
           )}
+          <div className="max-w-xl mx-auto" style={{ borderTop: `1px solid ${COLORS.border}` }}>
+            {jogosVisiveis.map((m) => (
+              <MatchCardExpansivel key={m.id} match={m} teams={teams} sessao={sessao} saveMatches={saveMatches} matches={matches} config={config} />
+            ))}
+            {jogosVisiveis.length === 0 && (
+              <p className="text-xs py-6 text-center" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                Sem jogos nesta fase.
+              </p>
+            )}
+          </div>
         </>
       )}
     </div>
