@@ -4078,12 +4078,55 @@ function Comunidade({ posts, savePosts, sessao }) {
 // Cronômetro de partida (2 tempos corridos, sem escrita a cada segundo —
 // cada cliente calcula localmente a partir do horário salvo no jogo)
 // ---------------------------------------------------------------------------
+// Relógio do jogo: o horário de início é gravado pelo celular de quem
+// organiza e lido pelo celular de cada pessoa. Se os relógios dos aparelhos
+// estiverem diferentes (é comum), o cronômetro ficava com minutos a mais,
+// a menos ou até negativo. Por isso todos usam a hora "de verdade", obtida de
+// um serviço de hora pública, e o aparelho só guarda a diferença (skew).
+let skewRelogioMs = 0;
+async function sincronizarRelogio() {
+  const fontes = [
+    async () => {
+      const t0 = Date.now();
+      const r = await fetch("https://worldtimeapi.org/api/timezone/Etc/UTC", { cache: "no-store" });
+      const j = await r.json();
+      const t1 = Date.now();
+      return Number(j.unixtime) * 1000 + (t1 - t0) / 2 - t1;
+    },
+    async () => {
+      const t0 = Date.now();
+      const r = await fetch("https://timeapi.io/api/time/current/zone?timeZone=UTC", { cache: "no-store" });
+      const j = await r.json();
+      const t1 = Date.now();
+      return Date.parse(`${j.dateTime}Z`) + (t1 - t0) / 2 - t1;
+    },
+  ];
+  for (const f of fontes) {
+    try {
+      const d = await f();
+      if (Number.isFinite(d) && Math.abs(d) < 24 * 3600 * 1000) {
+        skewRelogioMs = d;
+        return;
+      }
+    } catch (e) {
+      // tenta a próxima fonte; se nenhuma responder, usa a hora do aparelho
+    }
+  }
+}
+if (typeof window !== "undefined") {
+  sincronizarRelogio();
+  setInterval(sincronizarRelogio, 5 * 60 * 1000);
+}
+function agoraReal() {
+  return Date.now() + skewRelogioMs;
+}
+
 function computeElapsedMs(match) {
   const acumulado = match.tempoAcumuladoMs || 0;
   if (match.status === "ao_vivo" && match.tempoIniciadoEm) {
-    return acumulado + (Date.now() - match.tempoIniciadoEm);
+    return Math.max(0, acumulado + (agoraReal() - match.tempoIniciadoEm));
   }
-  return acumulado;
+  return Math.max(0, acumulado);
 }
 
 function formatElapsed(ms) {
@@ -4524,10 +4567,10 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
   const patch = (fields) => onUpdate({ ...match, ...fields });
 
   const iniciarPrimeiroTempo = () =>
-    patch({ status: "ao_vivo", pausado: false, tempoAtual: 1, tempoIniciadoEm: Date.now(), tempoAcumuladoMs: 0 });
+    patch({ status: "ao_vivo", pausado: false, tempoAtual: 1, tempoIniciadoEm: agoraReal(), tempoAcumuladoMs: 0 });
   const pausarTempo = () =>
     patch({ pausado: true, tempoAcumuladoMs: computeElapsedMs(match), tempoIniciadoEm: null });
-  const retomarTempo = () => patch({ pausado: false, tempoIniciadoEm: Date.now() });
+  const retomarTempo = () => patch({ pausado: false, tempoIniciadoEm: agoraReal() });
   const irParaIntervalo = () =>
     patch({
       pausado: false,
@@ -4536,7 +4579,7 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
       tempoIniciadoEm: null,
     });
   const iniciarSegundoTempo = () =>
-    patch({ status: "ao_vivo", pausado: false, tempoAtual: 2, tempoIniciadoEm: Date.now() });
+    patch({ status: "ao_vivo", pausado: false, tempoAtual: 2, tempoIniciadoEm: agoraReal() });
   const encerrarJogo = () =>
     patch({
       pausado: false,
