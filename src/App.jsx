@@ -5047,42 +5047,183 @@ async function baixarFichaTodosTimes(teams) {
   preencherJanelaImpressao(win, "Fichas de todos os times", partes.join(""));
 }
 
-function sumulaHtml(match, teams) {
-  const timeA = teams.find((t) => t.id === match.timeA);
-  const timeB = teams.find((t) => t.id === match.timeB);
-  const linhasTime = (time) =>
-    (time && Array.isArray(time.jogadores) ? time.jogadores : [])
-      .map(
-        (j) =>
-          `<tr><td>${escapeHtml(j.numero || "—")}</td><td>${escapeHtml(j.nome || "—")}</td><td></td><td></td><td></td></tr>`
-      )
-      .join("");
+const SUMULA_CSS = `
+  @page { size: A4; margin: 8mm; }
+  .sm { font-family: Arial, Helvetica, sans-serif; color: #111; font-size: 10px; page-break-after: always; }
+  .sm:last-child { page-break-after: auto; }
+  .sm table { border-collapse: collapse; width: 100%; margin: 0; }
+  .sm td, .sm th { border: 1px solid #222; padding: 2px 5px; font-size: 10px; text-align: left; height: 16px; }
+  .sm .c { text-align: center; }
+  .sm .g { background: #ececec; font-weight: bold; }
+  .sm .sp { height: 7px; }
+  .sm .cols { display: flex; gap: 6px; align-items: flex-start; }
+  .sm .esq { width: 57%; }
+  .sm .dir { width: 43%; }
+  .sm .bloco { margin-bottom: 14px; }
+  .sm .gol td { height: 22px; font-size: 8px; vertical-align: top; padding: 1px 2px; }
+  .sm .gol td span { display: block; text-align: center; font-size: 9px; color: #666; margin-top: 3px; }
+  .sm .ttl { text-align: center; font-weight: bold; font-size: 11px; }
+  .sm .fl td { height: 18px; }
+`;
+
+function sumulaBlocoTime(time, nomeTime, mapaCpf) {
+  const lista = (time && Array.isArray(time.jogadores) ? time.jogadores : [])
+    .slice()
+    .sort((a, b) => (Number(a.numero) || 999) - (Number(b.numero) || 999));
+  const linhas = [];
+  for (let n = 0; n < 15; n++) {
+    const j = lista[n];
+    const cpf = j && mapaCpf && mapaCpf[j.id] ? String(mapaCpf[j.id]).replace(/\D/g, "") : "";
+    linhas.push(
+      `<tr><td class="c" style="width:18px">${n + 1}</td><td>${j ? escapeHtml(j.apelido || j.nome || "") : ""}${
+        cpf ? `<span style="float:right">(${cpf})</span>` : ""
+      }</td><td class="c" style="width:34px">${j ? escapeHtml(j.numero || "") : ""}</td><td style="width:50px"></td><td style="width:50px"></td></tr>`
+    );
+  }
+  const tecnico = time && time.capitao ? escapeHtml(time.capitao) : "";
+  const celulas = (n) => Array.from({ length: n }, () => "<td></td>").join("");
+  const gols = [0, 1, 2, 3]
+    .map(
+      (r) =>
+        `<tr class="gol">${Array.from({ length: 7 }, (_, c) => `<td>${r * 7 + c + 1}<span>:</span></td>`).join("")}</tr>`
+    )
+    .join("");
   return `
-    <div class="secao">
-      <h1>Súmula de Partida</h1>
-      <div class="meta">Fase: ${escapeHtml(match.fase || "—")} · Data: ____/____/______ · Horário: ____:____ · Local: Ginásio CSU</div>
-      <h2>${escapeHtml(timeA ? timeA.nome : "Time A")}</h2>
-      <table>
-        <thead><tr><th>Nº</th><th>Nome</th><th>Gol</th><th>Cartão amarelo</th><th>Cartão vermelho</th></tr></thead>
-        <tbody>${linhasTime(timeA)}</tbody>
-      </table>
-      <h2>${escapeHtml(timeB ? timeB.nome : "Time B")}</h2>
-      <table>
-        <thead><tr><th>Nº</th><th>Nome</th><th>Gol</th><th>Cartão amarelo</th><th>Cartão vermelho</th></tr></thead>
-        <tbody>${linhasTime(timeB)}</tbody>
-      </table>
-      <div class="meta" style="margin-top:24px; font-size:13px;">
-        Placar final: _______ &nbsp;x&nbsp; _______<br/><br/>
-        Árbitro: _____________________________________ &nbsp;&nbsp; Mesário: _____________________________________
+    <div class="bloco cols">
+      <div class="esq">
+        <table>
+          <tr><td colspan="5" class="g">${escapeHtml(nomeTime)}</td></tr>
+          <tr class="g"><td colspan="2">Jogadores</td><td class="c">Nº</td><td class="c">Ama</td><td class="c">Ver</td></tr>
+          ${linhas.join("")}
+          <tr><td colspan="5"><b>Técnico:</b> ${tecnico}</td></tr>
+        </table>
+      </div>
+      <div class="dir">
+        <table class="fl">
+          <tr><td colspan="7" class="ttl g">Faltas acumuladas</td></tr>
+          <tr><td class="g" style="width:64px">Período 1</td>${celulas(6)}</tr>
+          <tr><td class="g">Período 2</td>${celulas(6)}</tr>
+        </table>
+        <div class="sp"></div>
+        <table>
+          <tr><td colspan="2" class="ttl g">Pedidos de tempo</td></tr>
+          <tr><td class="c g">Período 1</td><td class="c g">Período 2</td></tr>
+          <tr><td class="c">:</td><td class="c">:</td></tr>
+        </table>
+        <div class="sp"></div>
+        <table class="gol">
+          <tr><td colspan="7" class="ttl g" style="height:16px;font-size:11px">GOLS</td></tr>
+          ${gols}
+        </table>
+        <div class="sp"></div>
+        <table class="fl">
+          <tr><td class="g">Substituições</td>${[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => `<td class="c g">${n}</td>`).join("")}</tr>
+          <tr><td class="g">Entrou</td>${celulas(9)}</tr>
+          <tr><td class="g">Saiu</td>${celulas(9)}</tr>
+        </table>
+        <div class="sp"></div>
+        <table class="fl">
+          <tr><td class="g" style="width:64px">Técnico:</td><td>${tecnico}</td></tr>
+          <tr><td class="g">Capitão:</td><td></td></tr>
+        </table>
       </div>
     </div>`;
 }
 
-function baixarSumula(match, teams) {
+function sumulaHtml(match, teams, numeroJogo, mapasCpf) {
+  const timeA = teams.find((t) => t.id === match.timeA);
+  const timeB = teams.find((t) => t.id === match.timeB);
+  const rotuloSelecao = (t) => (t ? (/^\d/.test(t.nome) ? `Seleção ${t.nome}` : t.nome) : "A definir");
+  const nomeA = rotuloSelecao(timeA);
+  const nomeB = rotuloSelecao(timeB);
+  const grupo = (match.fase || "").startsWith("Grupo");
+  const faseTxt = grupo ? "fase de grupos" : "eliminatórias";
+  const rodadaTxt = grupo ? `${match.rodada || 1}ª rodada · ${match.fase}` : match.fase || "";
+  let dataTxt = "";
+  if (match.horario) {
+    const d = new Date(match.horario);
+    const meses = ["jan.", "fev.", "mar.", "abr.", "mai.", "jun.", "jul.", "ago.", "set.", "out.", "nov.", "dez."];
+    const dias = ["dom.", "seg.", "ter.", "qua.", "qui.", "sex.", "sáb."];
+    dataTxt = `${d.getDate()} de ${meses[d.getMonth()]} | ${dias[d.getDay()]} - ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  }
+  const mc = mapasCpf || {};
+  return `
+    <div class="sm">
+      <style>${SUMULA_CSS}</style>
+      <table>
+        <tr><td colspan="2"><b>Competição:</b> VIII Copa CSU Ex-Alunos</td><td style="width:90px"><b>Jogo Nº:</b> ${numeroJogo || ""}</td></tr>
+        <tr><td style="width:45%"><b>Categoria:</b></td><td><b>Fase:</b> ${escapeHtml(faseTxt)}</td><td><b>Rodada:</b> ${escapeHtml(rodadaTxt)}</td></tr>
+      </table>
+      <table style="margin-top:-1px">
+        <tr><td class="c g" style="width:40%">${escapeHtml(nomeA)}</td><td style="width:8%"></td><td class="c g" style="width:4%">x</td><td style="width:8%"></td><td class="g">${escapeHtml(nomeB)}</td></tr>
+      </table>
+      <div class="sp"></div>
+      <div class="cols">
+        <div class="esq">
+          <table>
+            <tr><td style="width:45%"><b>Local:</b> Ginásio CSU</td><td><b>Data:</b> ${escapeHtml(dataTxt)}</td></tr>
+          </table>
+          <div class="sp"></div>
+          <table><tr><td><b>Arbitragem:</b></td></tr></table>
+        </div>
+        <div class="dir">
+          <table class="fl">
+            <tr><td style="width:40%"></td><td class="c g">Início</td><td class="c g">Fim</td></tr>
+            <tr><td class="g">Período 1</td><td></td><td></td></tr>
+            <tr><td class="g">Período 2</td><td></td><td></td></tr>
+            <tr><td class="g">Período Extra</td><td></td><td></td></tr>
+          </table>
+        </div>
+      </div>
+      <div class="sp"></div>
+      ${sumulaBlocoTime(timeA, nomeA, mc[match.timeA])}
+      ${sumulaBlocoTime(timeB, nomeB, mc[match.timeB])}
+    </div>`;
+}
+
+async function cpfsParaSumulas(jogos, teams) {
+  const ids = new Set();
+  jogos.forEach((m) => {
+    if (m.timeA) ids.add(m.timeA);
+    if (m.timeB) ids.add(m.timeB);
+  });
+  const mapas = {};
+  await Promise.all(
+    Array.from(ids).map(async (id) => {
+      try {
+        mapas[id] = await buscarCpfsDoTime(id);
+      } catch (e) {
+        console.error("Falha ao buscar CPFs pra súmula", id, e);
+        mapas[id] = {};
+      }
+    })
+  );
+  return mapas;
+}
+
+function ordemCronologica(matches) {
+  return [...matches].sort((x, y) => String(x.horario || "").localeCompare(String(y.horario || "")));
+}
+
+async function baixarSumula(match, teams, matches) {
   const timeA = teams.find((t) => t.id === match.timeA);
   const timeB = teams.find((t) => t.id === match.timeB);
   const nomeArquivo = `${timeA ? timeA.nome : "TimeA"} x ${timeB ? timeB.nome : "TimeB"}`;
-  abrirImpressao(`Súmula — ${nomeArquivo}`, sumulaHtml(match, teams));
+  const numero = ordemCronologica(matches || [match]).findIndex((m) => m.id === match.id) + 1;
+  const win = abrirJanelaImpressao();
+  const mapas = await cpfsParaSumulas([match], teams);
+  preencherJanelaImpressao(win, `Súmula — ${nomeArquivo}`, sumulaHtml(match, teams, numero, mapas));
+}
+
+async function baixarTodasSumulas(matches, teams) {
+  const ordenados = ordemCronologica(matches);
+  const win = abrirJanelaImpressao();
+  const mapas = await cpfsParaSumulas(ordenados, teams);
+  preencherJanelaImpressao(
+    win,
+    "Súmulas de todos os jogos",
+    ordenados.map((m, i) => sumulaHtml(m, teams, i + 1, mapas)).join("")
+  );
 }
 
 // Planilha financeira — times ordenados por data de inscrição, com
@@ -5374,6 +5515,14 @@ function DocumentosOrganizacao({ teams, matches }) {
         <div>
           {matches.length > 0 ? (
             <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => baixarTodasSumulas(matches, teams)}
+                className="px-3 py-1.5 rounded-full text-xs font-semibold inline-flex items-center gap-1"
+                style={{ backgroundColor: COLORS.accent, color: "#0B1220", fontFamily: "'Inter', sans-serif" }}
+              >
+                <Download size={12} /> Baixar todas
+              </button>
               {matches.map((m) => {
                 const timeA = teams.find((t) => t.id === m.timeA);
                 const timeB = teams.find((t) => t.id === m.timeB);
@@ -5381,7 +5530,7 @@ function DocumentosOrganizacao({ teams, matches }) {
                   <button
                     key={m.id}
                     type="button"
-                    onClick={() => baixarSumula(m, teams)}
+                    onClick={() => baixarSumula(m, teams, matches)}
                     className="px-3 py-1.5 rounded-full text-xs font-medium inline-flex items-center gap-1"
                     style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
                   >
