@@ -2769,8 +2769,8 @@ function MatchCardExpansivel({ match, teams, sessao, saveMatches, matches, confi
       {escudo ? (
         <img src={escudo} alt="" className="w-14 h-14 object-contain" />
       ) : (
-        <div className="w-14 h-14 rounded-full flex items-center justify-center text-lg font-bold" style={{ backgroundColor: COLORS.border, color: COLORS.slate }}>
-          ?
+        <div className="w-14 h-14 rounded-full flex items-center justify-center text-sm font-bold" style={{ backgroundColor: COLORS.border, color: COLORS.slate }}>
+          {String(nome || "?").slice(0, 4)}
         </div>
       )}
       <span className="text-[11px] font-semibold text-center leading-tight break-words" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
@@ -3031,9 +3031,23 @@ function Chaveamento({ matches, teams, sessao, saveMatches, config }) {
             </div>
           )}
           <div className="max-w-xl mx-auto" style={{ borderTop: `1px solid ${COLORS.border}` }}>
-            {jogosVisiveis.map((m) => (
-              <MatchCardExpansivel key={m.id} match={m} teams={teams} sessao={sessao} saveMatches={saveMatches} matches={matches} config={config} />
-            ))}
+            {(faseAtual === "grupos" ? gruposDeGrupo : [faseAtual]).map((g) => {
+              const doGrupo = jogosVisiveis.filter((m) => m.fase === g);
+              if (doGrupo.length === 0) return null;
+              return (
+                <div key={g} className="mb-6">
+                  <div
+                    className="text-sm font-bold uppercase tracking-widest py-2 px-3 mt-4 rounded-lg"
+                    style={{ backgroundColor: COLORS.card, color: COLORS.accent, border: `1px solid ${COLORS.border}`, fontFamily: "'Sora', sans-serif" }}
+                  >
+                    {g}
+                  </div>
+                  {doGrupo.map((m) => (
+                    <MatchCardExpansivel key={m.id} match={m} teams={teams} sessao={sessao} saveMatches={saveMatches} matches={matches} config={config} />
+                  ))}
+                </div>
+              );
+            })}
             {jogosVisiveis.length === 0 && (
               <p className="text-xs py-6 text-center" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
                 Sem jogos nesta fase.
