@@ -4575,11 +4575,13 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
     patch({
       pausado: false,
       status: "intervalo",
-      tempoAcumuladoMs: computeElapsedMs(match),
+      tempoPrimeiroMs: computeElapsedMs(match),
+      tempoAcumuladoMs: 0,
       tempoIniciadoEm: null,
     });
+  // O 2º tempo começa do zero (cada tempo tem o seu próprio cronômetro).
   const iniciarSegundoTempo = () =>
-    patch({ status: "ao_vivo", pausado: false, tempoAtual: 2, tempoIniciadoEm: agoraReal() });
+    patch({ status: "ao_vivo", pausado: false, tempoAtual: 2, tempoAcumuladoMs: 0, tempoIniciadoEm: agoraReal() });
   const encerrarJogo = () =>
     patch({
       pausado: false,
@@ -4599,6 +4601,7 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
       golId: it.golId || null,
       timeNome: teamName(it.timeId),
       minuto,
+      tempo: match.tempoAtual === 2 ? 2 : 1,
     }));
     // o gol e a assistência andam juntos: a assistência aponta pro id do gol
     novos.forEach((ev, n) => {
@@ -4929,7 +4932,7 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
                 >
                   <span>
                     {TIPOS_EVENTO.find((t) => t.value === ev.tipo)?.label} — {ev.jogador} ({ev.timeNome}){" "}
-                    {ev.minuto != null && <span style={{ color: COLORS.slate }}>{ev.minuto}'</span>}
+                    {ev.minuto != null && <span style={{ color: COLORS.slate }}>{ev.minuto}'{ev.tempo === 2 ? " (2ºT)" : ""}</span>}
                   </span>
                   <button onClick={() => removeEvento(ev.id)} aria-label="Remover evento">
                     <X size={12} color={COLORS.slate} />
