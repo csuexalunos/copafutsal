@@ -3767,8 +3767,10 @@ async function moderarPost(savePosts, id, acao) {
   );
 }
 
+// A Comunidade é livre: nada fica esperando aprovação (a organização ainda
+// pode remover). Publicações antigas que estavam pendentes passam a aparecer.
 function postPendente(p) {
-  return p.status === "pendente";
+  return false;
 }
 
 function Comunidade({ posts, savePosts, sessao }) {
@@ -3847,10 +3849,9 @@ function Comunidade({ posts, savePosts, sessao }) {
         videoUrl: "",
         legenda: legenda.trim(),
         criadoEm: new Date().toISOString(),
-        // Quem enviou + aprovação: tudo que a galera manda fica pendente
-        // até a organização liberar (a organização publica direto).
+        // Publicação livre (sem aprovação), sempre com o nome de quem enviou.
         autor: sessao ? { id: sessao.id, nome: sessao.nome || sessao.email || "", turma: sessao.turma || "" } : null,
-        status: podeModerar ? "aprovado" : "pendente",
+        status: "aprovado",
         ...extra,
       };
       await comTimeout(
@@ -3968,9 +3969,13 @@ function Comunidade({ posts, savePosts, sessao }) {
                     )}
                   </div>
                   {p.autor && p.autor.nome && (
-                    <p className="text-xs mt-1" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-                      Enviada por <span className="font-semibold">{p.autor.nome}</span>
-                      {p.autor.turma ? ` · turma ${p.autor.turma}` : ""}
+                    <p className="text-sm mt-1.5" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+                      <span className="font-bold">{p.autor.nome}</span>
+                      {p.autor.turma && (
+                        <span className="ml-2 text-xs font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: COLORS.chipSoft, color: COLORS.ink }}>
+                          turma {p.autor.turma}
+                        </span>
+                      )}
                     </p>
                   )}
                   {podeModerar && (
@@ -4085,7 +4090,7 @@ function Comunidade({ posts, savePosts, sessao }) {
       <SectionLabel eyebrow="Comunidade" title="Fotos e vídeos" />
       <p className="text-sm mb-5 max-w-xl" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
         Os melhores momentos da Copa, enviados por quem está no app. Toque numa foto para ampliar, curtir e comentar.
-        Tudo aparece para todos depois da aprovação da organização.
+        As publicações são livres e sempre mostram o nome de quem enviou.
       </p>
 
       <div className="flex items-center gap-3 mb-3 flex-wrap">
@@ -4105,7 +4110,7 @@ function Comunidade({ posts, savePosts, sessao }) {
         />
         <button
           type="button"
-          onClick={() => fotoInputRef.current && fotoInputRef.current.click()}
+          onClick={() => (sessao ? fotoInputRef.current && fotoInputRef.current.click() : alert("Entre na sua conta para publicar: seu nome aparece junto da foto."))}
           disabled={capturing}
           className="px-4 py-2.5 rounded-full inline-flex items-center gap-2 text-sm font-semibold disabled:opacity-60"
           style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
@@ -4115,7 +4120,7 @@ function Comunidade({ posts, savePosts, sessao }) {
         </button>
         <button
           type="button"
-          onClick={() => videoInputRef.current && videoInputRef.current.click()}
+          onClick={() => (sessao ? videoInputRef.current && videoInputRef.current.click() : alert("Entre na sua conta para publicar: seu nome aparece junto do vídeo."))}
           disabled={subindoVideo}
           className="px-4 py-2.5 rounded-full inline-flex items-center gap-2 text-sm font-semibold disabled:opacity-60"
           style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
@@ -4137,6 +4142,9 @@ function Comunidade({ posts, savePosts, sessao }) {
           style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
         >
           <img src={fotoStaged.url} alt="" className="w-full rounded-xl max-h-64 object-cover" />
+          <p className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Vai aparecer para todos como <strong style={{ color: COLORS.ink }}>{(sessao && sessao.nome) || "—"}</strong>
+          </p>
           <input
             type="text"
             placeholder="Legenda (opcional)"
@@ -4174,6 +4182,9 @@ function Comunidade({ posts, savePosts, sessao }) {
           style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
         >
           <video src={videoStaged.url} controls className="w-full rounded-xl max-h-64" />
+          <p className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Vai aparecer para todos como <strong style={{ color: COLORS.ink }}>{(sessao && sessao.nome) || "—"}</strong>
+          </p>
           <input
             type="text"
             placeholder="Legenda (opcional)"
@@ -4210,7 +4221,7 @@ function Comunidade({ posts, savePosts, sessao }) {
           className="flex items-center gap-2 text-sm font-medium px-4 py-3 rounded-xl mb-6"
           style={{ backgroundColor: COLORS.accentSoft, color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}
         >
-          <Check size={16} /> {podeModerar ? "Publicado!" : "Enviado! Aparece pra todo mundo assim que a organização aprovar."}
+          <Check size={16} /> Publicado! Todo mundo já pode ver.
         </div>
       )}
 
@@ -4266,11 +4277,13 @@ function Comunidade({ posts, savePosts, sessao }) {
                   </span>
                 )}
                 <span
-                  className="absolute bottom-0 inset-x-0 flex items-center gap-2.5 px-2 py-1 text-[11px] font-semibold text-white"
-                  style={{ background: "linear-gradient(transparent, rgba(0,0,0,0.7))", fontFamily: "'Inter', sans-serif" }}
+                  className="absolute bottom-0 inset-x-0 flex flex-col items-start px-2 pb-1 pt-4 text-white"
+                  style={{ background: "linear-gradient(transparent, rgba(0,0,0,0.8))", fontFamily: "'Inter', sans-serif" }}
                 >
-                  <span>♥ {p.curtidas || 0}</span>
-                  <span>💬 {(p.comentarios || []).length}</span>
+                  <span className="text-[11px] font-bold leading-tight max-w-full truncate">{(p.autor && p.autor.nome) || "Anônimo"}</span>
+                  <span className="text-[10px] opacity-90">
+                    ♥ {p.curtidas || 0}  💬 {(p.comentarios || []).length}
+                  </span>
                 </span>
               </button>
             ))}
