@@ -3367,15 +3367,6 @@ function TabelaClassificacao({ titulo, linhas, destaqueTop, teams, matches }) {
           </tbody>
         </table>
       </div>
-      {destaqueTop ? (
-        <p className="text-[11px] mt-2" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-          <span style={{ color: "#4ADE80" }}>■</span> Classificados · Pts pontos · J jogos · V vitórias · E empates · D derrotas · SG saldo · GP gols pró · GC gols contra. Toque no time para ver detalhes.
-        </p>
-      ) : (
-        <p className="text-[11px] mt-2" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-          Toque no time para ver elenco, destaques e jogos.
-        </p>
-      )}
       <ModalElencoTime team={timeSelecionado} onClose={() => setTimeSelecionado(null)} matches={matches} teams={teams} />
     </div>
   );
@@ -3541,10 +3532,7 @@ function ClassificacaoTabela({ matches, teams }) {
       ) : (
         <>
           <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
-            <p className="text-sm max-w-xl" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-              Atualiza sozinha conforme os jogos acontecem. Os classificados (em verde) avançam
-              pro mata-mata automaticamente.
-            </p>
+            <span />
             <button
               type="button"
               onClick={() => setModo(modo === "grupos" ? "geral" : "grupos")}
