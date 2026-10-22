@@ -4089,7 +4089,7 @@ function Comunidade({ posts, savePosts, sessao }) {
     <div>
       <SectionLabel eyebrow="Comunidade" title="Fotos e vídeos" />
       <p className="text-sm mb-5 max-w-xl" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-        A Copa pelos olhos de quem estava lá. Envie suas fotos e vídeos, e curta e comente os da galera.
+        Cada gol, cada abraço, cada comemoração vira lembrança. Registre o seu momento da Copa e faça parte da história.
       </p>
 
       <div className="flex items-center gap-3 mb-3 flex-wrap">
