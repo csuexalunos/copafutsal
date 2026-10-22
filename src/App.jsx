@@ -3697,7 +3697,7 @@ function Galeria({ config }) {
 // Mostra uma foto ou vídeo guardado no bucket privado — como não existe
 // mais link fixo, pede um link temporário (assinado) na hora de exibir,
 // só funciona pra quem está logado.
-function MidiaProtegida({ caminho, tipo, className, legenda, aoClicar }) {
+function MidiaProtegida({ caminho, tipo, className, legenda, aoClicar, miniatura }) {
   const [url, setUrl] = useState(null);
   const [erro, setErro] = useState(null);
 
@@ -3741,7 +3741,11 @@ function MidiaProtegida({ caminho, tipo, className, legenda, aoClicar }) {
     );
   }
   return tipo === "video" ? (
-    <video src={url} controls className={className} />
+    miniatura ? (
+      <video src={`${url}#t=0.1`} muted playsInline preload="metadata" className={className} />
+    ) : (
+      <video src={url} controls className={className} />
+    )
   ) : (
     <img
       src={url}
@@ -3770,6 +3774,7 @@ function postPendente(p) {
 function Comunidade({ posts, savePosts, sessao }) {
   const podeModerar = !!(sessao && sessao.tipo === "admin" && sessao.escopo !== "jogos");
   const [fotoAberta, setFotoAberta] = useState(null);
+  const [postAberto, setPostAberto] = useState(null);
   // Antes dava pra escolher a edição ao publicar, mas na prática ninguém
   // posta foto de edição passada — fica fixo na atual, e some a confusão
   // de ter que escolher algo toda vez que for mandar uma foto/vídeo.
@@ -3930,178 +3935,8 @@ function Comunidade({ posts, savePosts, sessao }) {
   const anos = ["Todos", ...Array.from(new Set(postsVisiveis.map((p) => p.ano).filter(Boolean)))];
   const postsFiltrados = filtroAno === "Todos" ? postsVisiveis : postsVisiveis.filter((p) => p.ano === filtroAno);
 
-  return (
-    <div>
-      <SectionLabel eyebrow="Comunidade" title="Fotos e vídeos" />
-      <p className="text-sm mb-6 max-w-xl" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-        Espaço aberto pra quem estiver no app compartilhar fotos e vídeos da Copa — direto
-        da câmera ou da galeria do celular, sem link. Toque numa foto pra ver inteira. As publicações
-        aparecem pra todo mundo depois que a organização aprovar.
-      </p>
-
-      <div className="flex items-center gap-3 mb-3 flex-wrap">
-        <input
-          ref={fotoInputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={handleFotoFile}
-        />
-        <input
-          ref={videoInputRef}
-          type="file"
-          accept="video/*"
-          className="hidden"
-          onChange={handleVideoFile}
-        />
-        <button
-          type="button"
-          onClick={() => fotoInputRef.current && fotoInputRef.current.click()}
-          disabled={capturing}
-          className="w-14 h-14 rounded-full flex items-center justify-center shrink-0 disabled:opacity-60"
-          style={{ backgroundColor: COLORS.accent }}
-          aria-label="Adicionar foto"
-        >
-          {capturing ? (
-            <Loader2 size={22} color="#FFFFFF" className="animate-spin" />
-          ) : (
-            <Camera size={22} color="#FFFFFF" />
-          )}
-        </button>
-        <button
-          type="button"
-          onClick={() => videoInputRef.current && videoInputRef.current.click()}
-          disabled={subindoVideo}
-          className="w-14 h-14 rounded-full flex items-center justify-center shrink-0 disabled:opacity-60"
-          style={{ backgroundColor: COLORS.navy }}
-          aria-label="Adicionar vídeo"
-        >
-          {subindoVideo ? <Loader2 size={20} color={COLORS.gold} className="animate-spin" /> : <Video size={20} color={COLORS.gold} />}
-        </button>
-        <div className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-          Foto ou vídeo (câmera ou galeria): você escolhe a legenda antes de publicar.
-        </div>
-      </div>
-
-      {videoErro && (
-        <div className="text-sm mb-3" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
-          {videoErro}
-        </div>
-      )}
-
-      {fotoStaged && (
-        <div
-          className="rounded-2xl p-4 mb-8 space-y-3"
-          style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
-        >
-          <img src={fotoStaged.url} alt="" className="w-full rounded-xl max-h-64 object-cover" />
-          <input
-            type="text"
-            placeholder="Legenda (opcional)"
-            value={legenda}
-            onChange={(e) => setLegenda(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl text-sm"
-            style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
-          />
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={publicarFoto}
-              disabled={saving}
-              className="px-5 py-2.5 rounded-xl font-semibold text-sm inline-flex items-center gap-2 disabled:opacity-60"
-              style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
-            >
-              {saving && <Loader2 size={16} className="animate-spin" />}
-              Publicar foto
-            </button>
-            <button
-              type="button"
-              onClick={() => setFotoStaged(null)}
-              className="px-4 py-2.5 rounded-xl text-sm"
-              style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
-            >
-              Cancelar
-            </button>
-          </div>
-        </div>
-      )}
-
-      {videoStaged && (
-        <div
-          className="rounded-2xl p-4 mb-8 space-y-3"
-          style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
-        >
-          <video src={videoStaged.url} controls className="w-full rounded-xl max-h-64" />
-          <input
-            type="text"
-            placeholder="Legenda (opcional)"
-            value={legenda}
-            onChange={(e) => setLegenda(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl text-sm"
-            style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
-          />
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={publicarVideo}
-              disabled={saving}
-              className="px-5 py-2.5 rounded-xl font-semibold text-sm inline-flex items-center gap-2 disabled:opacity-60"
-              style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
-            >
-              {saving && <Loader2 size={16} className="animate-spin" />}
-              Publicar vídeo
-            </button>
-            <button
-              type="button"
-              onClick={() => setVideoStaged(null)}
-              className="px-4 py-2.5 rounded-xl text-sm"
-              style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
-            >
-              Cancelar
-            </button>
-          </div>
-        </div>
-      )}
-
-      {sent && (
-        <div
-          className="flex items-center gap-2 text-sm font-medium px-4 py-3 rounded-xl mb-6"
-          style={{ backgroundColor: COLORS.accentSoft, color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}
-        >
-          <Check size={16} /> {podeModerar ? "Publicado!" : "Enviado! Aparece pra todo mundo assim que a organização aprovar."}
-        </div>
-      )}
-
-      {anos.length > 1 && (
-        <div className="flex flex-wrap gap-2 mb-5">
-          {anos.map((a) => (
-            <button
-              key={a}
-              onClick={() => setFiltroAno(a)}
-              className="px-3 py-1.5 rounded-full text-xs font-medium"
-              style={{
-                backgroundColor: filtroAno === a ? COLORS.accent : COLORS.card,
-                color: filtroAno === a ? "#FFFFFF" : COLORS.slate,
-                border: `1px solid ${filtroAno === a ? COLORS.accent : COLORS.border}`,
-                fontFamily: "'Inter', sans-serif",
-              }}
-            >
-              {a}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {postsFiltrados.length === 0 ? (
-        <EmptyState>Nenhuma foto ou vídeo publicado ainda nessa edição. Seja o primeiro a compartilhar.</EmptyState>
-      ) : (
-        <div className="grid sm:grid-cols-2 gap-4">
-          {postsFiltrados
-            .slice()
-            .reverse()
-            .map((p) => (
+  const cartaoPost = (p) => (
               <div
-                key={p.id}
                 className="rounded-2xl overflow-hidden"
                 style={{ border: `1px solid ${COLORS.border}`, backgroundColor: COLORS.card }}
               >
@@ -4243,9 +4078,233 @@ function Comunidade({ posts, savePosts, sessao }) {
                   )}
                 </div>
               </div>
+  );
+
+  return (
+    <div>
+      <SectionLabel eyebrow="Comunidade" title="Fotos e vídeos" />
+      <p className="text-sm mb-5 max-w-xl" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+        Os melhores momentos da Copa, enviados por quem está no app. Toque numa foto para ampliar, curtir e comentar.
+        Tudo aparece para todos depois da aprovação da organização.
+      </p>
+
+      <div className="flex items-center gap-3 mb-3 flex-wrap">
+        <input
+          ref={fotoInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleFotoFile}
+        />
+        <input
+          ref={videoInputRef}
+          type="file"
+          accept="video/*"
+          className="hidden"
+          onChange={handleVideoFile}
+        />
+        <button
+          type="button"
+          onClick={() => fotoInputRef.current && fotoInputRef.current.click()}
+          disabled={capturing}
+          className="px-4 py-2.5 rounded-full inline-flex items-center gap-2 text-sm font-semibold disabled:opacity-60"
+          style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+          aria-label="Adicionar foto"
+        >
+          {capturing ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />} Enviar foto
+        </button>
+        <button
+          type="button"
+          onClick={() => videoInputRef.current && videoInputRef.current.click()}
+          disabled={subindoVideo}
+          className="px-4 py-2.5 rounded-full inline-flex items-center gap-2 text-sm font-semibold disabled:opacity-60"
+          style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+          aria-label="Adicionar vídeo"
+        >
+          {subindoVideo ? <Loader2 size={16} className="animate-spin" /> : <Video size={16} color={COLORS.gold} />} Enviar vídeo
+        </button>
+      </div>
+
+      {videoErro && (
+        <div className="text-sm mb-3" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
+          {videoErro}
+        </div>
+      )}
+
+      {fotoStaged && (
+        <div
+          className="rounded-2xl p-4 mb-8 space-y-3"
+          style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
+        >
+          <img src={fotoStaged.url} alt="" className="w-full rounded-xl max-h-64 object-cover" />
+          <input
+            type="text"
+            placeholder="Legenda (opcional)"
+            value={legenda}
+            onChange={(e) => setLegenda(e.target.value)}
+            className="w-full px-3 py-2 rounded-xl text-sm"
+            style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+          />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={publicarFoto}
+              disabled={saving}
+              className="px-5 py-2.5 rounded-xl font-semibold text-sm inline-flex items-center gap-2 disabled:opacity-60"
+              style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+            >
+              {saving && <Loader2 size={16} className="animate-spin" />}
+              Publicar foto
+            </button>
+            <button
+              type="button"
+              onClick={() => setFotoStaged(null)}
+              className="px-4 py-2.5 rounded-xl text-sm"
+              style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {videoStaged && (
+        <div
+          className="rounded-2xl p-4 mb-8 space-y-3"
+          style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
+        >
+          <video src={videoStaged.url} controls className="w-full rounded-xl max-h-64" />
+          <input
+            type="text"
+            placeholder="Legenda (opcional)"
+            value={legenda}
+            onChange={(e) => setLegenda(e.target.value)}
+            className="w-full px-3 py-2 rounded-xl text-sm"
+            style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+          />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={publicarVideo}
+              disabled={saving}
+              className="px-5 py-2.5 rounded-xl font-semibold text-sm inline-flex items-center gap-2 disabled:opacity-60"
+              style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+            >
+              {saving && <Loader2 size={16} className="animate-spin" />}
+              Publicar vídeo
+            </button>
+            <button
+              type="button"
+              onClick={() => setVideoStaged(null)}
+              className="px-4 py-2.5 rounded-xl text-sm"
+              style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {sent && (
+        <div
+          className="flex items-center gap-2 text-sm font-medium px-4 py-3 rounded-xl mb-6"
+          style={{ backgroundColor: COLORS.accentSoft, color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}
+        >
+          <Check size={16} /> {podeModerar ? "Publicado!" : "Enviado! Aparece pra todo mundo assim que a organização aprovar."}
+        </div>
+      )}
+
+      {anos.length > 1 && (
+        <div className="flex flex-wrap gap-2 mb-5">
+          {anos.map((a) => (
+            <button
+              key={a}
+              onClick={() => setFiltroAno(a)}
+              className="px-3 py-1.5 rounded-full text-xs font-medium"
+              style={{
+                backgroundColor: filtroAno === a ? COLORS.accent : COLORS.card,
+                color: filtroAno === a ? "#FFFFFF" : COLORS.slate,
+                border: `1px solid ${filtroAno === a ? COLORS.accent : COLORS.border}`,
+                fontFamily: "'Inter', sans-serif",
+              }}
+            >
+              {a}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {postsFiltrados.length === 0 ? (
+        <EmptyState>Nenhuma foto ou vídeo publicado ainda nessa edição. Seja o primeiro a compartilhar.</EmptyState>
+      ) : (
+        <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
+          {postsFiltrados
+            .slice()
+            .reverse()
+            .map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setPostAberto(p.id)}
+                className="relative aspect-square overflow-hidden rounded-xl"
+                style={{ backgroundColor: COLORS.zebra, border: `1px solid ${COLORS.border}` }}
+                aria-label={p.legenda ? `Abrir: ${p.legenda}` : "Abrir publicação"}
+              >
+                {p.videoUrl ? (
+                  <MidiaProtegida caminho={p.videoUrl} tipo="video" miniatura className="w-full h-full object-cover pointer-events-none" />
+                ) : (
+                  p.fotoUrl && <MidiaProtegida caminho={p.fotoUrl} tipo="foto" className="w-full h-full object-cover" legenda={p.legenda} />
+                )}
+                {p.videoUrl && (
+                  <span className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(0,0,0,0.55)" }}>
+                    <Video size={13} color="#FFFFFF" />
+                  </span>
+                )}
+                {postPendente(p) && (
+                  <span className="absolute top-1.5 left-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: COLORS.accent, color: "#fff" }}>
+                    Aguardando
+                  </span>
+                )}
+                <span
+                  className="absolute bottom-0 inset-x-0 flex items-center gap-2.5 px-2 py-1 text-[11px] font-semibold text-white"
+                  style={{ background: "linear-gradient(transparent, rgba(0,0,0,0.7))", fontFamily: "'Inter', sans-serif" }}
+                >
+                  <span>♥ {p.curtidas || 0}</span>
+                  <span>💬 {(p.comentarios || []).length}</span>
+                </span>
+              </button>
             ))}
         </div>
       )}
+
+      {postAberto && (() => {
+        const p = posts.find((x) => x.id === postAberto);
+        if (!p) return null;
+        return (
+          <div
+            className="fixed inset-0 z-40 flex items-end sm:items-center justify-center sm:p-4"
+            style={{ backgroundColor: "rgba(0,0,0,0.75)" }}
+            onClick={() => setPostAberto(null)}
+            role="dialog"
+            aria-label="Publicação"
+          >
+            <div className="w-full max-w-md max-h-[92vh] overflow-y-auto sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="flex justify-end p-2">
+                <button
+                  type="button"
+                  onClick={() => setPostAberto(null)}
+                  className="w-9 h-9 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: "rgba(255,255,255,0.18)" }}
+                  aria-label="Fechar"
+                >
+                  <X size={18} color="#FFFFFF" />
+                </button>
+              </div>
+              {cartaoPost(p)}
+            </div>
+          </div>
+        );
+      })()}
 
       {fotoAberta && (
         <div
