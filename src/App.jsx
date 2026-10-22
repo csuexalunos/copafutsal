@@ -2780,10 +2780,10 @@ function MatchCardExpansivel({ match, teams, sessao, saveMatches, matches, confi
   );
 
   return (
-    <div className="w-full" style={{ borderBottom: `1px solid ${COLORS.border}` }}>
+    <div className="w-full rounded-2xl overflow-hidden mt-4" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
       <button type="button" onClick={() => setExpanded((v) => !v)} className="w-full text-center px-2 pt-4 pb-3">
         <div className="text-[11px] font-bold uppercase tracking-widest mb-3" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
-          {match.fase || "Fase"}
+          {match.horario ? `${String(new Date(match.horario).getHours()).padStart(2, "0")}:${String(new Date(match.horario).getMinutes()).padStart(2, "0")} · ` : ""}{match.fase || "Fase"}
         </div>
         <div className="flex items-start justify-between gap-1">
           {lado(nomeA, escudoA)}
@@ -2940,28 +2940,27 @@ function Chaveamento({ matches, teams, sessao, saveMatches, config }) {
     return Array.from(nomes).sort((a, b) => faseRank(a) - faseRank(b));
   }, [matches]);
 
-  const [faseSel, setFaseSel] = useState(null);
-  const [rodadaSel, setRodadaSel] = useState(null);
-  const rodadasGrupo = useMemo(
-    () => Array.from(new Set(matches.filter((m) => (m.fase || "").startsWith("Grupo")).map((m) => m.rodada || 1))).sort((a, b) => a - b),
+  const [diaSel, setDiaSel] = useState(null);
+  const chaveDia = (m) => (m.horario ? new Date(m.horario).toDateString() : "sem");
+  const jogosOrdenados = useMemo(
+    () => [...matches].sort((x, y) => String(x.horario || "").localeCompare(String(y.horario || ""))),
     [matches]
   );
-  const opcoesFase = [
-    ...(gruposDeGrupo.length > 0 ? [{ id: "grupos", label: "Fase de grupos" }] : []),
-    ...fasesEliminatorias.map((f) => ({ id: f, label: f })),
-  ];
-  const emAndamento = matches.find((m) => m.status === "ao_vivo" || m.status === "intervalo");
-  const proximo = matches.find((m) => m.status !== "encerrado");
-  const alvo = emAndamento || proximo || matches[matches.length - 1];
-  const faseDoAlvo = alvo ? ((alvo.fase || "").startsWith("Grupo") ? "grupos" : alvo.fase) : null;
-  const faseAtual = opcoesFase.some((o) => o.id === faseSel) ? faseSel : opcoesFase.some((o) => o.id === faseDoAlvo) ? faseDoAlvo : opcoesFase[0]?.id;
-  const rodadaPadrao = alvo && (alvo.fase || "").startsWith("Grupo") ? alvo.rodada || 1 : rodadasGrupo[0];
-  const rodadaAtual = rodadasGrupo.includes(rodadaSel) ? rodadaSel : rodadaPadrao;
-  const jogosVisiveis = matches
-    .filter((m) =>
-      faseAtual === "grupos" ? (m.fase || "").startsWith("Grupo") && (m.rodada || 1) === rodadaAtual : m.fase === faseAtual
-    )
-    .sort((x, y) => String(x.horario || "").localeCompare(String(y.horario || "")));
+  const dias = useMemo(() => {
+    const vistos = [];
+    jogosOrdenados.forEach((m) => {
+      const k = chaveDia(m);
+      if (!vistos.some((d) => d.k === k)) {
+        const dt = m.horario ? new Date(m.horario) : null;
+        const nomes = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+        vistos.push({ k, label: dt ? `${nomes[dt.getDay()]} ${dt.getDate()}/${dt.getMonth() + 1}` : "Sem horário" });
+      }
+    });
+    return vistos;
+  }, [jogosOrdenados]);
+  const alvo = jogosOrdenados.find((m) => m.status === "ao_vivo" || m.status === "intervalo") || jogosOrdenados.find((m) => m.status !== "encerrado") || jogosOrdenados[jogosOrdenados.length - 1];
+  const diaAtual = dias.some((d) => d.k === diaSel) ? diaSel : alvo ? chaveDia(alvo) : dias[0]?.k;
+  const jogosVisiveis = jogosOrdenados.filter((m) => chaveDia(m) === diaAtual);
 
   return (
     <div>
@@ -2990,69 +2989,27 @@ function Chaveamento({ matches, teams, sessao, saveMatches, config }) {
       ) : (
         <>
           <div className="flex gap-2 overflow-x-auto pb-2 mb-3">
-            {opcoesFase.map((o) => (
+            {dias.map((d) => (
               <button
-                key={o.id}
+                key={d.k}
                 type="button"
-                onClick={() => {
-                  setFaseSel(o.id);
-                  if (o.id === "grupos") setRodadaSel(rodadaPadrao);
-                }}
+                onClick={() => setDiaSel(d.k)}
                 className="px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap shrink-0"
                 style={{
-                  backgroundColor: faseAtual === o.id ? COLORS.accent : "transparent",
-                  color: faseAtual === o.id ? "#0B1220" : COLORS.slate,
-                  border: `1px solid ${faseAtual === o.id ? COLORS.accent : COLORS.border}`,
+                  backgroundColor: diaAtual === d.k ? COLORS.accent : "transparent",
+                  color: diaAtual === d.k ? "#0B1220" : COLORS.slate,
+                  border: `1px solid ${diaAtual === d.k ? COLORS.accent : COLORS.border}`,
                   fontFamily: "'Inter', sans-serif",
                 }}
               >
-                {o.label}
+                {d.label}
               </button>
             ))}
           </div>
-          {faseAtual === "grupos" && rodadasGrupo.length > 0 && (
-            <div className="flex gap-2 overflow-x-auto pb-2 mb-2">
-              {rodadasGrupo.map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  onClick={() => setRodadaSel(r)}
-                  className="px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap shrink-0"
-                  style={{
-                    backgroundColor: rodadaAtual === r ? COLORS.card : "transparent",
-                    color: rodadaAtual === r ? COLORS.accent : COLORS.slate,
-                    border: `1px solid ${rodadaAtual === r ? COLORS.accent : COLORS.border}`,
-                    fontFamily: "'Inter', sans-serif",
-                  }}
-                >
-                  {r}ª Rodada
-                </button>
-              ))}
-            </div>
-          )}
-          <div className="max-w-xl mx-auto" style={{ borderTop: `1px solid ${COLORS.border}` }}>
-            {(faseAtual === "grupos" ? gruposDeGrupo : [faseAtual]).map((g) => {
-              const doGrupo = jogosVisiveis.filter((m) => m.fase === g);
-              if (doGrupo.length === 0) return null;
-              return (
-                <div key={g} className="mb-6">
-                  <div
-                    className="text-sm font-bold uppercase tracking-widest py-2 px-3 mt-4 rounded-lg"
-                    style={{ backgroundColor: COLORS.card, color: COLORS.accent, border: `1px solid ${COLORS.border}`, fontFamily: "'Sora', sans-serif" }}
-                  >
-                    {g}
-                  </div>
-                  {doGrupo.map((m) => (
-                    <MatchCardExpansivel key={m.id} match={m} teams={teams} sessao={sessao} saveMatches={saveMatches} matches={matches} config={config} />
-                  ))}
-                </div>
-              );
-            })}
-            {jogosVisiveis.length === 0 && (
-              <p className="text-xs py-6 text-center" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-                Sem jogos nesta fase.
-              </p>
-            )}
+          <div className="max-w-xl mx-auto pb-4">
+            {jogosVisiveis.map((m) => (
+              <MatchCardExpansivel key={m.id} match={m} teams={teams} sessao={sessao} saveMatches={saveMatches} matches={matches} config={config} />
+            ))}
           </div>
         </>
       )}
@@ -4100,7 +4057,7 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
       {cartao && (
         <div role="button" onClick={() => setExpanded((v) => !v)} className="w-full text-center px-3 pt-4 pb-4">
           <div className="text-[11px] font-bold uppercase tracking-widest mb-3" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
-            {match.fase || "Fase"}
+            {match.horario ? `${String(new Date(match.horario).getHours()).padStart(2, "0")}:${String(new Date(match.horario).getMinutes()).padStart(2, "0")} · ` : ""}{match.fase || "Fase"}
           </div>
           <div className="flex items-start justify-between gap-1">
             {ladoCartao(match.timeA)}
