@@ -4716,10 +4716,10 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
     });
   };
 
-  const removeEvento = async (id) => {
+  const removeEvento = async (id, extraIds = []) => {
     const ev = (match.eventos || []).find((x) => x.id === id);
     if (!ev) return;
-    const ids = new Set([id]);
+    const ids = new Set([id, ...extraIds]);
     if (ev.tipo === "gol") (match.eventos || []).forEach((x) => x.golId === id && ids.add(x.id));
     const extra = {};
     if (ev.tipo === "gol") {
@@ -5029,25 +5029,56 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
 
           <RegistradorEventos match={match} teams={teams} suspensos={suspensosJogo} onRegistrar={registrarEventos} />
 
-          {(match.eventos || []).length > 0 && (
-            <ul className="space-y-1">
-              {match.eventos.map((ev) => (
-                <li
-                  key={ev.id}
-                  className="flex items-center justify-between text-xs px-2 py-1 rounded"
-                  style={{ backgroundColor: COLORS.card, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
-                >
-                  <span>
-                    {TIPOS_EVENTO.find((t) => t.value === ev.tipo)?.label} — {ev.jogador} ({ev.timeNome}){" "}
-                    {ev.minuto != null && <span style={{ color: COLORS.slate }}>{ev.minuto}'{ev.tempo === 2 ? " (2ºT)" : ""}</span>}
-                  </span>
-                  <button onClick={() => removeEvento(ev.id)} aria-label="Remover evento">
-                    <X size={12} color={COLORS.slate} />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+          {(match.eventos || []).length > 0 && (() => {
+            const evs = match.eventos;
+            const usados = new Set();
+            const linhas = [];
+            evs.forEach((ev, idx) => {
+              if (usados.has(ev.id)) return;
+              usados.add(ev.id);
+              let ass = null;
+              if (ev.tipo === "gol") {
+                ass =
+                  evs.find((x) => x.tipo === "assistencia" && x.golId === ev.id && !usados.has(x.id)) ||
+                  (evs[idx + 1] &&
+                    evs[idx + 1].tipo === "assistencia" &&
+                    !evs[idx + 1].golId &&
+                    evs[idx + 1].timeNome === ev.timeNome &&
+                    evs[idx + 1].minuto === ev.minuto &&
+                    !usados.has(evs[idx + 1].id)
+                    ? evs[idx + 1]
+                    : null);
+                if (ass) usados.add(ass.id);
+              }
+              linhas.push({ ev, ass });
+            });
+            const tempoTxt = (ev) => (ev.minuto != null ? `${ev.minuto}'${ev.tempo === 2 ? " (2ºT)" : ""}` : "");
+            return (
+              <ul className="space-y-1">
+                {linhas.map(({ ev, ass }) => (
+                  <li
+                    key={ev.id}
+                    className="flex items-center justify-between gap-2 text-xs px-2 py-1.5 rounded"
+                    style={{ backgroundColor: COLORS.card, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+                  >
+                    <span className="min-w-0">
+                      {TIPOS_EVENTO.find((t) => t.value === ev.tipo)?.label} — {ev.jogador} ({ev.timeNome})
+                      {ass && (
+                        <>
+                          {"  ·  "}
+                          {TIPOS_EVENTO.find((t) => t.value === "assistencia")?.label} — {ass.jogador}
+                        </>
+                      )}{" "}
+                      <span style={{ color: COLORS.slate }}>{tempoTxt(ev)}</span>
+                    </span>
+                    <button onClick={() => removeEvento(ev.id, ass ? [ass.id] : [])} aria-label="Remover evento" className="shrink-0">
+                      <X size={12} color={COLORS.slate} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            );
+          })()}
         </div>
       )}
       <ModalElencoTime team={timeModal} onClose={() => setTimeModal(null)} />
