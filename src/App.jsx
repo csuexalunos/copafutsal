@@ -37,6 +37,7 @@ import {
   Wallet,
   Clock,
   Upload,
+  Bell,
 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import {
@@ -46,6 +47,7 @@ import {
   registrarAcesso, contarAcessos, registrarEvento as registrarEventoBruto, buscarMetricasDetalhadas, esqueciSenha, definirNovaSenha, supabase,
   buscarCpfsDoTime, salvarCpfJogador, salvarCpfsEmLote, excluirCpfsDoJogador,
 } from "./lib/supabase.js";
+import { pushSuportado, ehIosNaoInstalado, inscricaoAtual, timesSalvos, ativarPush, desativarPush, avisarInicioJogo } from "./lib/push.js";
 
 // Link oficial pra finalizar a inscrição (anexar ficha em PDF e pagar),
 // depois que o time é aprovado pela comissão.
@@ -3182,6 +3184,87 @@ function TabelaPrevia({ config }) {
   );
 }
 
+// Cartão "Avisos de jogos": o torcedor liga/desliga as notificações e
+// escolhe se quer todos os jogos ou só de certos times.
+function AvisosJogos({ teams }) {
+  const [suportado] = useState(pushSuportado());
+  const [ativo, setAtivo] = useState(false);
+  const [aberto, setAberto] = useState(false);
+  const [times, setTimes] = useState(timesSalvos());
+  const [ocupado, setOcupado] = useState(false);
+  const [erro, setErro] = useState("");
+  useEffect(() => { inscricaoAtual().then((s) => setAtivo(!!s)); }, []);
+  if (!suportado && !ehIosNaoInstalado()) return null;
+  const alternar = (nome) => setTimes((l) => (l.includes(nome) ? l.filter((x) => x !== nome) : [...l, nome]));
+  const salvar = async () => {
+    setOcupado(true); setErro("");
+    try { await ativarPush(times); setAtivo(true); setAberto(false); } catch (e) { setErro(e.message || "Não foi possível ativar."); }
+    setOcupado(false);
+  };
+  const desligar = async () => {
+    setOcupado(true);
+    try { await desativarPush(); setAtivo(false); } catch (e) { setErro(e.message || "Erro."); }
+    setOcupado(false);
+  };
+  return (
+    <div className="rounded-2xl p-4 mb-5" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+      <div className="flex items-center gap-3">
+        <Bell size={20} color={COLORS.accent} />
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-semibold" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>
+            {ativo ? "Avisos de jogos ligados" : "Receba o aviso quando o jogo começar"}
+          </div>
+          <div className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            {ativo ? (times.length ? `Só de: ${times.join(", ")}` : "De todos os jogos") : "Notificação no celular na hora do apito inicial."}
+          </div>
+        </div>
+        {ativo ? (
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setAberto((v) => !v)} className="text-xs underline" style={{ color: COLORS.slate }}>Editar</button>
+            <button type="button" onClick={desligar} disabled={ocupado} className="text-xs underline" style={{ color: COLORS.slate }}>Desligar</button>
+          </div>
+        ) : (
+          <button type="button" onClick={() => (ehIosNaoInstalado() ? setAberto(true) : setAberto((v) => !v))}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0"
+            style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}>
+            Ativar avisos
+          </button>
+        )}
+      </div>
+      {aberto && ehIosNaoInstalado() && (
+        <p className="text-xs mt-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+          No iPhone: toque em Compartilhar → "Adicionar à Tela de Início", abra o app por lá e ative os avisos.
+        </p>
+      )}
+      {aberto && !ehIosNaoInstalado() && (
+        <div className="mt-3">
+          <div className="text-xs mb-2" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Quais jogos? (sem escolher nenhum = todos)
+          </div>
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {teams.map((t) => {
+              const on = times.includes(t.nome);
+              return (
+                <button key={t.id} type="button" onClick={() => alternar(t.nome)}
+                  className="px-2.5 py-1 rounded-full text-xs"
+                  style={{ backgroundColor: on ? COLORS.navy : COLORS.zebra, color: on ? COLORS.gold : COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}>
+                  {t.nome}
+                </button>
+              );
+            })}
+          </div>
+          <button type="button" onClick={salvar} disabled={ocupado}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+            style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}>
+            {ocupado ? "Ativando..." : ativo ? "Salvar" : "Ativar"}
+          </button>
+        </div>
+      )}
+      {erro && <p className="text-xs mt-2" style={{ color: "#DC2626" }}>{erro}</p>}
+    </div>
+  );
+}
+
 function Chaveamento({ matches, teams, sessao, saveMatches, config }) {
   const faseRank = (f) => {
     if (f.startsWith("Grupo")) return 0;
@@ -3265,6 +3348,7 @@ function Chaveamento({ matches, teams, sessao, saveMatches, config }) {
   return (
     <div>
       <SectionLabel eyebrow="Todos os confrontos" title="Jogos ao Vivo" />
+      <AvisosJogos teams={teams} />
       {(() => {
         const inicio = horariosDoConfig(config).inicioSexta;
         const abertura = new Date(inicio.getTime() - 30 * 60000);
@@ -5008,8 +5092,20 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
 
   const patch = (fields) => onUpdate({ ...match, ...fields });
 
-  const iniciarPrimeiroTempo = () =>
+  const textoAviso = () => `${teamName(match.timeA)} x ${teamName(match.timeB)}`;
+  const iniciarPrimeiroTempo = () => {
     patch({ status: "ao_vivo", pausado: false, tempoAtual: 1, tempoIniciadoEm: agoraReal(), tempoAcumuladoMs: 0 });
+    avisarInicioJogo({
+      titulo: "⚽ Começou o jogo!",
+      corpo: `${textoAviso()} — acompanhe ao vivo.`,
+      times: [teamName(match.timeA), teamName(match.timeB)],
+      tag: `jogo-${match.id}`,
+    }).catch((e) => console.error("Falha ao enviar avisos", e));
+  };
+  const avisarWhatsapp = () => {
+    const msg = `⚽ Começou o jogo da Copa Santa Úrsula!\n${textoAviso()}\nAcompanhe ao vivo: https://csuexalunos.github.io/copafutsal/`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+  };
   const pausarTempo = () =>
     patch({ pausado: true, tempoAcumuladoMs: computeElapsedMs(match), tempoIniciadoEm: null });
   const retomarTempo = () => patch({ pausado: false, tempoIniciadoEm: agoraReal() });
@@ -5318,6 +5414,16 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
                 style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}
               >
                 Iniciar 1º tempo
+              </button>
+            )}
+            {(match.status === "ao_vivo" || match.status === "agendado") && (
+              <button
+                type="button"
+                onClick={avisarWhatsapp}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+                style={{ backgroundColor: "#22C55E", color: "#0B1220", fontFamily: "'Inter', sans-serif" }}
+              >
+                Avisar no WhatsApp
               </button>
             )}
             {match.status === "ao_vivo" && (
