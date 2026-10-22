@@ -5215,14 +5215,15 @@ async function baixarSumula(match, teams, matches) {
   preencherJanelaImpressao(win, `Súmula — ${nomeArquivo}`, sumulaHtml(match, teams, numero, mapas));
 }
 
-async function baixarTodasSumulas(matches, teams) {
-  const ordenados = ordemCronologica(matches);
+async function baixarTodasSumulas(jogos, teams, todos) {
+  const ordenados = ordemCronologica(jogos);
+  const base = ordemCronologica(todos || jogos);
   const win = abrirJanelaImpressao();
   const mapas = await cpfsParaSumulas(ordenados, teams);
   preencherJanelaImpressao(
     win,
-    "Súmulas de todos os jogos",
-    ordenados.map((m, i) => sumulaHtml(m, teams, i + 1, mapas)).join("")
+    "Súmulas",
+    ordenados.map((m) => sumulaHtml(m, teams, base.findIndex((x) => x.id === m.id) + 1, mapas)).join("")
   );
 }
 
@@ -5514,30 +5515,63 @@ function DocumentosOrganizacao({ teams, matches }) {
       {secaoDoc === "sumulas" && (
         <div>
           {matches.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
+            <div>
               <button
                 type="button"
-                onClick={() => baixarTodasSumulas(matches, teams)}
-                className="px-3 py-1.5 rounded-full text-xs font-semibold inline-flex items-center gap-1"
+                onClick={() => baixarTodasSumulas(matches, teams, matches)}
+                className="px-4 py-2 rounded-full text-xs font-semibold inline-flex items-center gap-1 mb-4"
                 style={{ backgroundColor: COLORS.accent, color: "#0B1220", fontFamily: "'Inter', sans-serif" }}
               >
-                <Download size={12} /> Baixar todas
+                <Download size={12} /> Baixar todas as súmulas (um arquivo)
               </button>
-              {matches.map((m) => {
-                const timeA = teams.find((t) => t.id === m.timeA);
-                const timeB = teams.find((t) => t.id === m.timeB);
-                return (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => baixarSumula(m, teams, matches)}
-                    className="px-3 py-1.5 rounded-full text-xs font-medium inline-flex items-center gap-1"
-                    style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
-                  >
-                    <Download size={12} /> {timeA ? timeA.nome : "?"} x {timeB ? timeB.nome : "?"}
-                  </button>
-                );
-              })}
+              {(() => {
+                const rotulo = (m) => ((m.fase || "").startsWith("Grupo") ? `${m.rodada || 1}ª Rodada` : m.fase || "Outros");
+                const ordenados = ordemCronologica(matches);
+                const grupos = [];
+                ordenados.forEach((m) => {
+                  const r = rotulo(m);
+                  let g = grupos.find((x) => x.r === r);
+                  if (!g) {
+                    g = { r, jogos: [] };
+                    grupos.push(g);
+                  }
+                  g.jogos.push(m);
+                });
+                return grupos.map((g) => (
+                  <div key={g.r} className="mb-5">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold uppercase tracking-widest" style={{ color: COLORS.accent, fontFamily: "'Sora', sans-serif" }}>
+                        {g.r}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => baixarTodasSumulas(g.jogos, teams, matches)}
+                        className="px-3 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1"
+                        style={{ border: `1px solid ${COLORS.accent}`, color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}
+                      >
+                        <Download size={12} /> Baixar a rodada
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {g.jogos.map((m) => {
+                        const timeA = teams.find((t) => t.id === m.timeA);
+                        const timeB = teams.find((t) => t.id === m.timeB);
+                        return (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => baixarSumula(m, teams, matches)}
+                            className="px-3 py-1.5 rounded-full text-xs font-medium inline-flex items-center gap-1"
+                            style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+                          >
+                            <Download size={12} /> {timeA ? timeA.nome : "?"} x {timeB ? timeB.nome : "?"}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ));
+              })()}
             </div>
           ) : (
             <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
