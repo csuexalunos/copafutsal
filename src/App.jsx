@@ -4329,6 +4329,191 @@ function contarAvisosJogos(matches, teams) {
   );
 }
 
+function RegistradorEventos({ match, teams, suspensos, onRegistrar }) {
+  const [tipo, setTipo] = useState(null);
+  const [timeId, setTimeId] = useState(null);
+  const [golDe, setGolDe] = useState(null);
+  const [outro, setOutro] = useState("");
+  const [salvando, setSalvando] = useState(false);
+
+  const reset = () => {
+    setTipo(null);
+    setTimeId(null);
+    setGolDe(null);
+    setOutro("");
+  };
+  const time = teams.find((t) => t.id === timeId);
+  const elencoBruto = time ? (Array.isArray(time.jogadores) && time.jogadores.length > 0 ? time.jogadores : ELENCOS_2025[time.nome] || []) : [];
+  const elenco = elencoBruto
+    .map((j, i) => ({ ...j, _k: j.id || `${j.numero}_${i}` }))
+    .sort((a, b) => (Number(a.numero) || 999) - (Number(b.numero) || 999));
+  const rotulo = (j) => j.apelido || j.nome || "?";
+  const estaSuspenso = (j) =>
+    time && (suspensos || []).some((x) => x.timeNome === time.nome && (nomesBatem(x.jogador, j.apelido) || nomesBatem(x.jogador, j.nome)));
+  const escudoDe = (id) => {
+    const t = teams.find((x) => x.id === id);
+    return t ? ESCUDOS_TIMES[t.nome] || t.escudoUrl : null;
+  };
+  const nomeDe = (id) => teams.find((t) => t.id === id)?.nome || "?";
+
+  const enviar = async (itens) => {
+    setSalvando(true);
+    try {
+      await onRegistrar(itens);
+    } finally {
+      setSalvando(false);
+      reset();
+    }
+  };
+
+  const escolherJogador = (nome, jogadorId, k) => {
+    if (tipo === "gol") {
+      setGolDe({ nome, jogadorId, k });
+      return;
+    }
+    enviar([{ tipo, jogador: nome, jogadorId, timeId }]);
+  };
+  const escolherAssistencia = (nomeAss, idAss) => {
+    const itens = [{ tipo: "gol", jogador: golDe.nome, jogadorId: golDe.jogadorId, timeId }];
+    if (nomeAss) itens.push({ tipo: "assistencia", jogador: nomeAss, jogadorId: idAss, timeId, ligarAoGol: 0 });
+    enviar(itens);
+  };
+
+  const btn = (ativo) => ({
+    backgroundColor: ativo ? COLORS.accent : COLORS.card,
+    color: ativo ? "#0B1220" : COLORS.ink,
+    border: `1px solid ${ativo ? COLORS.accent : COLORS.border}`,
+    fontFamily: "'Inter', sans-serif",
+  });
+  const passo = (t) => (
+    <div className="text-[11px] font-bold uppercase tracking-widest mb-2" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+      {t}
+    </div>
+  );
+
+  const grade = (onPick, excluirK, comSuspensao) => (
+    <div className="grid grid-cols-3 gap-2">
+      {elenco
+        .filter((j) => j._k !== excluirK)
+        .map((j) => {
+          const susp = comSuspensao && estaSuspenso(j);
+          return (
+            <button
+              key={j._k}
+              type="button"
+              disabled={salvando || susp}
+              onClick={() => onPick(rotulo(j), j.id || null, j._k)}
+              className="rounded-xl px-2 py-2.5 text-center disabled:opacity-60"
+              style={{ ...btn(false), borderColor: susp ? "#EF4444" : COLORS.border }}
+            >
+              <div className="text-base font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                {j.numero || "–"}
+              </div>
+              <div className="text-[11px] font-semibold truncate">{rotulo(j)}</div>
+              {susp && <div className="text-[9px] font-bold" style={{ color: "#EF4444" }}>SUSPENSO</div>}
+            </button>
+          );
+        })}
+    </div>
+  );
+
+  return (
+    <div className="rounded-xl p-3" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+      {!tipo && (
+        <>
+          {passo("Registrar lance")}
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              ["gol", "⚽ Gol"],
+              ["cartao_amarelo", "🟨 Amarelo"],
+              ["cartao_vermelho", "🟥 Vermelho"],
+            ].map(([v, l]) => (
+              <button key={v} type="button" onClick={() => setTipo(v)} className="rounded-xl py-3 text-sm font-semibold" style={btn(false)}>
+                {l}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {tipo && !timeId && (
+        <>
+          {passo(`${tipo === "gol" ? "Gol" : tipo === "cartao_amarelo" ? "Cartão amarelo" : "Cartão vermelho"} — de qual time?`)}
+          <div className="grid grid-cols-2 gap-2">
+            {[match.timeA, match.timeB].map((id) => (
+              <button key={id} type="button" onClick={() => setTimeId(id)} className="rounded-xl py-3 flex flex-col items-center gap-1" style={btn(false)}>
+                {escudoDe(id) && <img src={escudoDe(id)} alt="" className="w-10 h-10 object-contain" />}
+                <span className="text-sm font-semibold">{nomeDe(id)}</span>
+              </button>
+            ))}
+          </div>
+          <button type="button" onClick={reset} className="text-xs mt-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Cancelar
+          </button>
+        </>
+      )}
+
+      {tipo && timeId && !golDe && (
+        <>
+          {passo(`${tipo === "gol" ? "Quem fez o gol" : "Quem levou o cartão"} — ${nomeDe(timeId)}`)}
+          {elenco.length === 0 && (
+            <p className="text-xs mb-2" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+              Esse time ainda não tem elenco cadastrado. Digite o nome abaixo.
+            </p>
+          )}
+          {grade((n, id, k) => escolherJogador(n, id, k), null, true)}
+          <div className="flex gap-2 mt-3">
+            <input
+              type="text"
+              placeholder="Outro jogador (digitar)"
+              value={outro}
+              onChange={(e) => setOutro(e.target.value)}
+              className="flex-1 min-w-0 px-3 py-2 rounded-lg text-xs"
+              style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+            />
+            <button
+              type="button"
+              disabled={!outro.trim() || salvando}
+              onClick={() => escolherJogador(outro.trim(), null)}
+              className="px-3 py-2 rounded-lg text-xs font-semibold disabled:opacity-40"
+              style={{ backgroundColor: COLORS.accent, color: "#0B1220", fontFamily: "'Inter', sans-serif" }}
+            >
+              OK
+            </button>
+          </div>
+          <div className="flex gap-4 mt-3">
+            <button type="button" onClick={() => setTimeId(null)} className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+              ← Trocar time
+            </button>
+            <button type="button" onClick={reset} className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+              Cancelar
+            </button>
+          </div>
+        </>
+      )}
+
+      {tipo === "gol" && timeId && golDe && (
+        <>
+          {passo(`Gol de ${golDe.nome} — teve assistência?`)}
+          <button
+            type="button"
+            disabled={salvando}
+            onClick={() => escolherAssistencia(null)}
+            className="w-full rounded-xl py-3 text-sm font-semibold mb-2"
+            style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}
+          >
+            Sem assistência
+          </button>
+          {grade((n, id) => escolherAssistencia(n, id), golDe.k, false)}
+          <button type="button" onClick={() => setGolDe(null)} className="text-xs mt-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            ← Trocar quem fez o gol
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, podeDescer, souSuperAdmin, cartao, suspensosJogo }) {
   const [expanded, setExpanded] = useState(false);
   const [eventForm, setEventForm] = useState({ tipo: "gol", jogador: "", timeId: "" });
@@ -4355,27 +4540,63 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
       tempoIniciadoEm: null,
     });
 
-  const addEvento = async (e) => {
-    e.preventDefault();
-    if (!eventForm.jogador.trim() || !eventForm.timeId) return;
-    const evento = {
-      id: `ev_${Date.now()}`,
-      tipo: eventForm.tipo,
-      jogador: eventForm.jogador.trim(),
-      timeNome: teamName(eventForm.timeId),
-      minuto: Math.floor(computeElapsedMs(match) / 60000),
-    };
-    const eventos = [...(match.eventos || []), evento];
-    let extra = {};
-    if (eventForm.tipo === "gol") {
-      extra = eventForm.timeId === match.timeA ? { golsA: (match.golsA || 0) + 1 } : { golsB: (match.golsB || 0) + 1 };
-    }
-    await onUpdate({ ...match, eventos, ...extra });
-    setEventForm({ tipo: "gol", jogador: "", timeId: "" });
+  const registrarEventos = async (itens) => {
+    const minuto = Math.floor(computeElapsedMs(match) / 60000);
+    const baseId = Date.now();
+    const novos = itens.map((it, n) => ({
+      id: `ev_${baseId}_${n}`,
+      tipo: it.tipo,
+      jogador: it.jogador,
+      jogadorId: it.jogadorId || null,
+      golId: it.golId || null,
+      timeNome: teamName(it.timeId),
+      minuto,
+    }));
+    // o gol e a assistência andam juntos: a assistência aponta pro id do gol
+    novos.forEach((ev, n) => {
+      if (itens[n].ligarAoGol != null) ev.golId = novos[itens[n].ligarAoGol].id;
+    });
+    let golsA = match.golsA || 0;
+    let golsB = match.golsB || 0;
+    let mudouPlacar = false;
+    itens.forEach((it) => {
+      if (it.tipo !== "gol") return;
+      mudouPlacar = true;
+      if (it.timeId === match.timeA) golsA += 1;
+      else golsB += 1;
+    });
+    await onUpdate({
+      ...match,
+      eventos: [...(match.eventos || []), ...novos],
+      ...(mudouPlacar ? { golsA, golsB } : {}),
+    });
   };
 
   const removeEvento = async (id) => {
-    await onUpdate({ ...match, eventos: (match.eventos || []).filter((ev) => ev.id !== id) });
+    const ev = (match.eventos || []).find((x) => x.id === id);
+    if (!ev) return;
+    const ids = new Set([id]);
+    if (ev.tipo === "gol") (match.eventos || []).forEach((x) => x.golId === id && ids.add(x.id));
+    const extra = {};
+    if (ev.tipo === "gol") {
+      if (ev.timeNome === teamName(match.timeA)) extra.golsA = Math.max(0, (Number(match.golsA) || 0) - 1);
+      else extra.golsB = Math.max(0, (Number(match.golsB) || 0) - 1);
+    }
+    await onUpdate({ ...match, eventos: (match.eventos || []).filter((x) => !ids.has(x.id)), ...extra });
+  };
+
+  const refazerJogo = async () => {
+    if (!window.confirm("Refazer o jogo? Apaga placar, gols, assistências, cartões e cronômetro, e volta para 'não iniciado'.")) return;
+    await onUpdate({
+      ...match,
+      status: "agendado",
+      golsA: null,
+      golsB: null,
+      eventos: [],
+      tempoAtual: 1,
+      tempoIniciadoEm: null,
+      tempoAcumuladoMs: 0,
+    });
   };
 
   const inputGol = (campo) => (
@@ -4621,65 +4842,19 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
                 Encerrar jogo
               </button>
             )}
+            {(match.status !== "agendado" || (match.eventos || []).length > 0 || match.golsA != null || match.golsB != null) && (
+              <button
+                type="button"
+                onClick={refazerJogo}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+                style={{ border: `1px solid ${COLORS.border}`, color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+              >
+                ↺ Refazer jogo
+              </button>
+            )}
           </div>
 
-          <form onSubmit={addEvento} className="flex flex-wrap gap-2 items-center">
-            <select
-              value={eventForm.tipo}
-              onChange={(e) => setEventForm({ ...eventForm, tipo: e.target.value })}
-              className="px-2 py-1.5 rounded-lg text-xs"
-              style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
-            >
-              {TIPOS_EVENTO.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-            <select
-              value={eventForm.timeId}
-              onChange={(e) => setEventForm({ ...eventForm, timeId: e.target.value })}
-              className="px-2 py-1.5 rounded-lg text-xs"
-              style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
-            >
-              <option value="">Time</option>
-              {[match.timeA, match.timeB].map((id) => (
-                <option key={id} value={id}>
-                  {teamName(id)}
-                </option>
-              ))}
-            </select>
-            <input
-              type="text"
-              list={`elenco_${eventForm.timeId}`}
-              placeholder="Jogador"
-              value={eventForm.jogador}
-              onChange={(e) => setEventForm({ ...eventForm, jogador: e.target.value })}
-              className="px-2 py-1.5 rounded-lg text-xs flex-1 min-w-[7rem]"
-              style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
-            />
-            {(() => {
-              const time = teams.find((t) => t.id === eventForm.timeId);
-              const proprio = time && Array.isArray(time.jogadores) && time.jogadores.length > 0 ? time.jogadores : null;
-              const elenco = proprio || (time && ELENCOS_2025[time.nome]);
-              if (!elenco) return null;
-              return (
-                <datalist id={`elenco_${eventForm.timeId}`}>
-                  {elenco.map((j, i) => {
-                    const rotulo = j.apelido || j.nome;
-                    return <option key={j.id || j.numero || i} value={j.numero ? `${rotulo} (${j.numero})` : rotulo} />;
-                  })}
-                </datalist>
-              );
-            })()}
-            <button
-              type="submit"
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold"
-              style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
-            >
-              + Registrar
-            </button>
-          </form>
+          <RegistradorEventos match={match} teams={teams} suspensos={suspensosJogo} onRegistrar={registrarEventos} />
 
           {(match.eventos || []).length > 0 && (
             <ul className="space-y-1">
