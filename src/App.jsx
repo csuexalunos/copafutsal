@@ -794,6 +794,22 @@ function anosDaTurma(turma) {
   return nums.map((n) => (n.length === 2 ? Number("20" + n) : Number(n))).filter((n) => n > 1990 && n < 2030);
 }
 
+// Ordem de turmas: da mais antiga (2001/02) à mais nova; 2022.1 < 2022.2 < 2022.3.
+// Nomes sem ano (times personalizados) ficam no fim, em ordem alfabética.
+function chaveTurma(nome) {
+  const m = String(nome || "").match(/\d{4}(?:\.\d+)?/);
+  if (m) return parseFloat(m[0]);
+  const anos = anosDaTurma(nome);
+  return anos.length ? Math.min(...anos) : Infinity;
+}
+function compararTurmas(a, b) {
+  const na = typeof a === "string" ? a : a && a.nome;
+  const nb = typeof b === "string" ? b : b && b.nome;
+  const d = chaveTurma(na) - chaveTurma(nb);
+  if (d !== 0 && !Number.isNaN(d)) return d;
+  return String(na || "").localeCompare(String(nb || ""), "pt-BR");
+}
+
 // Mesma lista de turmas, só que em ordem crescente de ano — usada em
 // todo lugar que lista turmas pra escolher (cadastro, inscrição, etc.).
 const TURMAS_HISTORICAS_ORDENADAS = [...TURMAS_HISTORICAS].sort((a, b) => {
@@ -12966,7 +12982,9 @@ export default function App() {
   const [sessao, setSessao] = useState(null);
   const [checandoSessao, setCheckandoSessao] = useState(true);
   const [emRecuperacaoSenha, setEmRecuperacaoSenha] = useState(false);
-  const [teams, saveTeams, loadingTeams] = useSharedStorage("copasu:teams", [], 7000);
+  const [teamsBanco, saveTeams, loadingTeams] = useSharedStorage("copasu:teams", [], 7000);
+  // Em todo o app os times aparecem em ordem de turma (2001/02 ... 2025).
+  const teams = useMemo(() => [...(teamsBanco || [])].sort(compararTurmas), [teamsBanco]);
   const [matches, saveMatches, loadingMatches] = useSharedStorage("copasu:matches", [], 5000);
   const [posts, savePosts, loadingPosts] = useSharedStorage("copasu:community", [], 6000);
   const [adminRequests, saveAdminRequests, loadingAdminRequests] = useSharedStorage("copasu:admin_requests", [], 8000);
