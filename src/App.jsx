@@ -2747,7 +2747,7 @@ function MatchCardExpansivel({ match, teams, sessao, saveMatches, matches, confi
     };
     return (
       <div className="w-full">
-        <MatchAdminRow match={match} teams={teams} onUpdate={onUpdate} cartao />
+        <MatchAdminRow match={match} teams={teams} onUpdate={onUpdate} cartao suspensosJogo={calcularSuspensoes(matches, teams).porJogo[match.id]} />
       </div>
     );
   }
@@ -4032,7 +4032,183 @@ function calcularSuspensos(matches) {
     .filter((t) => t.motivos.length > 0);
 }
 
-function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, podeDescer, souSuperAdmin, cartao }) {
+// Suspensões por jogo, seguindo o regulamento (Art. 27 a 30):
+// - 1 vermelho = 1 jogo de suspensão; 3 amarelos = 1 jogo (a série zera);
+// - 2 amarelos + vermelho no mesmo jogo: o 2º amarelo não conta (Art. 28 d);
+// - amarelos de séries incompletas não passam pra semifinal (Art. 28 b);
+// - a suspensão é cumprida no PRÓXIMO jogo do time, na ordem cronológica.
+// Tudo é recalculado a partir dos eventos dos jogos, então qualquer
+// correção de cartão/placar atualiza as suspensões (e as súmulas) sozinha.
+function nomesBatem(a, b) {
+  const na = normalizarTexto(a || "");
+  const nb = normalizarTexto(b || "");
+  return !!na && !!nb && (na === nb || na.includes(nb) || nb.includes(na));
+}
+
+function calcularSuspensoes(matches, teams) {
+  const nomeDe = (id) => (teams || []).find((t) => t.id === id)?.nome || "";
+  const ord = ordemCronologica(matches || []);
+  const st = {};
+  const porJogo = {};
+  const amarelosAntes = {};
+  const violacoes = [];
+  let resetSemi = false;
+  const chave = (j, t) => `${normalizarTexto(j)}|${t || ""}`;
+
+  ord.forEach((m) => {
+    if ((m.fase || "") === "Semifinal" && !resetSemi) {
+      Object.values(st).forEach((p) => {
+        p.amarelos = 0;
+      });
+      resetSemi = true;
+    }
+    const nomes = [nomeDe(m.timeA), nomeDe(m.timeB)].filter(Boolean);
+    amarelosAntes[m.id] = {};
+    Object.entries(st).forEach(([k, p]) => {
+      if (p.amarelos > 0) amarelosAntes[m.id][k] = p.amarelos;
+    });
+
+    porJogo[m.id] = [];
+    Object.values(st).forEach((p) => {
+      if (p.devidos > 0 && nomes.includes(p.timeNome)) {
+        porJogo[m.id].push({ jogador: p.jogador, timeNome: p.timeNome, motivo: p.motivos[0] || "suspensão automática" });
+        p.devidos -= 1;
+        p.motivos.shift();
+      }
+    });
+
+    (m.eventos || []).forEach((ev) => {
+      if (porJogo[m.id].some((x) => x.timeNome === ev.timeNome && nomesBatem(x.jogador, ev.jogador))) {
+        if (!violacoes.some((v) => v.matchId === m.id && nomesBatem(v.jogador, ev.jogador) && v.timeNome === ev.timeNome)) {
+          violacoes.push({ matchId: m.id, jogador: ev.jogador, timeNome: ev.timeNome });
+        }
+      }
+    });
+
+    const doJogo = {};
+    (m.eventos || []).forEach((ev) => {
+      if (ev.tipo !== "cartao_amarelo" && ev.tipo !== "cartao_vermelho") return;
+      const k = chave(ev.jogador, ev.timeNome);
+      if (!doJogo[k]) doJogo[k] = { jogador: ev.jogador, timeNome: ev.timeNome, am: 0, ve: 0 };
+      if (ev.tipo === "cartao_amarelo") doJogo[k].am += 1;
+      else doJogo[k].ve += 1;
+    });
+    Object.entries(doJogo).forEach(([k, c]) => {
+      if (!st[k]) st[k] = { jogador: c.jogador, timeNome: c.timeNome, amarelos: 0, devidos: 0, motivos: [] };
+      const p = st[k];
+      let am = c.am;
+      if (c.ve > 0 && am >= 2) am -= 1;
+      p.amarelos += am;
+      for (let i = 0; i < c.ve; i++) {
+        p.devidos += 1;
+        p.motivos.push("cartão vermelho");
+      }
+      while (p.amarelos >= 3) {
+        p.amarelos -= 3;
+        p.devidos += 1;
+        p.motivos.push("3 cartões amarelos");
+      }
+    });
+  });
+
+  const pendentes = Object.values(st)
+    .filter((p) => p.devidos > 0)
+    .map((p) => ({ jogador: p.jogador, timeNome: p.timeNome, motivo: p.motivos[0] || "suspensão automática" }));
+  const pendurados = Object.values(st)
+    .filter((p) => p.amarelos > 0)
+    .map((p) => ({ jogador: p.jogador, timeNome: p.timeNome, amarelos: p.amarelos }));
+  return { porJogo, pendentes, pendurados, violacoes, amarelosAntes };
+}
+
+function PainelAvisosJogos({ matches, teams }) {
+  const sus = useMemo(() => calcularSuspensoes(matches, teams), [matches, teams]);
+  const nomeDe = (id) => teams.find((t) => t.id === id)?.nome || "?";
+  const abertos = ordemCronologica(matches).filter((m) => m.status !== "encerrado" && (sus.porJogo[m.id] || []).length > 0);
+  const vazio = abertos.length === 0 && sus.pendentes.length === 0 && sus.violacoes.length === 0;
+  const caixa = { backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` };
+  const hora = (m) => (m.horario ? formatarHorarioJogo(m.horario) : "");
+  return (
+    <div className="max-w-xl space-y-4 mb-8">
+      {sus.violacoes.length > 0 && (
+        <div className="rounded-2xl p-4" style={{ ...caixa, border: "1.5px solid #EF4444" }}>
+          <div className="font-semibold text-sm mb-2" style={{ color: "#EF4444", fontFamily: "'Sora', sans-serif" }}>
+            ⛔ Jogador suspenso com lance registrado
+          </div>
+          <ul className="space-y-1">
+            {sus.violacoes.map((v, i) => {
+              const m = matches.find((x) => x.id === v.matchId);
+              return (
+                <li key={i} className="text-sm" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+                  <strong>{v.jogador}</strong> ({v.timeNome}) em {m ? `${nomeDe(m.timeA)} x ${nomeDe(m.timeB)}` : "jogo"}. Confira antes de seguir (Art. 29).
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+      <div className="rounded-2xl p-4" style={caixa}>
+        <div className="font-semibold text-sm mb-2" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>
+          🚫 Suspensos nos próximos jogos
+        </div>
+        {abertos.length === 0 && sus.pendentes.length === 0 ? (
+          <p className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Ninguém suspenso por enquanto.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {abertos.map((m) => (
+              <li key={m.id} className="text-sm" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+                <div className="text-xs mb-0.5" style={{ color: COLORS.slate }}>
+                  {nomeDe(m.timeA)} x {nomeDe(m.timeB)} · {hora(m)}
+                </div>
+                {sus.porJogo[m.id].map((x, i) => (
+                  <div key={i}>
+                    <strong>{x.jogador}</strong> ({x.timeNome}) — {x.motivo}
+                  </div>
+                ))}
+              </li>
+            ))}
+            {sus.pendentes.map((x, i) => (
+              <li key={`p${i}`} className="text-sm" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+                <strong>{x.jogador}</strong> ({x.timeNome}) — {x.motivo}
+                <span className="text-xs" style={{ color: COLORS.slate }}> · cumpre no próximo jogo do time (ainda não definido)</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      {sus.pendurados.length > 0 && (
+        <div className="rounded-2xl p-4" style={caixa}>
+          <div className="font-semibold text-sm mb-2" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>
+            🟨 Pendurados
+          </div>
+          <ul className="space-y-1">
+            {sus.pendurados.map((x, i) => (
+              <li key={i} className="text-sm" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+                <strong>{x.jogador}</strong> ({x.timeNome}) — {x.amarelos} amarelo{x.amarelos > 1 ? "s" : ""} na série
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {!vazio && (
+        <p className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+          Calculado sozinho a partir dos cartões lançados nos jogos (Art. 27 a 30). Se corrigir um cartão, isto e as súmulas se ajustam.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function contarAvisosJogos(matches, teams) {
+  const sus = calcularSuspensoes(matches, teams);
+  const abertos = (matches || []).filter((m) => m.status !== "encerrado");
+  return (
+    abertos.reduce((n, m) => n + (sus.porJogo[m.id] || []).length, 0) + sus.pendentes.length + sus.violacoes.length
+  );
+}
+
+function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, podeDescer, souSuperAdmin, cartao, suspensosJogo }) {
   const [expanded, setExpanded] = useState(false);
   const [eventForm, setEventForm] = useState({ tipo: "gol", jogador: "", timeId: "" });
   const [timeModal, setTimeModal] = useState(null);
@@ -4129,6 +4305,11 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
           <div className="text-[11px] font-bold uppercase tracking-widest mb-3" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
             {match.horario ? `${String(new Date(match.horario).getHours()).padStart(2, "0")}:${String(new Date(match.horario).getMinutes()).padStart(2, "0")} · ` : ""}{match.fase || "Fase"}
           </div>
+          {suspensosJogo && suspensosJogo.length > 0 && (
+            <div className="rounded-lg px-3 py-2 mb-3 text-xs text-left" style={{ border: "1.5px solid #EF4444", color: "#FCA5A5", fontFamily: "'Inter', sans-serif" }}>
+              ⛔ <strong>Suspensos neste jogo:</strong> {suspensosJogo.map((x) => `${x.jogador} (${x.timeNome}) — ${x.motivo}`).join(" · ")}
+            </div>
+          )}
           <div className="flex items-start justify-between gap-1">
             {ladoCartao(match.timeA)}
             <div className="flex flex-col items-center gap-2 pt-1 flex-1 min-w-0" onClick={(e) => e.stopPropagation()}>
@@ -5066,7 +5247,7 @@ const SUMULA_CSS = `
   .sm .fl td { height: 18px; }
 `;
 
-function sumulaBlocoTime(time, nomeTime, mapaCpf) {
+function sumulaBlocoTime(time, nomeTime, mapaCpf, suspensos, amarelosAntes) {
   const lista = (time && Array.isArray(time.jogadores) ? time.jogadores : [])
     .slice()
     .sort((a, b) => (Number(a.numero) || 999) - (Number(b.numero) || 999));
@@ -5074,10 +5255,20 @@ function sumulaBlocoTime(time, nomeTime, mapaCpf) {
   for (let n = 0; n < 15; n++) {
     const j = lista[n];
     const cpf = j && mapaCpf && mapaCpf[j.id] ? String(mapaCpf[j.id]).replace(/\D/g, "") : "";
+    const susp = j && (suspensos || []).find((x) => nomesBatem(x.jogador, j.apelido) || nomesBatem(x.jogador, j.nome));
+    let amarelos = 0;
+    if (j) {
+      Object.entries(amarelosAntes || {}).forEach(([k, v]) => {
+        const [nomeEv, timeEv] = k.split("|");
+        if (timeEv === nomeTime.replace(/^Seleção /, "") && (nomesBatem(nomeEv, j.apelido) || nomesBatem(nomeEv, j.nome))) amarelos = v;
+      });
+    }
     linhas.push(
-      `<tr><td class="c" style="width:18px">${n + 1}</td><td>${j ? escapeHtml(j.apelido || j.nome || "") : ""}${
+      `<tr${susp ? ' style="background:#fde2e2"' : ""}><td class="c" style="width:18px">${n + 1}</td><td>${
+        j ? `<span style="${susp ? "text-decoration:line-through;color:#b00020" : ""}">${escapeHtml(j.apelido || j.nome || "")}</span>` : ""
+      }${susp ? ` <b style="color:#b00020">SUSPENSO (${escapeHtml(susp.motivo)})</b>` : ""}${
         cpf ? `<span style="float:right">(${cpf})</span>` : ""
-      }</td><td class="c" style="width:34px">${j ? escapeHtml(j.numero || "") : ""}</td><td style="width:50px"></td><td style="width:50px"></td></tr>`
+      }</td><td class="c" style="width:34px">${j ? escapeHtml(j.numero || "") : ""}</td><td class="c" style="width:50px">${"|".repeat(amarelos)}</td><td style="width:50px"></td></tr>`
     );
   }
   const tecnico = time && time.capitao ? escapeHtml(time.capitao) : "";
@@ -5130,7 +5321,7 @@ function sumulaBlocoTime(time, nomeTime, mapaCpf) {
     </div>`;
 }
 
-function sumulaHtml(match, teams, numeroJogo, mapasCpf) {
+function sumulaHtml(match, teams, numeroJogo, mapasCpf, sus) {
   const timeA = teams.find((t) => t.id === match.timeA);
   const timeB = teams.find((t) => t.id === match.timeB);
   const rotuloSelecao = (t) => (t ? (/^\d/.test(t.nome) ? `Seleção ${t.nome}` : t.nome) : "A definir");
@@ -5176,8 +5367,8 @@ function sumulaHtml(match, teams, numeroJogo, mapasCpf) {
         </div>
       </div>
       <div class="sp"></div>
-      ${sumulaBlocoTime(timeA, nomeA, mc[match.timeA])}
-      ${sumulaBlocoTime(timeB, nomeB, mc[match.timeB])}
+      ${sumulaBlocoTime(timeA, nomeA, mc[match.timeA], (sus && sus.porJogo[match.id] || []).filter((x) => timeA && x.timeNome === timeA.nome), sus && sus.amarelosAntes[match.id])}
+      ${sumulaBlocoTime(timeB, nomeB, mc[match.timeB], (sus && sus.porJogo[match.id] || []).filter((x) => timeB && x.timeNome === timeB.nome), sus && sus.amarelosAntes[match.id])}
     </div>`;
 }
 
@@ -5212,7 +5403,7 @@ async function baixarSumula(match, teams, matches) {
   const numero = ordemCronologica(matches || [match]).findIndex((m) => m.id === match.id) + 1;
   const win = abrirJanelaImpressao();
   const mapas = await cpfsParaSumulas([match], teams);
-  preencherJanelaImpressao(win, `Súmula — ${nomeArquivo}`, sumulaHtml(match, teams, numero, mapas));
+  preencherJanelaImpressao(win, `Súmula — ${nomeArquivo}`, sumulaHtml(match, teams, numero, mapas, calcularSuspensoes(matches || [match], teams)));
 }
 
 async function baixarTodasSumulas(jogos, teams, todos) {
@@ -5220,10 +5411,11 @@ async function baixarTodasSumulas(jogos, teams, todos) {
   const base = ordemCronologica(todos || jogos);
   const win = abrirJanelaImpressao();
   const mapas = await cpfsParaSumulas(ordenados, teams);
+  const sus = calcularSuspensoes(todos || jogos, teams);
   preencherJanelaImpressao(
     win,
     "Súmulas",
-    ordenados.map((m) => sumulaHtml(m, teams, base.findIndex((x) => x.id === m.id) + 1, mapas)).join("")
+    ordenados.map((m) => sumulaHtml(m, teams, base.findIndex((x) => x.id === m.id) + 1, mapas, sus)).join("")
   );
 }
 
@@ -9676,6 +9868,7 @@ function LoginGate({ onLogin }) {
 // só) — cada grupo abre numa tela própria, com botão de voltar pro hub.
 // ---------------------------------------------------------------------------
 const GRUPOS_ORGANIZACAO = [
+  { chave: "avisos", titulo: "Avisos dos jogos", subtitulo: "Suspensos e alertas pra quem lança placar", icone: AlertTriangle },
   { chave: "comunicacao", titulo: "Comunicação", subtitulo: "E-mails de aprovação e lembrete", icone: Mail },
   { chave: "pessoas", titulo: "Pessoas e acesso", subtitulo: "Inscritos, representantes, avaliações", icone: Users },
   { chave: "fotos", titulo: "Fotos e vídeos", subtitulo: "Aprovar o que a galera enviou pra Comunidade", icone: Camera },
@@ -10979,6 +11172,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
             pessoas:
               perfis.filter((p) => p.status !== "aprovado" && p.status !== "recusado" && !p.visualizado).length +
               (souSuperAdmin ? adminRequests.filter((r) => r.status === "pendente").length : 0),
+            avisos: contarAvisosJogos(matches, teams),
             times: avaliacoes.filter((a) => a.status === "pendente").length,
             fotos: (posts || []).filter(postPendente).length,
             financeiro: teams.filter(
@@ -11469,8 +11663,11 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
         </div>
       )}
 
+      {secaoAtiva === "avisos" && <PainelAvisosJogos matches={matches} teams={teams} />}
+
       {secaoAtiva === "jogos" && (
       <>
+      <PainelAvisosJogos matches={matches} teams={teams} />
       <div className="max-w-xl">
         <div className="rounded-2xl p-5 mb-8" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
           <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
