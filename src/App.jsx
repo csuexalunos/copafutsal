@@ -3018,9 +3018,24 @@ function Chaveamento({ matches, teams, sessao, saveMatches, config }) {
             ))}
           </div>
           <div className="max-w-xl mx-auto pb-4">
-            {jogosVisiveis.map((m) => (
-              <MatchCardExpansivel key={m.id} match={m} teams={teams} sessao={sessao} saveMatches={saveMatches} matches={matches} config={config} />
-            ))}
+            {jogosVisiveis.map((m, idx) => {
+              const rot = (x) => ((x.fase || "").startsWith("Grupo") ? `${x.rodada || 1}ª Rodada` : x.fase || "");
+              const novo = idx === 0 || rot(jogosVisiveis[idx - 1]) !== rot(m);
+              return (
+                <div key={m.id}>
+                  {novo && (
+                    <div className="flex items-center gap-3 mt-8 mb-1">
+                      <div className="flex-1 h-px" style={{ backgroundColor: COLORS.border }} />
+                      <span className="text-xs font-bold uppercase tracking-widest" style={{ color: COLORS.accent, fontFamily: "'Sora', sans-serif" }}>
+                        {rot(m)}
+                      </span>
+                      <div className="flex-1 h-px" style={{ backgroundColor: COLORS.border }} />
+                    </div>
+                  )}
+                  <MatchCardExpansivel match={m} teams={teams} sessao={sessao} saveMatches={saveMatches} matches={matches} config={config} />
+                </div>
+              );
+            })}
           </div>
         </>
       )}
