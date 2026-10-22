@@ -3153,7 +3153,129 @@ function TabelaClassificacao({ titulo, linhas, destaqueTop, teams }) {
   );
 }
 
+function EstatisticasJogadores({ matches, teams, tipo }) {
+  const sus = useMemo(() => calcularSuspensoes(matches, teams), [matches, teams]);
+  const linhas = useMemo(() => {
+    const mapa = {};
+    matches.forEach((m) => {
+      (m.eventos || []).forEach((ev) => {
+        const k = `${normalizarTexto(ev.jogador || "")}|${ev.timeNome || ""}`;
+        if (!mapa[k]) mapa[k] = { jogador: ev.jogador, timeNome: ev.timeNome, gol: 0, assistencia: 0, cartao_amarelo: 0, cartao_vermelho: 0 };
+        if (mapa[k][ev.tipo] != null) mapa[k][ev.tipo] += 1;
+      });
+    });
+    const todos = Object.values(mapa);
+    if (tipo === "cartoes") {
+      return todos
+        .filter((p) => p.cartao_amarelo + p.cartao_vermelho > 0)
+        .sort((a, b) => b.cartao_vermelho - a.cartao_vermelho || b.cartao_amarelo - a.cartao_amarelo || a.jogador.localeCompare(b.jogador));
+    }
+    const campo = tipo === "gols" ? "gol" : "assistencia";
+    return todos.filter((p) => p[campo] > 0).sort((a, b) => b[campo] - a[campo] || a.jogador.localeCompare(b.jogador));
+  }, [matches, tipo]);
+
+  const campo = tipo === "gols" ? "gol" : "assistencia";
+  const suspenso = (p) =>
+    sus.pendentes.some((x) => x.timeNome === p.timeNome && nomesBatem(x.jogador, p.jogador)) ||
+    matches.some(
+      (m) => m.status !== "encerrado" && (sus.porJogo[m.id] || []).some((x) => x.timeNome === p.timeNome && nomesBatem(x.jogador, p.jogador))
+    );
+  const vazio = {
+    gols: "Ainda não há gols registrados.",
+    assistencias: "Ainda não há assistências registradas.",
+    cartoes: "Ainda não há cartões registrados.",
+  }[tipo];
+  if (linhas.length === 0) return <EmptyState>{vazio}</EmptyState>;
+  let posAnt = 0;
+  let valAnt = null;
+  return (
+    <div className="rounded-2xl overflow-hidden" style={{ border: `1px solid ${COLORS.border}` }}>
+      {linhas.map((p, idx) => {
+        const valor = tipo === "cartoes" ? `${p.cartao_vermelho}|${p.cartao_amarelo}` : p[campo];
+        if (valor !== valAnt) {
+          posAnt = idx + 1;
+          valAnt = valor;
+        }
+        const escudo = ESCUDOS_TIMES[p.timeNome];
+        return (
+          <div
+            key={`${p.jogador}|${p.timeNome}`}
+            className="flex items-center gap-3 px-4 py-2.5"
+            style={{ backgroundColor: idx % 2 === 0 ? COLORS.card : COLORS.zebra, fontFamily: "'Inter', sans-serif" }}
+          >
+            <span className="w-6 text-sm font-bold text-center" style={{ color: posAnt <= 3 && tipo !== "cartoes" ? COLORS.accent : COLORS.slate }}>
+              {posAnt}
+            </span>
+            {escudo ? <img src={escudo} alt="" className="w-7 h-7 object-contain shrink-0" /> : <span className="w-7 shrink-0" />}
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-semibold truncate" style={{ color: COLORS.ink }}>
+                {p.jogador}
+                {tipo === "cartoes" && suspenso(p) && (
+                  <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: "#EF4444", color: "#fff" }}>
+                    SUSPENSO
+                  </span>
+                )}
+              </div>
+              <div className="text-xs truncate" style={{ color: COLORS.slate }}>
+                {p.timeNome}
+              </div>
+            </div>
+            {tipo === "cartoes" ? (
+              <div className="flex items-center gap-3 text-sm font-bold shrink-0" style={{ fontFamily: "'JetBrains Mono', monospace", color: COLORS.ink }}>
+                <span>🟨 {p.cartao_amarelo}</span>
+                <span>🟥 {p.cartao_vermelho}</span>
+              </div>
+            ) : (
+              <span className="text-lg font-bold shrink-0" style={{ fontFamily: "'JetBrains Mono', monospace", color: COLORS.ink }}>
+                {p[campo]}
+              </span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function Classificacao({ matches, teams }) {
+  const [aba, setAba] = useState("tabela");
+  const abas = [
+    { id: "tabela", label: "Tabela" },
+    { id: "gols", label: "⚽ Artilharia" },
+    { id: "assistencias", label: "🅰️ Assistências" },
+    { id: "cartoes", label: "🟨🟥 Cartões" },
+  ];
+  return (
+    <div>
+      <SectionLabel eyebrow="Tabela" title="Classificação" />
+      <div className="flex gap-2 overflow-x-auto pb-2 mb-4">
+        {abas.map((a) => (
+          <button
+            key={a.id}
+            type="button"
+            onClick={() => setAba(a.id)}
+            className="px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap shrink-0"
+            style={{
+              backgroundColor: aba === a.id ? COLORS.accent : "transparent",
+              color: aba === a.id ? "#0B1220" : COLORS.slate,
+              border: `1px solid ${aba === a.id ? COLORS.accent : COLORS.border}`,
+              fontFamily: "'Inter', sans-serif",
+            }}
+          >
+            {a.label}
+          </button>
+        ))}
+      </div>
+      {aba === "tabela" ? (
+        <ClassificacaoTabela matches={matches} teams={teams} />
+      ) : (
+        <EstatisticasJogadores matches={matches} teams={teams} tipo={aba} />
+      )}
+    </div>
+  );
+}
+
+function ClassificacaoTabela({ matches, teams }) {
   const geral = useMemo(() => calcularClassificacaoGeral(matches, teams), [matches, teams]);
 
   const gruposNomes = useMemo(() => {
@@ -3184,7 +3306,6 @@ function Classificacao({ matches, teams }) {
 
   return (
     <div>
-      <SectionLabel eyebrow="Tabela" title="Classificação" />
       {teams.length === 0 ? (
         <EmptyState>Ainda não há times inscritos.</EmptyState>
       ) : !temGrupos ? (
