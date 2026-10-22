@@ -11527,6 +11527,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
 
   const [reqNome, setReqNome] = useState("");
   const [reqEmail, setReqEmail] = useState("");
+  const [reqWhats, setReqWhats] = useState("");
   const [reqMotivo, setReqMotivo] = useState("");
   const [reqEnviado, setReqEnviado] = useState(false);
   const [ultimaSenhaGerada, setUltimaSenhaGerada] = useState(null);
@@ -11541,11 +11542,15 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
 
   const enviarSolicitacao = async (e) => {
     e.preventDefault();
-    if (!reqNome.trim() || !reqEmail.trim()) return;
+    const nome = (reqNome.trim() || (sessao && sessao.nome) || "").trim();
+    const email = ((sessao && sessao.email) || reqEmail || "").trim();
+    if (!nome || !reqWhats.trim()) return;
     const nova = {
       id: `req_${Date.now()}`,
-      nome: reqNome.trim(),
-      email: reqEmail.trim(),
+      nome,
+      email,
+      whatsapp: reqWhats.trim(),
+      turma: (sessao && sessao.turma) || "",
       motivo: reqMotivo.trim(),
       status: "pendente",
       criadoEm: new Date().toISOString(),
@@ -11553,6 +11558,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
     await saveAdminRequests([...adminRequests, nova]);
     setReqNome("");
     setReqEmail("");
+    setReqWhats("");
     setReqMotivo("");
     setReqEnviado(true);
   };
@@ -11822,17 +11828,17 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
               <form onSubmit={enviarSolicitacao} className="mt-3 space-y-2">
                 <input
                   type="text"
-                  value={reqNome}
+                  value={reqNome || (sessao && sessao.nome) || ""}
                   onChange={(e) => setReqNome(e.target.value)}
                   placeholder="Seu nome"
                   className="w-full px-3 py-2 rounded-xl text-sm"
                   style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
                 />
                 <input
-                  type="email"
-                  value={reqEmail}
-                  onChange={(e) => setReqEmail(e.target.value)}
-                  placeholder="Seu e-mail (o mesmo do cadastro)"
+                  type="tel"
+                  value={reqWhats}
+                  onChange={(e) => setReqWhats(e.target.value)}
+                  placeholder="Seu WhatsApp (com DDD)"
                   className="w-full px-3 py-2 rounded-xl text-sm"
                   style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1.5px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
                 />
@@ -12325,42 +12331,70 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
           <ul className="space-y-2">
             {adminRequests
               .filter((r) => r.status === "pendente")
-              .map((r) => (
-                <li
-                  key={r.id}
-                  className="flex items-center gap-3 text-sm px-3 py-2 rounded-lg"
-                  style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
-                >
-                  <span className="flex-1 min-w-0 truncate">
-                    {r.nome} — {r.email} {r.motivo && `— ${r.motivo}`}
-                  </span>
-                  <select
-                    value={escopoPorSolicitacao[r.id] || "completo"}
-                    onChange={(e) => setEscopoPorSolicitacao({ ...escopoPorSolicitacao, [r.id]: e.target.value })}
-                    className="px-2 py-1 rounded-lg text-xs shrink-0"
-                    style={{ border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+              .map((r) => {
+                const perfil = perfis.find((p) => (p.email || "").trim().toLowerCase() === (r.email || "").trim().toLowerCase());
+                const whats = r.whatsapp || (perfil && perfil.whatsapp) || "";
+                const turma = r.turma || (perfil && perfil.turma) || "";
+                const nome = r.nome || (perfil && perfil.nome) || "Sem nome";
+                const link = linkWhatsapp(whats, `Oi, ${nome.split(" ")[0]}! Aqui é da organização da Copa Ex-Alunos CSU. Vi seu pedido para ajudar a organizar. Podemos conversar?`);
+                return (
+                  <li
+                    key={r.id}
+                    className="text-sm px-3 py-3 rounded-lg"
+                    style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
                   >
-                    <option value="completo">Acesso total</option>
-                    <option value="jogos">Só jogos</option>
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => aprovarSolicitacao(r)}
-                    className="px-3 py-1 rounded-lg text-xs font-semibold shrink-0"
-                    style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
-                  >
-                    Aprovar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => recusarSolicitacao(r)}
-                    className="px-3 py-1 rounded-lg text-xs font-semibold shrink-0"
-                    style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
-                  >
-                    Recusar
-                  </button>
-                </li>
-              ))}
+                    <div className="font-semibold break-words">{nome}</div>
+                    <div className="text-xs mt-0.5 break-words" style={{ color: COLORS.slate }}>
+                      {turma ? `turma ${turma} · ` : ""}
+                      {whats ? `WhatsApp ${whats}` : "sem WhatsApp informado"}
+                      {r.email ? ` · ${r.email}` : ""}
+                    </div>
+                    {r.motivo && (
+                      <div className="text-xs mt-1.5 break-words" style={{ color: COLORS.ink }}>
+                        “{r.motivo}”
+                      </div>
+                    )}
+                    <div className="flex flex-wrap items-center gap-2 mt-3">
+                      {link && (
+                        <a
+                          href={link}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5"
+                          style={{ backgroundColor: "#25D366", color: "#052E16", fontFamily: "'Inter', sans-serif" }}
+                        >
+                          <MessageCircle size={13} /> Conversar no WhatsApp
+                        </a>
+                      )}
+                      <select
+                        value={escopoPorSolicitacao[r.id] || "completo"}
+                        onChange={(e) => setEscopoPorSolicitacao({ ...escopoPorSolicitacao, [r.id]: e.target.value })}
+                        className="px-2 py-1.5 rounded-lg text-xs"
+                        style={{ backgroundColor: COLORS.card, border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+                      >
+                        <option value="completo">Acesso total</option>
+                        <option value="jogos">Só jogos</option>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => aprovarSolicitacao(r)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+                        style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+                      >
+                        Aprovar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => recusarSolicitacao(r)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+                        style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+                      >
+                        Recusar
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
           </ul>
         </div>
       )}
