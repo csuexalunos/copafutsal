@@ -2758,8 +2758,8 @@ function MatchCardExpansivel({ match, teams, sessao, saveMatches, matches, confi
   const status = match.status || "agendado";
   const aoVivo = status === "ao_vivo";
   const rotuloStatus =
-    match.virtual ? (timeA && timeB ? "PROVISÓRIO" : "A DEFINIR") : status === "encerrado" ? "ENCERRADO" : status === "intervalo" ? "INTERVALO" : aoVivo ? "AO VIVO" : "AGENDADO";
-  const corStatus = aoVivo ? "#22C55E" : status === "intervalo" ? COLORS.accent : COLORS.slate;
+    match.virtual ? (timeA && timeB ? "PROVISÓRIO" : "A DEFINIR") : status === "encerrado" ? "ENCERRADO" : status === "intervalo" ? "INTERVALO" : aoVivo ? (match.pausado ? "PAUSADO" : "AO VIVO") : "AGENDADO";
+  const corStatus = aoVivo ? (match.pausado ? "#F59E0B" : "#22C55E") : status === "intervalo" ? COLORS.accent : COLORS.slate;
   const dh = match.horario ? new Date(match.horario) : null;
   const diasLongos = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
   const dataTxt = dh
@@ -4108,14 +4108,14 @@ function MatchClock({ match }) {
       ? "Intervalo"
       : match.status === "encerrado"
       ? "Encerrado"
-      : `${match.tempoAtual === 2 ? "2º tempo" : "1º tempo"} · ${formatElapsed(computeElapsedMs(match))}`;
+      : `${match.pausado ? "⏸ Tempo parado" : match.tempoAtual === 2 ? "2º tempo" : "1º tempo"} · ${formatElapsed(computeElapsedMs(match))}`;
 
   return (
     <span
       className="text-xs font-semibold"
       style={{
         fontFamily: "'JetBrains Mono', monospace",
-        color: match.status === "ao_vivo" ? "#22C55E" : COLORS.slate,
+        color: match.status === "ao_vivo" ? (match.pausado ? "#F59E0B" : "#22C55E") : COLORS.slate,
       }}
     >
       {rotulo}
@@ -4524,17 +4524,22 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
   const patch = (fields) => onUpdate({ ...match, ...fields });
 
   const iniciarPrimeiroTempo = () =>
-    patch({ status: "ao_vivo", tempoAtual: 1, tempoIniciadoEm: Date.now(), tempoAcumuladoMs: 0 });
+    patch({ status: "ao_vivo", pausado: false, tempoAtual: 1, tempoIniciadoEm: Date.now(), tempoAcumuladoMs: 0 });
+  const pausarTempo = () =>
+    patch({ pausado: true, tempoAcumuladoMs: computeElapsedMs(match), tempoIniciadoEm: null });
+  const retomarTempo = () => patch({ pausado: false, tempoIniciadoEm: Date.now() });
   const irParaIntervalo = () =>
     patch({
+      pausado: false,
       status: "intervalo",
       tempoAcumuladoMs: computeElapsedMs(match),
       tempoIniciadoEm: null,
     });
   const iniciarSegundoTempo = () =>
-    patch({ status: "ao_vivo", tempoAtual: 2, tempoIniciadoEm: Date.now() });
+    patch({ status: "ao_vivo", pausado: false, tempoAtual: 2, tempoIniciadoEm: Date.now() });
   const encerrarJogo = () =>
     patch({
+      pausado: false,
       status: "encerrado",
       tempoAcumuladoMs: computeElapsedMs(match),
       tempoIniciadoEm: null,
@@ -4590,6 +4595,7 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
     await onUpdate({
       ...match,
       status: "agendado",
+      pausado: false,
       golsA: null,
       golsB: null,
       eventos: [],
@@ -4810,6 +4816,20 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
                 style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}
               >
                 Iniciar 1º tempo
+              </button>
+            )}
+            {match.status === "ao_vivo" && (
+              <button
+                type="button"
+                onClick={match.pausado ? retomarTempo : pausarTempo}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+                style={{
+                  backgroundColor: match.pausado ? "#22C55E" : "#F59E0B",
+                  color: "#0B1220",
+                  fontFamily: "'Inter', sans-serif",
+                }}
+              >
+                {match.pausado ? "▶ Retomar tempo" : "⏸ Pausar tempo"}
               </button>
             )}
             {match.status === "ao_vivo" && match.tempoAtual === 1 && (
