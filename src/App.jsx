@@ -3270,23 +3270,46 @@ function Chaveamento({ matches, teams, sessao, saveMatches, config }) {
 // ---------------------------------------------------------------------------
 function TabelaClassificacao({ titulo, linhas, destaqueTop, teams, matches }) {
   const [timeSelecionado, setTimeSelecionado] = useState(null);
-  const cols = ["Time", "J", "V", "E", "D", "GP", "GC", "SG", "Pts"];
+  // Pontos primeiro (é o que decide), depois jogos e o resumo do desempenho.
+  const cols = [
+    ["Pts", "Pontos"],
+    ["J", "Jogos"],
+    ["V", "Vitórias"],
+    ["E", "Empates"],
+    ["D", "Derrotas"],
+    ["SG", "Saldo de gols"],
+    ["GP", "Gols pró"],
+    ["GC", "Gols contra"],
+  ];
+  const mono = "'JetBrains Mono', monospace";
   return (
     <div className="mb-8">
       {titulo && (
-        <h3 className="text-sm font-bold mb-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+        <h3 className="text-base font-bold mb-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
           {titulo}
         </h3>
       )}
       <div className="overflow-x-auto rounded-2xl" style={{ border: `1px solid ${COLORS.border}` }}>
-        <table className="w-full text-sm" style={{ fontFamily: "'Inter', sans-serif" }}>
+        <table className="w-full text-sm" style={{ fontFamily: "'Inter', sans-serif", borderCollapse: "separate", borderSpacing: 0 }}>
           <thead>
-            <tr style={{ backgroundColor: COLORS.card, borderBottom: `2px solid ${COLORS.ink}` }}>
-              {cols.map((c, i) => (
+            <tr style={{ backgroundColor: COLORS.card }}>
+              <th
+                className="px-2 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide sticky left-0"
+                style={{ color: COLORS.slate, backgroundColor: COLORS.card, borderBottom: `2px solid ${COLORS.border}`, minWidth: 128 }}
+              >
+                Time
+              </th>
+              {cols.map(([c, nome], i) => (
                 <th
                   key={c}
-                  className={`px-3 py-2.5 text-xs font-semibold uppercase tracking-wide ${i === 0 ? "text-left" : "text-center"}`}
-                  style={{ color: COLORS.ink }}
+                  title={nome}
+                  className="px-2 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wide"
+                  style={{
+                    color: i === 0 ? COLORS.accent : COLORS.slate,
+                    borderBottom: `2px solid ${COLORS.border}`,
+                    backgroundColor: i === 0 ? "rgba(249,115,22,0.10)" : COLORS.card,
+                    minWidth: i === 0 ? 46 : 34,
+                  }}
                 >
                   {c}
                 </th>
@@ -3296,35 +3319,43 @@ function TabelaClassificacao({ titulo, linhas, destaqueTop, teams, matches }) {
           <tbody>
             {linhas.map((t, idx) => {
               const classificado = destaqueTop && idx < destaqueTop;
+              const bg = classificado ? "#0F2A1F" : idx % 2 === 0 ? COLORS.card : COLORS.zebra;
+              const sg = t.gp - t.gc;
+              const valores = [t.pts, t.j, t.v, t.e, t.d, sg > 0 ? `+${sg}` : sg, t.gp, t.gc];
               return (
                 <tr
                   key={t.id || t.nome}
                   onClick={() => teams && setTimeSelecionado(teams.find((tm) => tm.id === t.id) || null)}
                   className={teams ? "cursor-pointer" : ""}
-                  style={{
-                    backgroundColor: classificado ? "rgba(22,163,74,0.18)" : idx % 2 === 0 ? COLORS.card : COLORS.zebra,
-                    borderLeft: classificado ? "3px solid #16A34A" : "3px solid transparent",
-                  }}
                 >
-                  <td className="px-3 py-2.5 font-medium" style={{ color: COLORS.ink }}>
+                  <td
+                    className="px-2 py-3 font-semibold sticky left-0"
+                    style={{
+                      color: COLORS.ink,
+                      backgroundColor: bg,
+                      borderLeft: classificado ? "3px solid #16A34A" : "3px solid transparent",
+                      borderBottom: `1px solid ${COLORS.border}`,
+                    }}
+                  >
                     <span className="flex items-center gap-2">
-                      <span className="text-xs" style={{ color: COLORS.slate, fontFamily: "'JetBrains Mono', monospace" }}>
+                      <span className="text-xs w-4 text-center" style={{ color: classificado ? "#4ADE80" : COLORS.slate, fontFamily: mono }}>
                         {idx + 1}
                       </span>
-                      {ESCUDOS_TIMES[t.nome] && (
-                        <img src={ESCUDOS_TIMES[t.nome]} alt="" className="w-5 h-5 object-contain shrink-0" />
-                      )}
-                      {t.nome}
+                      {ESCUDOS_TIMES[t.nome] && <img src={ESCUDOS_TIMES[t.nome]} alt="" className="w-7 h-7 object-contain shrink-0" />}
+                      <span className="truncate">{t.nome}</span>
                     </span>
                   </td>
-                  {[t.j, t.v, t.e, t.d, t.gp, t.gc, t.gp - t.gc, t.pts].map((v, i) => (
+                  {valores.map((v, i) => (
                     <td
                       key={i}
-                      className="px-3 py-2.5 text-center"
+                      className="px-2 py-3 text-center"
                       style={{
-                        fontFamily: "'JetBrains Mono', monospace",
-                        color: i === 7 ? COLORS.accent : COLORS.ink,
-                        fontWeight: i === 7 ? 700 : 500,
+                        fontFamily: mono,
+                        fontSize: i === 0 ? 17 : 13,
+                        color: i === 0 ? COLORS.accent : i >= 6 ? COLORS.slate : COLORS.ink,
+                        fontWeight: i === 0 ? 800 : 500,
+                        backgroundColor: i === 0 ? (classificado ? "#14352A" : "rgba(249,115,22,0.08)") : bg,
+                        borderBottom: `1px solid ${COLORS.border}`,
                       }}
                     >
                       {v}
@@ -3336,6 +3367,15 @@ function TabelaClassificacao({ titulo, linhas, destaqueTop, teams, matches }) {
           </tbody>
         </table>
       </div>
+      {destaqueTop ? (
+        <p className="text-[11px] mt-2" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+          <span style={{ color: "#4ADE80" }}>■</span> Classificados · Pts pontos · J jogos · V vitórias · E empates · D derrotas · SG saldo · GP gols pró · GC gols contra. Toque no time para ver detalhes.
+        </p>
+      ) : (
+        <p className="text-[11px] mt-2" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+          Toque no time para ver elenco, destaques e jogos.
+        </p>
+      )}
       <ModalElencoTime team={timeSelecionado} onClose={() => setTimeSelecionado(null)} matches={matches} teams={teams} />
     </div>
   );
