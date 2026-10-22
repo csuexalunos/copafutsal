@@ -2755,6 +2755,7 @@ function MatchCardExpansivel({ match, teams, sessao, saveMatches, matches, confi
   const rotuloEvento = (tipo) =>
     ({ gol: "⚽ Gol", assistencia: "🅰️ Assistência", cartao_amarelo: "🟨 Amarelo", cartao_vermelho: "🟥 Vermelho" }[tipo] || tipo);
 
+  const suspensosJogo = calcularSuspensoes(matches || [], teams).porJogo[match.id] || [];
   const status = match.status || "agendado";
   const aoVivo = status === "ao_vivo";
   const rotuloStatus =
@@ -2815,6 +2816,11 @@ function MatchCardExpansivel({ match, teams, sessao, saveMatches, matches, confi
           {LOCAL_NOME}
           {dataTxt ? ` · ${dataTxt}` : ""}
         </div>
+        {suspensosJogo.length > 0 && (
+          <div className="rounded-lg px-3 py-2 mt-3 text-xs text-left" style={{ border: "1.5px solid #EF4444", color: "#FCA5A5", fontFamily: "'Inter', sans-serif" }}>
+            <strong>Observações:</strong> ⛔ {suspensosJogo.map((x) => `${x.jogador} (${x.timeNome}) suspenso — ${x.motivo}`).join(" · ")}
+          </div>
+        )}
       </button>
 
       {expanded && (
@@ -4701,7 +4707,7 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
           </div>
           {suspensosJogo && suspensosJogo.length > 0 && (
             <div className="rounded-lg px-3 py-2 mb-3 text-xs text-left" style={{ border: "1.5px solid #EF4444", color: "#FCA5A5", fontFamily: "'Inter', sans-serif" }}>
-              ⛔ <strong>Suspensos neste jogo:</strong> {suspensosJogo.map((x) => `${x.jogador} (${x.timeNome}) — ${x.motivo}`).join(" · ")}
+              <strong>Observações:</strong> ⛔ suspensos neste jogo — {suspensosJogo.map((x) => `${x.jogador} (${x.timeNome}) — ${x.motivo}`).join(" · ")}
             </div>
           )}
           <div className="flex items-start justify-between gap-1">
@@ -5731,6 +5737,13 @@ function sumulaHtml(match, teams, numeroJogo, mapasCpf, sus) {
       <div class="sp"></div>
       ${sumulaBlocoTime(timeA, nomeA, mc[match.timeA], (sus && sus.porJogo[match.id] || []).filter((x) => timeA && x.timeNome === timeA.nome), sus && sus.amarelosAntes[match.id])}
       ${sumulaBlocoTime(timeB, nomeB, mc[match.timeB], (sus && sus.porJogo[match.id] || []).filter((x) => timeB && x.timeNome === timeB.nome), sus && sus.amarelosAntes[match.id])}
+      <table style="margin-top:6px"><tr><td style="height:34px;vertical-align:top"><b>Observações:</b> ${
+        ((sus && sus.porJogo[match.id]) || []).length
+          ? `<span style="color:#b00020;font-weight:bold">${((sus && sus.porJogo[match.id]) || [])
+              .map((x) => `${escapeHtml(x.jogador)} (${escapeHtml(x.timeNome)}) SUSPENSO — ${escapeHtml(x.motivo)}`)
+              .join(" · ")}</span>`
+          : ""
+      }</td></tr></table>
     </div>`;
 }
 
