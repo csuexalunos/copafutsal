@@ -2730,6 +2730,7 @@ function MatchCard({ match, teamsById }) {
 // leitura, mas já mostra tudo em tempo real.
 function MatchCardExpansivel({ match, teams, sessao, saveMatches, matches, config }) {
   const [expanded, setExpanded] = useState(false);
+  const [timeModal, setTimeModal] = useState(null);
   const isAdmin = sessao && sessao.tipo === "admin";
   const timeA = teams.find((t) => t.id === match.timeA);
   const timeB = teams.find((t) => t.id === match.timeB);
@@ -2764,8 +2765,17 @@ function MatchCardExpansivel({ match, teams, sessao, saveMatches, matches, confi
   const dataTxt = dh
     ? `${diasLongos[dh.getDay()]}, ${String(dh.getDate()).padStart(2, "0")}/${String(dh.getMonth() + 1).padStart(2, "0")}/${dh.getFullYear()} · ${String(dh.getHours()).padStart(2, "0")}:${String(dh.getMinutes()).padStart(2, "0")}`
     : null;
-  const lado = (nome, escudo) => (
-    <div className="flex flex-col items-center gap-1.5 w-[84px] shrink-0">
+  const lado = (nome, escudo, time) => (
+    <div
+      role="button"
+      tabIndex={0}
+      className="flex flex-col items-center gap-1.5 w-[84px] shrink-0 cursor-pointer"
+      onClick={(e) => {
+        if (!time) return;
+        e.stopPropagation();
+        setTimeModal(time);
+      }}
+    >
       {escudo ? (
         <img src={escudo} alt="" className="w-14 h-14 object-contain" />
       ) : (
@@ -2786,7 +2796,7 @@ function MatchCardExpansivel({ match, teams, sessao, saveMatches, matches, confi
           {match.horario ? `${String(new Date(match.horario).getHours()).padStart(2, "0")}:${String(new Date(match.horario).getMinutes()).padStart(2, "0")} · ` : ""}{match.fase || "Fase"}
         </div>
         <div className="flex items-start justify-between gap-1">
-          {lado(nomeA, escudoA)}
+          {lado(nomeA, escudoA, timeA)}
           <div className="flex flex-col items-center gap-2 pt-1 min-w-0 flex-1">
             <span
               className="text-[10px] font-bold tracking-wider px-3 py-1 rounded-full"
@@ -2799,7 +2809,7 @@ function MatchCardExpansivel({ match, teams, sessao, saveMatches, matches, confi
             </span>
             {status !== "agendado" && status !== "encerrado" && <MatchClock match={match} />}
           </div>
-          {lado(nomeB, escudoB)}
+          {lado(nomeB, escudoB, timeB)}
         </div>
         <div className="text-[11px] mt-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
           {LOCAL_NOME}
@@ -2845,6 +2855,7 @@ function MatchCardExpansivel({ match, teams, sessao, saveMatches, matches, confi
           </div>
         </div>
       )}
+      <ModalElencoTime team={timeModal} onClose={() => setTimeModal(null)} />
     </div>
   );
 }
@@ -3975,6 +3986,7 @@ function calcularSuspensos(matches) {
 function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, podeDescer, souSuperAdmin, cartao }) {
   const [expanded, setExpanded] = useState(false);
   const [eventForm, setEventForm] = useState({ tipo: "gol", jogador: "", timeId: "" });
+  const [timeModal, setTimeModal] = useState(null);
 
   const teamName = (id) => teams.find((t) => t.id === id)?.nome || "?";
 
@@ -4034,7 +4046,16 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
     const nome = t?.nome || "?";
     const escudo = ESCUDOS_TIMES[nome] || (t && t.escudoUrl);
     return (
-      <div className="flex flex-col items-center gap-1.5 w-[84px] shrink-0">
+      <div
+        role="button"
+        tabIndex={0}
+        className="flex flex-col items-center gap-1.5 w-[84px] shrink-0 cursor-pointer"
+        onClick={(e) => {
+          if (!t) return;
+          e.stopPropagation();
+          setTimeModal(t);
+        }}
+      >
         {escudo ? (
           <img src={escudo} alt="" className="w-14 h-14 object-contain" />
         ) : (
@@ -4330,6 +4351,7 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
           )}
         </div>
       )}
+      <ModalElencoTime team={timeModal} onClose={() => setTimeModal(null)} />
     </div>
   );
 }
