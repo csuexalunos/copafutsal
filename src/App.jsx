@@ -2746,7 +2746,7 @@ function MatchCardExpansivel({ match, teams, sessao, saveMatches, matches, confi
     };
     return (
       <div className="w-full">
-        <MatchAdminRow match={match} teams={teams} onUpdate={onUpdate} />
+        <MatchAdminRow match={match} teams={teams} onUpdate={onUpdate} cartao />
       </div>
     );
   }
@@ -4015,7 +4015,7 @@ function calcularSuspensos(matches) {
     .filter((t) => t.motivos.length > 0);
 }
 
-function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, podeDescer, souSuperAdmin }) {
+function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, podeDescer, souSuperAdmin, cartao }) {
   const [expanded, setExpanded] = useState(false);
   const [eventForm, setEventForm] = useState({ tipo: "gol", jogador: "", timeId: "" });
 
@@ -4063,9 +4063,64 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
     await onUpdate({ ...match, eventos: (match.eventos || []).filter((ev) => ev.id !== id) });
   };
 
+  const inputGol = (campo) => (
+    <input
+      type="number"
+      value={match[campo] ?? ""}
+      onChange={(e) => patch({ [campo]: e.target.value === "" ? null : Number(e.target.value) })}
+      className="w-12 px-1 py-1.5 rounded-lg text-center text-lg font-bold"
+      style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'JetBrains Mono', monospace" }}
+    />
+  );
+  const ladoCartao = (id) => {
+    const t = teams.find((x) => x.id === id);
+    const nome = t?.nome || "?";
+    const escudo = ESCUDOS_TIMES[nome] || (t && t.escudoUrl);
+    return (
+      <div className="flex flex-col items-center gap-1.5 w-[84px] shrink-0">
+        {escudo ? (
+          <img src={escudo} alt="" className="w-14 h-14 object-contain" />
+        ) : (
+          <div className="w-14 h-14 rounded-full flex items-center justify-center text-sm font-bold" style={{ backgroundColor: COLORS.border, color: COLORS.slate }}>
+            {nome.slice(0, 4)}
+          </div>
+        )}
+        <span className="text-[11px] font-semibold text-center leading-tight break-words" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+          {nome}
+        </span>
+      </div>
+    );
+  };
+
   return (
-    <div className="rounded-lg overflow-hidden" style={{ backgroundColor: COLORS.zebra }}>
-      <div className="flex items-center gap-2 text-sm px-3 py-2">
+    <div
+      className={cartao ? "rounded-2xl overflow-hidden mt-4" : "rounded-lg overflow-hidden"}
+      style={cartao ? { backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` } : { backgroundColor: COLORS.zebra }}
+    >
+      {cartao && (
+        <div role="button" onClick={() => setExpanded((v) => !v)} className="w-full text-center px-3 pt-4 pb-4">
+          <div className="text-[11px] font-bold uppercase tracking-widest mb-3" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
+            {match.fase || "Fase"}
+          </div>
+          <div className="flex items-start justify-between gap-1">
+            {ladoCartao(match.timeA)}
+            <div className="flex flex-col items-center gap-2 pt-1 flex-1 min-w-0" onClick={(e) => e.stopPropagation()}>
+              <MatchClock match={match} />
+              <div className="flex items-center gap-2">
+                {inputGol("golsA")}
+                <span style={{ color: COLORS.slate }}>:</span>
+                {inputGol("golsB")}
+              </div>
+            </div>
+            {ladoCartao(match.timeB)}
+          </div>
+          <div className="text-[11px] mt-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            {LOCAL_NOME}
+            {match.horario ? ` · ${formatarHorarioJogo(match.horario)}` : ""} · toque para eventos
+          </div>
+        </div>
+      )}
+      <div className={cartao ? "hidden" : "flex items-center gap-2 text-sm px-3 py-2"}>
         {onMover && (
           <div className="flex flex-col shrink-0 -my-1">
             <button
