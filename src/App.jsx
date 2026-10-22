@@ -43,7 +43,7 @@ import {
   readKey, writeKey, cadastrarConta, entrarConta, sairConta, sessaoAtual, aoMudarSessao,
   criarPerfil, buscarPerfil, listarPerfis, atualizarPerfil, souAdmin, listarAdmins,
   promoverParaAdmin, removerAdmin, subirArquivo, urlAssinada, contarPessoasInscritas, buscarCpfsDaTurma,
-  registrarAcesso, contarAcessos, registrarEvento, buscarMetricasDetalhadas, esqueciSenha, definirNovaSenha, supabase,
+  registrarAcesso, contarAcessos, registrarEvento as registrarEventoBruto, buscarMetricasDetalhadas, esqueciSenha, definirNovaSenha, supabase,
   buscarCpfsDoTime, salvarCpfJogador, salvarCpfsEmLote, excluirCpfsDoJogador,
 } from "./lib/supabase.js";
 
@@ -67,6 +67,14 @@ const PIX_CHAVE_TEXTO = "12.516.746/0001-31 (CNPJ do Colégio Santa Úrsula)";
 // Redesign limpo e moderno: navy como base, laranja como único acento vivo,
 // muito branco, cartões com sombra suave em vez de blocos de cor pesados.
 // ---------------------------------------------------------------------------
+
+// Métricas: cliques de organizadores (e deste aparelho, se marcado) não contam.
+let ignorarMetricas = false;
+try { ignorarMetricas = localStorage.getItem("copasu:ignorar_metricas") === "1"; } catch (e) { /* sem storage */ }
+function registrarEvento(tipo, detalhe) {
+  if (ignorarMetricas) return Promise.resolve();
+  return registrarEventoBruto(tipo, detalhe);
+}
 
 const COLORS = {
   bg: "#0B0F1C", // fundo escuro — usado em toda a interface
@@ -1054,6 +1062,9 @@ function EmptyState({ children }) {
 // apelido e posição — nunca CPF nem outros dados sensíveis.
 // ---------------------------------------------------------------------------
 function ModalElencoTime({ team, onClose, matches, teams }) {
+  useEffect(() => {
+    if (team?.nome) registrarEvento("clique_time", team.nome).catch(() => {});
+  }, [team?.id]);
   if (!team) return null;
   return <ModalTimeConteudo team={team} onClose={onClose} matches={matches} teams={teams} />;
 }
@@ -12912,6 +12923,13 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
               vazio="Ainda sem visitas registradas."
             />
             <RankingMetricas
+              titulo="Times mais clicados"
+              icone={Users}
+              itens={metricas?.times}
+              rotular={(chave) => chave}
+              vazio="Ainda sem cliques em times (rode o SQL novo no Supabase)."
+            />
+            <RankingMetricas
               titulo="Links mais clicados"
               icone={ArrowRight}
               itens={metricas?.cliques}
@@ -12980,6 +12998,12 @@ const TABS = [
 export default function App() {
   const [tab, setTab] = useState("inicio");
   const [sessao, setSessao] = useState(null);
+  useEffect(() => {
+    if (sessao?.tipo === "admin") {
+      ignorarMetricas = true;
+      try { localStorage.setItem("copasu:ignorar_metricas", "1"); } catch (e) { /* ok */ }
+    }
+  }, [sessao]);
   const [checandoSessao, setCheckandoSessao] = useState(true);
   const [emRecuperacaoSenha, setEmRecuperacaoSenha] = useState(false);
   const [teamsBanco, saveTeams, loadingTeams] = useSharedStorage("copasu:teams", [], 7000);
