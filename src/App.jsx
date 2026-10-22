@@ -4089,8 +4089,7 @@ function Comunidade({ posts, savePosts, sessao }) {
     <div>
       <SectionLabel eyebrow="Comunidade" title="Fotos e vídeos" />
       <p className="text-sm mb-5 max-w-xl" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-        Os melhores momentos da Copa, enviados por quem está no app. Toque numa foto para ampliar, curtir e comentar.
-        As publicações são livres e sempre mostram o nome de quem enviou.
+        A Copa pelos olhos de quem estava lá. Envie suas fotos e vídeos, e curta e comente os da galera.
       </p>
 
       <div className="flex items-center gap-3 mb-3 flex-wrap">
