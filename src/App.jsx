@@ -1829,6 +1829,7 @@ function RosterEditor({ team, onSave, autenticado = true }) {
   const [jogadores, setJogadores] = useState(team.jogadores || []);
   const [saved, setSaved] = useState(false);
   const [avisoCpf, setAvisoCpf] = useState("");
+  const [mostrarForm, setMostrarForm] = useState(false);
 
   useEffect(() => {
     if (!autenticado) return;
@@ -1884,21 +1885,49 @@ function RosterEditor({ team, onSave, autenticado = true }) {
     setTimeout(() => setSaved(false), 2000);
   };
 
+  const qtd = jogadores.length;
+  const qtdOk = qtd >= MIN_JOGADORES_TIME && qtd <= MAX_JOGADORES_TIME;
   return (
     <div>
-      <div
-        className="text-xs font-semibold uppercase tracking-wide mb-2"
-        style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
-      >
-        Adicionar jogador — todos os campos são obrigatórios
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <div className="text-sm font-bold" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>
+          Elenco · {qtd} jogador{qtd === 1 ? "" : "es"}
+        </div>
+        <span
+          className="text-[11px] font-semibold px-2.5 py-1 rounded-full"
+          style={{
+            backgroundColor: qtdOk ? "rgba(34,197,94,0.15)" : COLORS.accentSoft,
+            color: qtdOk ? "#4ADE80" : COLORS.accent,
+            fontFamily: "'Inter', sans-serif",
+          }}
+        >
+          {qtdOk ? "Dentro do limite" : `Precisa de ${MIN_JOGADORES_TIME} a ${MAX_JOGADORES_TIME}`}
+        </span>
       </div>
-      <AddPlayerForm onAdd={addJogador} turma={team.nome} />
 
-      <div className="space-y-1.5 max-h-96 overflow-y-auto mb-3">
+      <div className="space-y-2.5 mb-5">
+        {jogadores.length === 0 && (
+          <p className="text-sm py-4 text-center" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Nenhum jogador ainda. Toque em "Adicionar jogador".
+          </p>
+        )}
         {jogadores.map((j) => (
           <PlayerRow key={j.id} player={j} onChange={updateJogador} onRemove={() => removeJogador(j.id)} turmaTime={team.nome} />
         ))}
       </div>
+
+      {mostrarForm ? (
+        <AddPlayerForm onAdd={addJogador} turma={team.nome} onCancel={() => setMostrarForm(false)} />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setMostrarForm(true)}
+          className="w-full mb-5 px-4 py-3 rounded-xl text-sm font-semibold"
+          style={{ border: `1.5px dashed ${COLORS.accent}`, color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}
+        >
+          + Adicionar jogador
+        </button>
+      )}
 
       {jogadores.length > 0 && (jogadores.length < MIN_JOGADORES_TIME || jogadores.length > MAX_JOGADORES_TIME) && (
         <div
@@ -2094,7 +2123,7 @@ async function buscarCpfDoJogadorConhecido(c) {
   }
 }
 
-function AddPlayerForm({ onAdd, turma }) {
+function AddPlayerForm({ onAdd, turma, onCancel }) {
   const vazio = {
     nome: "",
     apelido: "",
@@ -2161,6 +2190,7 @@ function AddPlayerForm({ onAdd, turma }) {
     setErro("");
     onAdd({ id: `j_${Date.now()}`, ...novo });
     setNovo(vazio);
+    if (onCancel) onCancel();
   };
 
   const campos = [
@@ -2180,10 +2210,20 @@ function AddPlayerForm({ onAdd, turma }) {
   ];
 
   return (
-    <div className="rounded-xl p-3 mb-3" style={{ backgroundColor: COLORS.card, border: `1.5px solid ${COLORS.border}` }}>
-      <div className="space-y-3">
+    <div className="rounded-2xl p-4 mb-5" style={{ backgroundColor: COLORS.zebra, border: `1.5px solid ${COLORS.accent}` }}>
+      <div className="flex items-center justify-between mb-4">
+        <span className="text-sm font-bold" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>
+          Novo jogador
+        </span>
+        {onCancel && (
+          <button type="button" onClick={onCancel} className="text-xs font-semibold" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Cancelar
+          </button>
+        )}
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
         {campos.map((f) => (
-          <div key={f.key}>
+          <div key={f.key} className={f.key === "nome" ? "sm:col-span-2" : ""}>
             <label
               className="block text-xs font-semibold uppercase tracking-wide mb-1"
               style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
@@ -2194,7 +2234,7 @@ function AddPlayerForm({ onAdd, turma }) {
               <select
                 value={novo[f.key]}
                 onChange={(e) => campo(f.key, e.target.value)}
-                className="w-full px-2.5 py-2 rounded-lg text-sm"
+                className="w-full px-3 py-2.5 rounded-lg text-sm"
                 style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
               >
                 <option value="">Selecione</option>
@@ -2212,7 +2252,7 @@ function AddPlayerForm({ onAdd, turma }) {
                 onChange={(e) => campo(f.key, e.target.value)}
                 onFocus={() => setCampoAtivo(f.key)}
                 autoComplete="off"
-                className="w-full px-2.5 py-2 rounded-lg text-sm"
+                className="w-full px-3 py-2.5 rounded-lg text-sm"
                 style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
               />
             )}
@@ -2253,7 +2293,7 @@ function AddPlayerForm({ onAdd, turma }) {
       <button
         type="button"
         onClick={adicionar}
-        className="mt-3 px-4 py-2 rounded-lg text-sm font-semibold"
+        className="mt-5 w-full px-4 py-3 rounded-xl text-sm font-semibold"
         style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
       >
         Adicionar jogador
