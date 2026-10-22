@@ -1037,26 +1037,98 @@ function EmptyState({ children }) {
 // time (na Classificação ou no Sorteio), a lista de jogadores. Só número,
 // apelido e posição — nunca CPF nem outros dados sensíveis.
 // ---------------------------------------------------------------------------
-function ModalElencoTime({ team, onClose }) {
+function ModalElencoTime({ team, onClose, matches, teams }) {
   if (!team) return null;
+  return <ModalTimeConteudo team={team} onClose={onClose} matches={matches} teams={teams} />;
+}
+
+function ModalTimeConteudo({ team, onClose, matches, teams }) {
+  const [aba, setAba] = useState("elenco");
   const jogadores = Array.isArray(team.jogadores) ? team.jogadores : [];
+  const temJogos = Array.isArray(matches) && Array.isArray(teams);
+  const sus = useMemo(() => (temJogos ? calcularSuspensoes(matches, teams) : null), [matches, teams, temJogos]);
+
+  // estatísticas do time, a partir dos eventos lançados nos jogos
+  const stats = useMemo(() => {
+    const mapa = {};
+    if (temJogos) {
+      matches.forEach((m) => {
+        (m.eventos || []).forEach((ev) => {
+          if (ev.timeNome !== team.nome) return;
+          const k = normalizarTexto(ev.jogador || "");
+          if (!mapa[k]) mapa[k] = { jogador: ev.jogador, gol: 0, assistencia: 0, cartao_amarelo: 0, cartao_vermelho: 0 };
+          if (mapa[k][ev.tipo] != null) mapa[k][ev.tipo] += 1;
+        });
+      });
+    }
+    return Object.values(mapa);
+  }, [matches, temJogos, team.nome]);
+  const suspensoAgora = (nome) =>
+    !!sus &&
+    (sus.pendentes.some((x) => x.timeNome === team.nome && nomesBatem(x.jogador, nome)) ||
+      (matches || []).some(
+        (m) => m.status !== "encerrado" && (sus.porJogo[m.id] || []).some((x) => x.timeNome === team.nome && nomesBatem(x.jogador, nome))
+      ));
+
+  const jogosDoTime = useMemo(() => {
+    if (!temJogos) return [];
+    return ordemCronologica(matches.filter((m) => m.timeA === team.id || m.timeB === team.id));
+  }, [matches, temJogos, team.id]);
+
+  const th = { color: COLORS.slate, fontFamily: "'Inter', sans-serif" };
+  const lista = (titulo, itens, fmt) => (
+    <div className="mb-4">
+      <div className="text-[11px] font-bold uppercase tracking-widest mb-1.5" style={th}>
+        {titulo}
+      </div>
+      {itens.length === 0 ? (
+        <p className="text-xs" style={th}>
+          Ninguém ainda.
+        </p>
+      ) : (
+        <ul className="space-y-1">
+          {itens.map((p) => (
+            <li
+              key={p.jogador}
+              className="flex items-center justify-between text-sm px-2.5 py-1.5 rounded-lg"
+              style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+            >
+              <span className="truncate">
+                {p.jogador}
+                {suspensoAgora(p.jogador) && titulo === "Cartões" && (
+                  <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: "#EF4444", color: "#fff" }}>
+                    SUSPENSO
+                  </span>
+                )}
+              </span>
+              <span className="font-bold shrink-0 ml-2" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                {fmt(p)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+
+  const abas = [
+    { id: "elenco", label: "Elenco" },
+    ...(temJogos ? [{ id: "destaques", label: "Destaques" }, { id: "jogos", label: "Jogos" }] : []),
+  ];
+
+  const nomeDe = (id) => teams?.find((t) => t.id === id)?.nome || "?";
+
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ backgroundColor: "rgba(0,0,0,0.6)" }}
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: "rgba(0,0,0,0.6)" }} onClick={onClose}>
       <div
-        className="w-full max-w-md rounded-2xl p-5 max-h-[80vh] overflow-y-auto"
+        className="w-full max-w-md rounded-2xl p-5 max-h-[85vh] overflow-y-auto"
         style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            {ESCUDOS_TIMES[team.nome] && (
-              <img src={ESCUDOS_TIMES[team.nome]} alt="" className="w-7 h-7 object-contain shrink-0" />
-            )}
-            <h3 className="font-bold text-base" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+            {ESCUDOS_TIMES[team.nome] && <img src={ESCUDOS_TIMES[team.nome]} alt="" className="w-9 h-9 object-contain shrink-0" />}
+            <h3 className="font-bold text-lg" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
               {team.nome}
             </h3>
           </div>
@@ -1064,36 +1136,146 @@ function ModalElencoTime({ team, onClose }) {
             <X size={18} color={COLORS.slate} />
           </button>
         </div>
-        {jogadores.length === 0 ? (
-          <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-            Elenco ainda não cadastrado.
-          </p>
-        ) : (
-          <table className="w-full text-sm" style={{ fontFamily: "'Inter', sans-serif" }}>
-            <thead>
-              <tr style={{ color: COLORS.slate }}>
-                <th className="text-left py-1.5 pr-3 text-xs uppercase tracking-wide">Nº</th>
-                <th className="text-left py-1.5 pr-3 text-xs uppercase tracking-wide">Apelido</th>
-                <th className="text-left py-1.5 text-xs uppercase tracking-wide">Posição</th>
-              </tr>
-            </thead>
-            <tbody>
-              {jogadores.map((j) => (
-                <tr key={j.id} style={{ borderTop: `1px solid ${COLORS.border}` }}>
-                  <td className="py-1.5 pr-3" style={{ color: COLORS.ink, fontFamily: "'JetBrains Mono', monospace" }}>
-                    {j.numero || "—"}
-                  </td>
-                  <td className="py-1.5 pr-3" style={{ color: COLORS.ink }}>
-                    {j.apelido || "—"}
-                  </td>
-                  <td className="py-1.5" style={{ color: COLORS.ink }}>
-                    {j.posicao || "—"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+
+        {abas.length > 1 && (
+          <div className="flex gap-2 mb-4">
+            {abas.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                onClick={() => setAba(a.id)}
+                className="px-3 py-1.5 rounded-full text-xs font-semibold"
+                style={{
+                  backgroundColor: aba === a.id ? COLORS.accent : "transparent",
+                  color: aba === a.id ? "#0B1220" : COLORS.slate,
+                  border: `1px solid ${aba === a.id ? COLORS.accent : COLORS.border}`,
+                  fontFamily: "'Inter', sans-serif",
+                }}
+              >
+                {a.label}
+              </button>
+            ))}
+          </div>
         )}
+
+        {aba === "elenco" &&
+          (jogadores.length === 0 ? (
+            <p className="text-sm" style={th}>
+              Elenco ainda não cadastrado.
+            </p>
+          ) : (
+            <table className="w-full text-sm" style={{ fontFamily: "'Inter', sans-serif" }}>
+              <thead>
+                <tr style={{ color: COLORS.slate }}>
+                  <th className="text-left py-1.5 pr-3 text-xs uppercase tracking-wide">Nº</th>
+                  <th className="text-left py-1.5 pr-3 text-xs uppercase tracking-wide">Apelido</th>
+                  <th className="text-left py-1.5 text-xs uppercase tracking-wide">Posição</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...jogadores]
+                  .sort((a, b) => (Number(a.numero) || 999) - (Number(b.numero) || 999))
+                  .map((j) => (
+                    <tr key={j.id} style={{ borderTop: `1px solid ${COLORS.border}` }}>
+                      <td className="py-1.5 pr-3" style={{ color: COLORS.ink, fontFamily: "'JetBrains Mono', monospace" }}>
+                        {j.numero || "—"}
+                      </td>
+                      <td className="py-1.5 pr-3" style={{ color: COLORS.ink }}>
+                        {j.apelido || j.nome || "—"}
+                        {temJogos && (suspensoAgora(j.apelido) || suspensoAgora(j.nome)) && (
+                          <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: "#EF4444", color: "#fff" }}>
+                            SUSPENSO
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-1.5" style={{ color: COLORS.ink }}>
+                        {j.posicao || "—"}
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          ))}
+
+        {aba === "destaques" && (
+          <>
+            {lista(
+              "Artilheiros",
+              stats.filter((p) => p.gol > 0).sort((a, b) => b.gol - a.gol),
+              (p) => `${p.gol} ⚽`
+            )}
+            {lista(
+              "Assistências",
+              stats.filter((p) => p.assistencia > 0).sort((a, b) => b.assistencia - a.assistencia),
+              (p) => `${p.assistencia} 🅰️`
+            )}
+            {lista(
+              "Cartões",
+              stats
+                .filter((p) => p.cartao_amarelo + p.cartao_vermelho > 0)
+                .sort((a, b) => b.cartao_vermelho - a.cartao_vermelho || b.cartao_amarelo - a.cartao_amarelo),
+              (p) => `🟨 ${p.cartao_amarelo}  🟥 ${p.cartao_vermelho}`
+            )}
+          </>
+        )}
+
+        {aba === "jogos" &&
+          (jogosDoTime.length === 0 ? (
+            <p className="text-sm" style={th}>
+              Ainda não há jogos definidos.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {jogosDoTime.map((m) => {
+                const casa = m.timeA === team.id;
+                const advId = casa ? m.timeB : m.timeA;
+                const adv = nomeDe(advId);
+                const gp = casa ? m.golsA : m.golsB;
+                const gc = casa ? m.golsB : m.golsA;
+                const temPlacar = m.golsA != null && m.golsA !== "" && m.golsB != null && m.golsB !== "";
+                const fim = m.status === "encerrado";
+                const aoVivo = m.status === "ao_vivo" || m.status === "intervalo";
+                const resultado = fim && temPlacar ? (Number(gp) > Number(gc) ? "V" : Number(gp) < Number(gc) ? "D" : "E") : null;
+                const cor = resultado === "V" ? "#22C55E" : resultado === "D" ? "#EF4444" : COLORS.slate;
+                const escudoAdv = ESCUDOS_TIMES[adv];
+                return (
+                  <li key={m.id} className="rounded-xl px-3 py-2.5" style={{ backgroundColor: COLORS.zebra, fontFamily: "'Inter', sans-serif" }}>
+                    <div className="text-[11px] mb-1" style={{ color: COLORS.slate }}>
+                      {(m.fase || "").startsWith("Grupo") ? `${m.rodada || 1}ª rodada · ${m.fase}` : m.fase}
+                      {m.horario ? ` · ${formatarHorarioJogo(m.horario)}` : ""}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {escudoAdv ? <img src={escudoAdv} alt="" className="w-7 h-7 object-contain shrink-0" /> : <span className="w-7 shrink-0" />}
+                      <span className="flex-1 min-w-0 text-sm font-semibold truncate" style={{ color: COLORS.ink }}>
+                        x {adv}
+                      </span>
+                      {(fim || aoVivo) && temPlacar ? (
+                        <span className="flex items-center gap-2 shrink-0">
+                          <span className="text-sm font-bold" style={{ color: COLORS.ink, fontFamily: "'JetBrains Mono', monospace" }}>
+                            {gp} x {gc}
+                          </span>
+                          {resultado && (
+                            <span className="text-[11px] font-bold w-5 h-5 rounded-full flex items-center justify-center" style={{ backgroundColor: cor, color: "#0B1220" }}>
+                              {resultado}
+                            </span>
+                          )}
+                          {aoVivo && (
+                            <span className="text-[10px] font-bold" style={{ color: "#22C55E" }}>
+                              AO VIVO
+                            </span>
+                          )}
+                        </span>
+                      ) : (
+                        <span className="text-xs shrink-0" style={{ color: COLORS.slate }}>
+                          {m.horario ? formatarHorarioJogo(m.horario).split(" · ")[1] : "a definir"}
+                        </span>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          ))}
       </div>
     </div>
   );
@@ -2861,7 +3043,7 @@ function MatchCardExpansivel({ match, teams, sessao, saveMatches, matches, confi
           </div>
         </div>
       )}
-      <ModalElencoTime team={timeModal} onClose={() => setTimeModal(null)} />
+      <ModalElencoTime team={timeModal} onClose={() => setTimeModal(null)} matches={matches} teams={teams} />
     </div>
   );
 }
@@ -3086,7 +3268,7 @@ function Chaveamento({ matches, teams, sessao, saveMatches, config }) {
 // ---------------------------------------------------------------------------
 // TAB: Classificação
 // ---------------------------------------------------------------------------
-function TabelaClassificacao({ titulo, linhas, destaqueTop, teams }) {
+function TabelaClassificacao({ titulo, linhas, destaqueTop, teams, matches }) {
   const [timeSelecionado, setTimeSelecionado] = useState(null);
   const cols = ["Time", "J", "V", "E", "D", "GP", "GC", "SG", "Pts"];
   return (
@@ -3154,7 +3336,7 @@ function TabelaClassificacao({ titulo, linhas, destaqueTop, teams }) {
           </tbody>
         </table>
       </div>
-      <ModalElencoTime team={timeSelecionado} onClose={() => setTimeSelecionado(null)} />
+      <ModalElencoTime team={timeSelecionado} onClose={() => setTimeSelecionado(null)} matches={matches} teams={teams} />
     </div>
   );
 }
@@ -3315,7 +3497,7 @@ function ClassificacaoTabela({ matches, teams }) {
       {teams.length === 0 ? (
         <EmptyState>Ainda não há times inscritos.</EmptyState>
       ) : !temGrupos ? (
-        <TabelaClassificacao linhas={geral} teams={teams} />
+        <TabelaClassificacao linhas={geral} teams={teams} matches={matches} />
       ) : (
         <>
           <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
@@ -3334,7 +3516,7 @@ function ClassificacaoTabela({ matches, teams }) {
           </div>
 
           {modo === "geral" ? (
-            <TabelaClassificacao titulo="Classificação geral" linhas={geral} destaqueTop={8} teams={teams} />
+            <TabelaClassificacao titulo="Classificação geral" linhas={geral} destaqueTop={8} teams={teams} matches={matches} />
           ) : (
             gruposNomes.map((fase) => (
               <TabelaClassificacao
@@ -3342,6 +3524,7 @@ function ClassificacaoTabela({ matches, teams }) {
                 titulo={fase}
                 destaqueTop={2}
                 teams={teams}
+                matches={matches}
                 linhas={pontosPartida(matches.filter((m) => m.fase === fase), teams).filter((t) =>
                   matches.some((m) => m.fase === fase && (m.timeA === t.id || m.timeB === t.id))
                 )}
