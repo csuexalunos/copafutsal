@@ -2734,13 +2734,13 @@ function MatchCardExpansivel({ match, teams, sessao, saveMatches, matches, confi
   const isAdmin = sessao && sessao.tipo === "admin";
   const timeA = teams.find((t) => t.id === match.timeA);
   const timeB = teams.find((t) => t.id === match.timeB);
-  const nomeA = timeA?.nome || match.timeA || "A definir";
-  const nomeB = timeB?.nome || match.timeB || "A definir";
-  const escudoA = ESCUDOS_TIMES[nomeA] || (timeA && timeA.escudoUrl);
-  const escudoB = ESCUDOS_TIMES[nomeB] || (timeB && timeB.escudoUrl);
+  const nomeA = timeA?.nome || match.rotA || match.timeA || "A definir";
+  const nomeB = timeB?.nome || match.rotB || match.timeB || "A definir";
+  const escudoA = timeA ? ESCUDOS_TIMES[nomeA] || timeA.escudoUrl : null;
+  const escudoB = timeB ? ESCUDOS_TIMES[nomeB] || timeB.escudoUrl : null;
   const played = match.golsA !== "" && match.golsB !== "" && match.golsA != null && match.golsB != null;
 
-  if (isAdmin && saveMatches) {
+  if (isAdmin && saveMatches && !match.virtual) {
     const onUpdate = async (updated) => {
       const atualizado = matches.map((m) => (m.id === updated.id ? updated : m));
       await saveMatches(gerarMataMataAutomatico(atualizado, teams, horariosDoConfig(config)));
@@ -2758,7 +2758,7 @@ function MatchCardExpansivel({ match, teams, sessao, saveMatches, matches, confi
   const status = match.status || "agendado";
   const aoVivo = status === "ao_vivo";
   const rotuloStatus =
-    status === "encerrado" ? "ENCERRADO" : status === "intervalo" ? "INTERVALO" : aoVivo ? "AO VIVO" : "AGENDADO";
+    match.virtual ? (timeA && timeB ? "PROVISÓRIO" : "A DEFINIR") : status === "encerrado" ? "ENCERRADO" : status === "intervalo" ? "INTERVALO" : aoVivo ? "AO VIVO" : "AGENDADO";
   const corStatus = aoVivo ? "#22C55E" : status === "intervalo" ? COLORS.accent : COLORS.slate;
   const dh = match.horario ? new Date(match.horario) : null;
   const diasLongos = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
@@ -2791,7 +2791,7 @@ function MatchCardExpansivel({ match, teams, sessao, saveMatches, matches, confi
 
   return (
     <div className="w-full rounded-2xl overflow-hidden mt-4" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
-      <button type="button" onClick={() => setExpanded((v) => !v)} className="w-full text-center px-2 pt-4 pb-3">
+      <button type="button" onClick={() => !match.virtual && setExpanded((v) => !v)} className="w-full text-center px-2 pt-4 pb-3">
         <div className="text-[11px] font-bold uppercase tracking-widest mb-3" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
           {match.horario ? `${String(new Date(match.horario).getHours()).padStart(2, "0")}:${String(new Date(match.horario).getMinutes()).padStart(2, "0")} · ` : ""}{match.fase || "Fase"}
         </div>
@@ -2953,9 +2953,43 @@ function Chaveamento({ matches, teams, sessao, saveMatches, config }) {
 
   const [diaSel, setDiaSel] = useState(null);
   const chaveDia = (m) => (m.horario ? new Date(m.horario).toDateString() : "sem");
+  const virtuais = useMemo(() => {
+    const h = horariosDoConfig(config);
+    const temFase = (f) => matches.some((m) => m.fase === f);
+    const jogosGrupo = matches.filter((m) => (m.fase || "").startsWith("Grupo"));
+    if (jogosGrupo.length === 0) return [];
+    const jogou = (m) => m.golsA != null && m.golsA !== "" && m.golsB != null && m.golsB !== "";
+    const ultima = Math.max(...jogosGrupo.map((m) => m.rodada || 1));
+    const comecou = jogosGrupo.filter((m) => (m.rodada || 1) === ultima).some(jogou);
+    let geral = [];
+    if (comecou) {
+      try {
+        geral = calcularClassificacaoGeral(matches, teams).slice(0, 8);
+      } catch (e) {
+        geral = [];
+      }
+    }
+    const slot = (i) => new Date(h.inicioDomingo.getTime() + i * DURACAO_SLOT_MIN * 60000).toISOString();
+    const out = [];
+    const mk = (id, fase, i, rotA, rotB, tA, tB) =>
+      out.push({ id, fase, horario: slot(i), timeA: tA || null, timeB: tB || null, rotA, rotB, virtual: true, status: "agendado", golsA: null, golsB: null, rodada: 1 });
+    const realQ = matches.filter((m) => m.fase === "Quartas");
+    if (!temFase("Quartas")) {
+      [[0, 7], [3, 4], [1, 6], [2, 5]].forEach(([a, b], i) =>
+        mk(`virt_q${i}`, "Quartas", i, `${a + 1}º geral`, `${b + 1}º geral`, geral[a]?.id, geral[b]?.id)
+      );
+    }
+    if (!temFase("Semifinal")) {
+      mk("virt_s0", "Semifinal", 4, "Venc. Quartas 1", "Venc. Quartas 2");
+      mk("virt_s1", "Semifinal", 5, "Venc. Quartas 3", "Venc. Quartas 4");
+    }
+    if (!temFase("3º Lugar")) mk("virt_3", "3º Lugar", 6, "Perd. Semi 1", "Perd. Semi 2");
+    if (!temFase("Final")) mk("virt_f", "Final", 7, "Venc. Semi 1", "Venc. Semi 2");
+    return realQ.length ? out : out;
+  }, [matches, teams, config]);
   const jogosOrdenados = useMemo(
-    () => [...matches].sort((x, y) => String(x.horario || "").localeCompare(String(y.horario || ""))),
-    [matches]
+    () => [...matches, ...virtuais].sort((x, y) => String(x.horario || "").localeCompare(String(y.horario || ""))),
+    [matches, virtuais]
   );
   const dias = useMemo(() => {
     const vistos = [];
