@@ -2818,7 +2818,7 @@ function MatchCardExpansivel({ match, teams, sessao, saveMatches, matches, confi
         </div>
         {suspensosJogo.length > 0 && (
           <div className="rounded-lg px-3 py-2 mt-3 text-xs text-left" style={{ border: "1.5px solid #EF4444", color: "#FCA5A5", fontFamily: "'Inter', sans-serif" }}>
-            <strong>Observações:</strong> ⛔ {suspensosJogo.map((x) => `${x.jogador} (${x.timeNome}) suspenso — ${x.motivo}`).join(" · ")}
+            <strong>Observações:</strong> ⛔ {suspensosJogo.map((x) => `${x.jogador} (${x.timeNome}) suspenso — ${x.motivo}${x.cumprida ? " ✓ cumprida" : ""}`).join(" · ")}
           </div>
         )}
       </button>
@@ -4239,11 +4239,23 @@ function calcularSuspensoes(matches, teams) {
     });
 
     porJogo[m.id] = [];
-    Object.values(st).forEach((p) => {
+    Object.entries(st).forEach(([k, p]) => {
       if (p.devidos > 0 && nomes.includes(p.timeNome)) {
-        porJogo[m.id].push({ jogador: p.jogador, timeNome: p.timeNome, motivo: p.motivos[0] || "suspensão automática" });
-        p.devidos -= 1;
-        p.motivos.shift();
+        // "Não cumpriu": a organização marcou que o jogador não cumpriu neste jogo
+        // (ex.: W.O.), então a suspensão passa pro jogo seguinte do time.
+        const naoCumpriu = (m.suspensoesNaoCumpridas || []).includes(k);
+        porJogo[m.id].push({
+          jogador: p.jogador,
+          timeNome: p.timeNome,
+          motivo: p.motivos[0] || "suspensão automática",
+          chave: k,
+          cumprida: (m.suspensoesCumpridas || []).includes(k),
+          naoCumpriu,
+        });
+        if (!naoCumpriu) {
+          p.devidos -= 1;
+          p.motivos.shift();
+        }
       }
     });
 
@@ -4290,11 +4302,53 @@ function calcularSuspensoes(matches, teams) {
   return { porJogo, pendentes, pendurados, violacoes, amarelosAntes };
 }
 
-function PainelAvisosJogos({ matches, teams }) {
+function marcarCumprimentoEm(m, chave, estado) {
+  const sem = (l) => (l || []).filter((x) => x !== chave);
+  return {
+    ...m,
+    suspensoesCumpridas: estado === "cumprida" ? [...sem(m.suspensoesCumpridas), chave] : sem(m.suspensoesCumpridas),
+    suspensoesNaoCumpridas: estado === "nao" ? [...sem(m.suspensoesNaoCumpridas), chave] : sem(m.suspensoesNaoCumpridas),
+  };
+}
+
+function BotoesCumprimento({ item, onMarcar }) {
+  const base = { fontFamily: "'Inter', sans-serif" };
+  if (item.cumprida || item.naoCumpriu) {
+    return (
+      <span className="text-[11px] font-semibold" style={{ ...base, color: item.cumprida ? "#22C55E" : "#F59E0B" }}>
+        {item.cumprida ? "✓ Cumprida" : "Não cumpriu — passa pro próximo jogo"}
+        {onMarcar && (
+          <button type="button" onClick={() => onMarcar(item.chave, "limpar")} className="ml-2 underline" style={{ color: COLORS.slate }}>
+            desfazer
+          </button>
+        )}
+      </span>
+    );
+  }
+  if (!onMarcar) return null;
+  return (
+    <span className="inline-flex gap-1.5">
+      <button type="button" onClick={() => onMarcar(item.chave, "cumprida")} className="px-2 py-0.5 rounded text-[11px] font-semibold" style={{ ...base, backgroundColor: "#22C55E", color: "#0B1220" }}>
+        ✓ Cumprida
+      </button>
+      <button type="button" onClick={() => onMarcar(item.chave, "nao")} className="px-2 py-0.5 rounded text-[11px] font-semibold" style={{ ...base, border: `1px solid ${COLORS.border}`, color: COLORS.slate }}>
+        Não cumpriu
+      </button>
+    </span>
+  );
+}
+
+function PainelAvisosJogos({ matches, teams, saveMatches }) {
   const sus = useMemo(() => calcularSuspensoes(matches, teams), [matches, teams]);
   const nomeDe = (id) => teams.find((t) => t.id === id)?.nome || "?";
   const abertos = ordemCronologica(matches).filter((m) => m.status !== "encerrado" && (sus.porJogo[m.id] || []).length > 0);
-  const vazio = abertos.length === 0 && sus.pendentes.length === 0 && sus.violacoes.length === 0;
+  const aConfirmar = ordemCronologica(matches).filter(
+    (m) => m.status === "encerrado" && (sus.porJogo[m.id] || []).some((x) => !x.cumprida && !x.naoCumpriu)
+  );
+  const marcar = saveMatches
+    ? (matchId, chave, estado) => saveMatches((atuais) => (atuais || []).map((m) => (m.id === matchId ? marcarCumprimentoEm(m, chave, estado) : m)))
+    : null;
+  const vazio = abertos.length === 0 && aConfirmar.length === 0 && sus.pendentes.length === 0 && sus.violacoes.length === 0;
   const caixa = { backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` };
   const hora = (m) => (m.horario ? formatarHorarioJogo(m.horario) : "");
   return (
@@ -4334,6 +4388,9 @@ function PainelAvisosJogos({ matches, teams }) {
                 {sus.porJogo[m.id].map((x, i) => (
                   <div key={i}>
                     <strong>{x.jogador}</strong> ({x.timeNome}) — {x.motivo}
+                    <div>
+                      <BotoesCumprimento item={x} onMarcar={marcar ? (c, e) => marcar(m.id, c, e) : null} />
+                    </div>
                   </div>
                 ))}
               </li>
@@ -4347,6 +4404,32 @@ function PainelAvisosJogos({ matches, teams }) {
           </ul>
         )}
       </div>
+      {aConfirmar.length > 0 && (
+        <div className="rounded-2xl p-4" style={{ ...caixa, border: "1.5px solid #F59E0B" }}>
+          <div className="font-semibold text-sm mb-2" style={{ color: "#F59E0B", fontFamily: "'Sora', sans-serif" }}>
+            ✅ Confirmar suspensões cumpridas
+          </div>
+          <ul className="space-y-2">
+            {aConfirmar.map((m) => (
+              <li key={m.id} className="text-sm" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+                <div className="text-xs mb-0.5" style={{ color: COLORS.slate }}>
+                  {nomeDe(m.timeA)} x {nomeDe(m.timeB)} · {hora(m)}
+                </div>
+                {sus.porJogo[m.id]
+                  .filter((x) => !x.cumprida && !x.naoCumpriu)
+                  .map((x, i) => (
+                    <div key={i} className="mb-1">
+                      <strong>{x.jogador}</strong> ({x.timeNome}) — {x.motivo}
+                      <div>
+                        <BotoesCumprimento item={x} onMarcar={marcar ? (c, e) => marcar(m.id, c, e) : null} />
+                      </div>
+                    </div>
+                  ))}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {sus.pendurados.length > 0 && (
         <div className="rounded-2xl p-4" style={caixa}>
           <div className="font-semibold text-sm mb-2" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>
@@ -4373,8 +4456,12 @@ function PainelAvisosJogos({ matches, teams }) {
 function contarAvisosJogos(matches, teams) {
   const sus = calcularSuspensoes(matches, teams);
   const abertos = (matches || []).filter((m) => m.status !== "encerrado");
+  const aConfirmar = (matches || []).filter((m) => m.status === "encerrado");
   return (
-    abertos.reduce((n, m) => n + (sus.porJogo[m.id] || []).length, 0) + sus.pendentes.length + sus.violacoes.length
+    abertos.reduce((n, m) => n + (sus.porJogo[m.id] || []).length, 0) +
+    aConfirmar.reduce((n, m) => n + (sus.porJogo[m.id] || []).filter((x) => !x.cumprida && !x.naoCumpriu).length, 0) +
+    sus.pendentes.length +
+    sus.violacoes.length
   );
 }
 
@@ -4707,7 +4794,21 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
           </div>
           {suspensosJogo && suspensosJogo.length > 0 && (
             <div className="rounded-lg px-3 py-2 mb-3 text-xs text-left" style={{ border: "1.5px solid #EF4444", color: "#FCA5A5", fontFamily: "'Inter', sans-serif" }}>
-              <strong>Observações:</strong> ⛔ suspensos neste jogo — {suspensosJogo.map((x) => `${x.jogador} (${x.timeNome}) — ${x.motivo}`).join(" · ")}
+              <strong>Observações:</strong> ⛔ suspensos neste jogo
+              {suspensosJogo.map((x) => (
+                <div key={x.chave} className="mt-1.5">
+                  {x.jogador} ({x.timeNome}) — {x.motivo}
+                  <div className="mt-1">
+                    <BotoesCumprimento
+                      item={x}
+                      onMarcar={(c, e) => {
+                        const n = marcarCumprimentoEm(match, c, e);
+                        patch({ suspensoesCumpridas: n.suspensoesCumpridas, suspensoesNaoCumpridas: n.suspensoesNaoCumpridas });
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
             </div>
           )}
           <div className="flex items-start justify-between gap-1">
@@ -12038,11 +12139,11 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
         </div>
       )}
 
-      {secaoAtiva === "avisos" && <PainelAvisosJogos matches={matches} teams={teams} />}
+      {secaoAtiva === "avisos" && <PainelAvisosJogos matches={matches} teams={teams} saveMatches={saveMatches} />}
 
       {secaoAtiva === "jogos" && (
       <>
-      <PainelAvisosJogos matches={matches} teams={teams} />
+      <PainelAvisosJogos matches={matches} teams={teams} saveMatches={saveMatches} />
       <div className="max-w-xl">
         <div className="rounded-2xl p-5 mb-8" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
           <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
