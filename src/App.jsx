@@ -5120,13 +5120,25 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
   // O 2º tempo começa do zero (cada tempo tem o seu próprio cronômetro).
   const iniciarSegundoTempo = () =>
     patch({ status: "ao_vivo", pausado: false, tempoAtual: 2, tempoAcumuladoMs: 0, tempoIniciadoEm: agoraReal() });
-  const encerrarJogo = () =>
+  const enviarAviso = (titulo, corpo) =>
+    avisarInicioJogo({
+      titulo,
+      corpo,
+      times: [teamName(match.timeA), teamName(match.timeB)],
+      tag: `jogo-${match.id}`,
+    }).catch((e) => console.error("Falha ao enviar avisos", e));
+  const encerrarJogo = () => {
     patch({
       pausado: false,
       status: "encerrado",
       tempoAcumuladoMs: computeElapsedMs(match),
       tempoIniciadoEm: null,
     });
+    enviarAviso(
+      "🏁 Fim de jogo!",
+      `${teamName(match.timeA)} ${match.golsA ?? 0} x ${match.golsB ?? 0} ${teamName(match.timeB)}`
+    );
+  };
 
   const registrarEventos = async (itens) => {
     const minuto = Math.floor(computeElapsedMs(match) / 60000);
@@ -5159,6 +5171,14 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
       eventos: [...(match.eventos || []), ...novos],
       ...(mudouPlacar ? { golsA, golsB } : {}),
     });
+    if (mudouPlacar) {
+      const g = novos.find((e) => e.tipo === "gol");
+      const a = novos.find((e) => e.tipo === "assistencia");
+      enviarAviso(
+        `⚽ GOOOL! ${g?.timeNome || ""}`,
+        `${g?.jogador || "Gol"}${a ? ` (assist.: ${a.jogador})` : ""} — ${teamName(match.timeA)} ${golsA} x ${golsB} ${teamName(match.timeB)}`
+      );
+    }
   };
 
   const removeEvento = async (id, extraIds = []) => {
