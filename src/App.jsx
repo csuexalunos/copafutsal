@@ -42,7 +42,7 @@ import {
 import { jsPDF } from "jspdf";
 import {
   readKey, writeKey, cadastrarConta, entrarConta, sairConta, sessaoAtual, aoMudarSessao,
-  criarPerfil, buscarPerfil, listarPerfis, atualizarPerfil, souAdmin, listarAdmins,
+  criarPerfil, buscarPerfil, listarPerfis, atualizarPerfil, atualizarPerfilConfirmado, souAdmin, listarAdmins,
   promoverParaAdmin, removerAdmin, subirArquivo, urlAssinada, contarPessoasInscritas, buscarCpfsDaTurma,
   registrarAcesso, contarAcessos, registrarEvento as registrarEventoBruto, buscarMetricasDetalhadas, esqueciSenha, definirNovaSenha, supabase,
   buscarCpfsDoTime, salvarCpfJogador, salvarCpfsEmLote, excluirCpfsDoJogador,
@@ -12017,6 +12017,12 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   const [buscaInscritos, setBuscaInscritos] = useState("");
   const [secaoAtiva, setSecaoAtiva] = useState(() => (restritoAJogos ? "jogos" : null));
   const [historico, , loadingHistorico] = useSharedStorage("copasu:historico", [], 10000);
+  // Ao abrir "Pessoas e acesso", busca a lista de cadastros de novo no banco
+  // (antes só carregava uma vez, ao abrir o app, e podia ficar desatualizada).
+  useEffect(() => {
+    if (secaoAtiva !== "pessoas") return;
+    listarPerfis().then((p) => setPerfis(p || [])).catch((e) => console.error("Falha ao recarregar perfis", e));
+  }, [secaoAtiva]);
   const novasAlteracoes = (historico || []).filter(
     (h) => !config?.ultimaVisualizacaoHistorico || new Date(h.em) > new Date(config.ultimaVisualizacaoHistorico)
   ).length;
@@ -12304,7 +12310,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   const revogarAcesso = async (p) => {
     if (!confirm(`Revogar o acesso de representante de "${p.nome || p.email}"? Ela precisa ser aprovada de novo pra voltar a editar o time.`)) return;
     try {
-      await atualizarPerfil(p.id, { status: "pendente" });
+      await atualizarPerfilConfirmado(p.id, { status: "pendente" });
       setPerfis(perfis.map((x) => (x.id === p.id ? { ...x, status: "pendente" } : x)));
     } catch (err) {
       console.error("Falha ao revogar acesso:", err);
@@ -12723,6 +12729,8 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
               (p.turma || "").toLowerCase().includes(termo);
 
             const filtrados = perfis.filter((p) => p.status !== "aprovado" && combina(p));
+            // Buscando alguém? Quem já é representante também aparece (com opção de revogar).
+            const jaRepresentantes = termo ? perfis.filter((p) => p.status === "aprovado" && combina(p)) : [];
             const pendentesTodos = filtrados
               .filter((p) => p.status !== "recusado")
               .sort((a, b) => new Date(b.criado_em || 0) - new Date(a.criado_em || 0));
@@ -12819,11 +12827,26 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
 
             return (
               <>
-                {pendentesNovos.length === 0 && pendentesAntigos.length === 0 ? (
+                {jaRepresentantes.length > 0 && (
+                  <ul className="space-y-2 mb-3">
+                    {jaRepresentantes.map((p) => (
+                      <li key={p.id} className="flex items-center gap-2 text-sm px-3 py-2.5 rounded-lg" style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium break-words">{p.nome || p.email}</div>
+                          <div className="text-xs" style={{ color: "#4ADE80" }}>✓ Já é representante{p.turma ? ` · ${p.turma}` : ""} — {p.email}</div>
+                        </div>
+                        <button type="button" onClick={() => revogarAcesso(p)} className="px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0" style={{ border: `1px solid ${COLORS.border}`, color: COLORS.slate }}>
+                          Revogar acesso
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {pendentesNovos.length === 0 && pendentesAntigos.length === 0 && jaRepresentantes.length === 0 ? (
                   <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
                     Nenhum inscrito pendente {termo ? "com essa busca" : "no momento"}.
                   </p>
-                ) : pendentesNovos.length === 0 ? (
+                ) : pendentesNovos.length === 0 && pendentesAntigos.length > 0 ? (
                   <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
                     Nenhum inscrito recente {termo ? "com essa busca" : ""} — veja os antigos abaixo.
                   </p>
