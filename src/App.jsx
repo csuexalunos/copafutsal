@@ -3955,8 +3955,190 @@ function PaginaCardTime({ turma, teams, matches, fundo }) {
   );
 }
 
+// ---------- Cards de CONFRONTO (dois elencos) ----------
+function dataHoraCard(horario) {
+  const h = horario ? new Date(horario) : null;
+  if (!h || isNaN(h)) return { dia: "", hora: "" };
+  const dias = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
+  const p = (n) => String(n).padStart(2, "0");
+  return { dia: `${dias[h.getDay()]} · ${p(h.getDate())}/${p(h.getMonth() + 1)}`, hora: `${p(h.getHours())}H${p(h.getMinutes())}` };
+}
+
+function nomeCardTime(team) {
+  if (!team) return "A definir";
+  return /^\d/.test(team.nome) ? `Seleção ${team.nome}` : team.nome;
+}
+
+function CardConfronto({ match, timeA, timeB, fundo = true }) {
+  const f = "'Sora', 'Inter', sans-serif";
+  const laranja = "#FF6B2B";
+  const amarelo = "#FFC400";
+  const jA = timeA ? jogadoresParaCard(timeA) : [];
+  const jB = timeB ? jogadoresParaCard(timeB) : [];
+  const maxN = Math.max(jA.length, jB.length, 1);
+  const duasCol = maxN > 9;
+  const nLin = duasCol ? Math.ceil(maxN / 2) : maxN;
+  const areaH = 590;
+  const rowH = Math.max(40, Math.min(88, Math.floor((areaH - (nLin - 1) * 10) / nLin)));
+  const larguraPainel = 880;
+  const larguraLinha = duasCol ? (larguraPainel - 40 - 14) / 2 : larguraPainel - 40;
+  const fsDe = (j) => {
+    const txt = j.apelido || j.nome || "";
+    const disp = larguraLinha - rowH - 36 - (j.posicao ? 20 + j.posicao.length * 11 : 0);
+    return Math.max(18, Math.min(Math.round(rowH * 0.5), Math.floor(disp / (Math.max(txt.length, 1) * 0.64))));
+  };
+  const fs = Math.min(...[...jA, ...jB, {}].map(fsDe));
+  const linha = (j, i) => (
+    <div key={j.id || i} style={{ display: "flex", alignItems: "center", gap: 18, height: rowH, background: "rgba(255,255,255,0.06)", borderRadius: 12, paddingRight: 16, overflow: "hidden", border: "1px solid rgba(255,255,255,0.08)" }}>
+      <div style={{ width: rowH + 6, height: "100%", background: `linear-gradient(135deg, ${laranja}, ${amarelo})`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: f, fontWeight: 800, fontSize: Math.round(rowH * 0.52), color: "#0B0F1C", flexShrink: 0 }}>{j.numero || "–"}</div>
+      <div style={{ flex: 1, minWidth: 0, fontFamily: f, fontWeight: 800, fontSize: fs, lineHeight: 1.05, color: "#fff", overflowWrap: "anywhere" }}>{j.apelido || j.nome || ""}</div>
+      {j.posicao && <div style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 15, letterSpacing: 1.5, textTransform: "uppercase", color: amarelo, border: `2px solid ${amarelo}`, borderRadius: 999, padding: "3px 11px", flexShrink: 0 }}>{j.posicao}</div>}
+    </div>
+  );
+  const painel = (team, jogs, lado) => {
+    const metade = Math.ceil(jogs.length / 2);
+    const cols = duasCol ? [jogs.slice(0, metade), jogs.slice(metade)] : [jogs];
+    return (
+      <div style={{ width: larguraPainel, padding: 20, borderRadius: 24, background: "rgba(0,0,0,0.28)", border: "1px solid rgba(255,255,255,0.08)", boxSizing: "border-box", display: "flex", gap: 14, alignContent: "flex-start", [lado === "A" ? "borderLeft" : "borderRight"]: `8px solid ${laranja}` }}>
+        {cols.map((c, i) => (
+          <div key={i} style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 10 }}>{c.map(linha)}</div>
+        ))}
+      </div>
+    );
+  };
+  const escudo = (t) => (t && (ESCUDOS_TIMES[t.nome] || t.escudoUrl)) || null;
+  const { dia, hora } = dataHoraCard(match && match.horario);
+  const lado = (t) => (
+    <div style={{ width: 560, display: "flex", flexDirection: "column", alignItems: "center" }}>
+      {escudo(t) ? <img src={escudo(t)} alt="" style={{ width: 210, height: 210, objectFit: "contain", filter: "drop-shadow(0 14px 30px rgba(0,0,0,0.5))" }} /> : <div style={{ width: 210, height: 210 }} />}
+      <div style={{ fontWeight: 800, fontSize: 52, marginTop: 10, whiteSpace: "nowrap" }}>{nomeCardTime(t)}</div>
+    </div>
+  );
+  return (
+    <div style={{ width: CARD_W, height: CARD_H, position: "relative", overflow: "hidden", fontFamily: f, color: "#fff",
+      background: fundo ? `radial-gradient(1000px 600px at 20% 0%, rgba(255,107,43,0.30), transparent 70%), radial-gradient(1000px 600px at 80% 0%, rgba(255,196,0,0.14), transparent 70%), #0B0F1C` : "transparent" }}>
+      <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: 10, background: `linear-gradient(90deg, ${laranja}, ${amarelo})` }} />
+      <div style={{ position: "absolute", left: 40, right: 40, top: 34, height: 300, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        {lado(timeA)}
+        <div style={{ textAlign: "center", flex: 1 }}>
+          <div style={{ fontWeight: 700, fontSize: 22, letterSpacing: 6, color: amarelo }}>{EDITION_ROMAN} COPA CSU EX-ALUNOS</div>
+          <div style={{ fontWeight: 800, fontSize: 130, lineHeight: 1, margin: "6px 0", background: `linear-gradient(135deg, ${laranja}, ${amarelo})`, WebkitBackgroundClip: "text", color: "transparent" }}>X</div>
+          {match && match.fase && <div style={{ display: "inline-block", background: laranja, color: "#0B0F1C", fontWeight: 800, fontSize: 24, letterSpacing: 3, padding: "6px 24px", borderRadius: 999 }}>{match.fase.toUpperCase()}</div>}
+          <div style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 24, color: "rgba(255,255,255,0.75)", marginTop: 12, letterSpacing: 2 }}>{[dia, hora, "GINÁSIO CSU"].filter(Boolean).join("  ·  ")}</div>
+        </div>
+        {lado(timeB)}
+      </div>
+      <div style={{ position: "absolute", left: 40, right: 40, bottom: 56, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        {painel(timeA, jA, "A")}
+        {painel(timeB, jB, "B")}
+      </div>
+      <div style={{ position: "absolute", left: 0, right: 0, bottom: 16, textAlign: "center", fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 18, color: "rgba(255,255,255,0.4)", letterSpacing: 4 }}>ELENCOS · APRESENTAÇÃO DO CONFRONTO</div>
+    </div>
+  );
+}
+
+function PaginaCardConfronto({ matchId, teams, matches, fundo }) {
+  const match = (matches || []).find((m) => String(m.id) === String(matchId));
+  const timeA = match && teams.find((t) => t.id === match.timeA);
+  const timeB = match && teams.find((t) => t.id === match.timeB);
+  const [w, setW] = useState(window.innerWidth);
+  useEffect(() => {
+    const fn = () => setW(window.innerWidth);
+    window.addEventListener("resize", fn);
+    if (!fundo) {
+      document.documentElement.style.background = "transparent";
+      document.body.style.background = "transparent";
+    }
+    return () => window.removeEventListener("resize", fn);
+  }, [fundo]);
+  const k = Math.min(w / CARD_W, window.innerHeight / CARD_H);
+  return (
+    <div style={{ background: fundo ? "#0B0F1C" : "transparent", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+      <div style={{ width: CARD_W * k, height: CARD_H * k, overflow: "hidden" }}>
+        <div style={{ width: CARD_W, height: CARD_H, transform: `scale(${k})`, transformOrigin: "top left" }}>
+          <CardConfronto match={match} timeA={timeA} timeB={timeB} fundo={fundo} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PainelCardsConfrontos({ teams, matches }) {
+  const [sel, setSel] = useState(null);
+  const [baixando, setBaixando] = useState(false);
+  const [copiado, setCopiado] = useState("");
+  const refCard = React.useRef(null);
+  const base = window.location.origin + window.location.pathname;
+  const lista = (matches || [])
+    .filter((m) => !m.virtual && m.timeA && m.timeB && teams.some((t) => t.id === m.timeA) && teams.some((t) => t.id === m.timeB))
+    .sort((a, b) => {
+      const ea = a.status === "encerrado" ? 1 : 0, eb = b.status === "encerrado" ? 1 : 0;
+      return ea - eb || String(a.horario || "").localeCompare(String(b.horario || ""));
+    });
+  const nome = (id) => nomeCardTime(teams.find((t) => t.id === id));
+  const atual = lista.find((m) => m.id === sel);
+  const baixar = async () => {
+    setBaixando(true);
+    try {
+      const no = refCard.current && refCard.current.querySelector("[data-card]");
+      const url = await toPng(no, { width: CARD_W, height: CARD_H, pixelRatio: 1, cacheBust: true });
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `confronto-${nome(atual.timeA)}-x-${nome(atual.timeB)}.png`.replace(/[^\w.-]+/g, "_");
+      a.click();
+    } catch (e) {
+      console.error(e);
+      alert("Não consegui gerar o PNG. Use o link do OBS ou tire print da pré-visualização.");
+    }
+    setBaixando(false);
+  };
+  const copiar = async (m) => {
+    const link = `${base}?confronto=${encodeURIComponent(m.id)}&fundo=0`;
+    try { await navigator.clipboard.writeText(link); setCopiado(m.id); setTimeout(() => setCopiado(""), 2000); } catch (e) { window.prompt("Copie o link:", link); }
+  };
+  return (
+    <div>
+      <p className="text-xs mb-4 max-w-xl" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+        Card 16:9 (1920×1080) do confronto, com os dois elencos, fase, data e horário. Os jogos que ainda vão acontecer aparecem primeiro.
+      </p>
+      {lista.length === 0 && <p className="text-sm" style={{ color: COLORS.slate }}>Nenhum jogo com os dois times definidos ainda.</p>}
+      <ul className="space-y-2 max-w-xl">
+        {lista.map((m) => {
+          const { dia, hora } = dataHoraCard(m.horario);
+          return (
+            <li key={m.id} className="flex flex-wrap items-center gap-2 px-3 py-2.5 rounded-xl" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+              <div className="mr-auto min-w-0">
+                <div className="font-semibold text-sm" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>{nome(m.timeA)} x {nome(m.timeB)}</div>
+                <div className="text-[11px]" style={{ color: COLORS.slate }}>{[m.fase, dia, hora.replace("H", ":")].filter(Boolean).join(" · ")}{m.status === "encerrado" ? " · encerrado" : ""}</div>
+              </div>
+              <button type="button" onClick={() => setSel(sel === m.id ? null : m.id)} className="text-xs font-semibold underline" style={{ color: COLORS.accent }}>{sel === m.id ? "Fechar" : "Ver card"}</button>
+              <button type="button" onClick={() => copiar(m)} className="text-xs font-semibold px-2.5 py-1.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, color: COLORS.ink }}>{copiado === m.id ? "Link copiado!" : "Copiar link pro OBS"}</button>
+            </li>
+          );
+        })}
+      </ul>
+      {atual && (
+        <div className="mt-5 max-w-3xl">
+          <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${COLORS.border}`, width: CARD_W * 0.4, maxWidth: "100%", height: CARD_H * 0.4, position: "relative", backgroundColor: "#0B0F1C" }}>
+            <div ref={refCard} style={{ position: "absolute", top: 0, left: 0, width: CARD_W, height: CARD_H, transformOrigin: "top left", transform: "scale(0.4)" }}>
+              <div data-card style={{ width: CARD_W, height: CARD_H }}>
+                <CardConfronto match={atual} timeA={teams.find((t) => t.id === atual.timeA)} timeB={teams.find((t) => t.id === atual.timeB)} />
+              </div>
+            </div>
+          </div>
+          <a href={`${base}?confronto=${encodeURIComponent(atual.id)}`} target="_blank" rel="noreferrer" className="inline-block mt-2 text-xs font-semibold underline" style={{ color: COLORS.accent }}>Abrir em tela cheia (nova aba)</a>
+          <button type="button" onClick={baixar} disabled={baixando} className="mt-3 block px-4 py-2 rounded-xl text-sm font-semibold" style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}>
+            {baixando ? "Gerando..." : "Baixar PNG (1920×1080)"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Seção da Organização: pré-visualiza, baixa PNG e copia o link pro OBS.
 function PainelCardsTransmissao({ teams, matches }) {
+  const [aba, setAba] = useState("times");
   const [sel, setSel] = useState(null);
   const [baixando, setBaixando] = useState("");
   const [copiado, setCopiado] = useState("");
@@ -3983,8 +4165,18 @@ function PainelCardsTransmissao({ teams, matches }) {
   };
   const lista = teams.filter(timeInscritoOficialmente);
   const atual = teams.find((t) => t.id === sel);
+  const abas = (
+    <div className="flex gap-2 mb-4">
+      {[["times", "Times"], ["confrontos", "Confrontos"]].map(([k, rot]) => (
+        <button key={k} type="button" onClick={() => setAba(k)} className="px-4 py-1.5 rounded-full text-xs font-semibold"
+          style={{ backgroundColor: aba === k ? COLORS.navy : "transparent", color: aba === k ? COLORS.gold : COLORS.ink, border: `1px solid ${aba === k ? COLORS.navy : COLORS.border}` }}>{rot}</button>
+      ))}
+    </div>
+  );
+  if (aba === "confrontos") return <div className="mt-4">{abas}<PainelCardsConfrontos teams={teams} matches={matches} /></div>;
   return (
     <div className="mt-4">
+      {abas}
       <p className="text-xs mb-4 max-w-xl" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
         Card 16:9 (1920×1080) de cada time com escudo, grupo e elenco, sempre com os dados atuais. Pra transmissão:
         use <b>Copiar link pro OBS</b> (Fonte de navegador, 1920×1080, fundo transparente) ou <b>Baixar PNG</b>.
@@ -14204,6 +14396,11 @@ export default function App() {
 
   const paramsUrl = new URLSearchParams(window.location.search);
   const cardTurma = paramsUrl.get("card");
+  const cardConfronto = paramsUrl.get("confronto");
+  if (cardConfronto) {
+    if (loading) return <div />;
+    return <PaginaCardConfronto matchId={cardConfronto} teams={teams} matches={matches} fundo={paramsUrl.get("fundo") !== "0"} />;
+  }
   if (cardTurma) {
     // Página só com o card do time (pra Fonte de navegador do OBS).
     if (loading) return <div />;
