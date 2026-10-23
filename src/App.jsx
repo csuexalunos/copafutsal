@@ -555,7 +555,8 @@ const PRAZO_INSCRICAO = "de 01 a 30 de setembro";
 // fim do dia 02/11/2026; depois só com liberação da organização (team.edicaoLiberada).
 const PRAZO_EDICAO_DETALHES = new Date("2026-11-03T00:00:00-03:00");
 function detalhesTravados(team) {
-  return !team?.edicaoLiberada && agoraReal() >= PRAZO_EDICAO_DETALHES.getTime();
+  // Edição liberada para todos os representantes (sem prazo e sem precisar liberar time a time).
+  return false;
 }
 const VALOR_INSCRICAO_ATLETA = "R$ 110,00 a R$ 140,00 por atleta, conforme o lote";
 // Lotes de inscrição — o valor por atleta aumenta conforme a data em que
@@ -3064,7 +3065,7 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes, confi
   // organização liberar o time). Só a criação de times novos fica fechada.
   const timeDoRepresentante = !isAdmin && turmaFixa ? teams.find((t) => t.nome === turmaFixa) : null;
   const edicaoDoTimeAberta =
-    !!timeDoRepresentante && (agoraReal() < PRAZO_EDICAO_DETALHES.getTime() || !!timeDoRepresentante.edicaoLiberada);
+    !!timeDoRepresentante;
   // Time já inscrito: só o painel simples "Meu time" (resumo + botão Editar time).
   if (timeDoRepresentante && (edicaoDoTimeAberta || inscricaoAberta(config, turmaFixa))) {
     return <MeuTimeRepresentante team={timeDoRepresentante} saveTeams={saveTeams} avaliacoes={avaliacoes} saveAvaliacoes={saveAvaliacoes} />;
@@ -9862,21 +9863,6 @@ function GerenciarElencos({ teams, saveTeams }) {
           </option>
         ))}
       </select>
-      {time && (
-        <label className="flex items-start gap-2 mb-4 text-xs cursor-pointer" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
-          <input
-            type="checkbox"
-            checked={!!time.edicaoLiberada}
-            onChange={(e) =>
-              saveTeams((atuais) => (atuais || []).map((t) => (t.id === time.id ? { ...t, edicaoLiberada: e.target.checked } : t)))
-            }
-            className="mt-0.5"
-          />
-          <span>
-            <b>Liberar edição de apelido, número e posição</b> para o representante deste time (depois do prazo de 02/11).
-          </span>
-        </label>
-      )}
       {time && <RosterEditor key={time.id} team={time} onSave={salvarTime} />}
     </div>
   );
