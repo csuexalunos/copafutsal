@@ -6315,21 +6315,24 @@ async function baixarFichaTodosTimes(teams) {
 
 const SUMULA_CSS = `
   @page { size: A4; margin: 8mm; }
-  .sm { font-family: Arial, Helvetica, sans-serif; color: #111; font-size: 10px; page-break-after: always; }
-  .sm:last-child { page-break-after: auto; }
+  html, body { padding: 0 !important; margin: 0 !important; }
+  /* uma súmula = uma página A4 (281mm úteis); a próxima sempre começa em folha nova */
+  .sm { font-family: Arial, Helvetica, sans-serif; color: #111; font-size: 10px; height: 280mm; max-height: 280mm; overflow: hidden; break-inside: avoid; page-break-inside: avoid; }
+  .sm + .sm { page-break-before: always; break-before: page; }
+  @media screen { .sm { margin-bottom: 24px; border-bottom: 1px dashed #bbb; } body { padding: 12px !important; } }
   .sm table { border-collapse: collapse; width: 100%; margin: 0; }
-  .sm td, .sm th { border: 1px solid #222; padding: 2px 5px; font-size: 10px; text-align: left; height: 16px; }
+  .sm td, .sm th { border: 1px solid #222; padding: 1px 5px; font-size: 10px; text-align: left; height: 14.5px; line-height: 1.15; }
   .sm .c { text-align: center; }
   .sm .g { background: #ececec; font-weight: bold; }
   .sm .sp { height: 7px; }
   .sm .cols { display: flex; gap: 6px; align-items: flex-start; }
   .sm .esq { width: 57%; }
   .sm .dir { width: 43%; }
-  .sm .bloco { margin-bottom: 14px; }
-  .sm .gol td { height: 22px; font-size: 8px; vertical-align: top; padding: 1px 2px; }
+  .sm .bloco { margin-bottom: 8px; }
+  .sm .gol td { height: 19px; font-size: 8px; vertical-align: top; padding: 1px 2px; }
   .sm .gol td span { display: block; text-align: center; font-size: 9px; color: #666; margin-top: 3px; }
   .sm .ttl { text-align: center; font-weight: bold; font-size: 11px; }
-  .sm .fl td { height: 18px; }
+  .sm .fl td { height: 16px; }
 `;
 
 function sumulaBlocoTime(time, nomeTime, mapaCpf, suspensos, amarelosAntes) {
