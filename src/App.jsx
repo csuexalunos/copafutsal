@@ -3224,17 +3224,29 @@ function AvisosJogos({ teams }) {
             <button type="button" onClick={desligar} disabled={ocupado} className="text-xs underline" style={{ color: COLORS.slate }}>Desligar</button>
           </div>
         ) : (
-          <button type="button" onClick={() => (ehIosNaoInstalado() ? setAberto(true) : setAberto((v) => !v))}
+          !ehIosNaoInstalado() && <button type="button" onClick={() => setAberto((v) => !v)}
             className="px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0"
             style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}>
             Ativar avisos
           </button>
         )}
       </div>
-      {aberto && ehIosNaoInstalado() && (
-        <p className="text-xs mt-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-          No iPhone: toque em Compartilhar → "Adicionar à Tela de Início", abra o app por lá e ative os avisos.
-        </p>
+      {ehIosNaoInstalado() && (
+        <div className="mt-3 text-xs" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+          <div className="font-semibold mb-1.5">No iPhone, para receber os avisos:</div>
+          {/CriOS|FxiOS|EdgiOS|OPiOS/i.test(navigator.userAgent) && (
+            <p className="mb-1.5" style={{ color: "#DC2626" }}>
+              Você está em outro navegador. Abra este site no <b>Safari</b> para conseguir instalar.
+            </p>
+          )}
+          <ol className="list-decimal pl-4 space-y-1" style={{ color: COLORS.slate }}>
+            <li>Abra este site no <b>Safari</b>.</li>
+            <li>Toque no botão <b>Compartilhar</b> (o quadrado com uma seta pra cima, na barra de baixo).</li>
+            <li>Role e escolha <b>"Adicionar à Tela de Início"</b> e confirme.</li>
+            <li>Abra o app <b>Copa CSU</b> pelo ícone novo na tela do celular.</li>
+            <li>Volte em Jogos ao Vivo e toque em <b>Ativar avisos</b>.</li>
+          </ol>
+        </div>
       )}
       {aberto && !ehIosNaoInstalado() && (
         <div className="mt-3">
