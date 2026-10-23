@@ -3835,76 +3835,53 @@ function CardApresentacaoTime({ team, grupo, fundo = true }) {
   const escudo = ESCUDOS_TIMES[team.nome] || team.escudoUrl;
   const apelidoTime = (TURMAS_HISTORICAS.find((t) => t.turma === team.nome) || {}).apelido || "";
   const f = "'Sora', 'Inter', sans-serif";
-  const laranja = "#FF6B2B";
-  const amarelo = "#FFC400";
-  const colunas = [jogs.slice(0, Math.ceil(jogs.length / 2)), jogs.slice(Math.ceil(jogs.length / 2))];
-  // altura das linhas se ajusta à quantidade de atletas (5 a 8 linhas por coluna)
-  const nLinhas = Math.max(1, colunas[0].length);
-  const rowH = Math.min(124, Math.floor((730 - (nLinhas - 1) * 14) / nLinhas));
-  // apelido sempre completo: reduz a fonte conforme o tamanho (e quebra linha só em último caso)
-  const fsApelido = (j) => {
+  const cor = useCorEscudo(escudo, "#FF6B2B");
+  const nLinhas = Math.max(1, jogs.length);
+  const rowH = Math.max(32, Math.min(76, Math.floor((740 - (nLinhas - 1) * 9) / nLinhas)));
+  const larguraLinha = 1090 - 40;
+  const fsDe = (j) => {
     const txt = j.apelido || j.nome || "";
-    const disp = 532 - rowH - 44 - (j.posicao ? 40 + j.posicao.length * 14 : 0);
-    return Math.max(22, Math.min(Math.round(rowH * 0.5), Math.floor(disp / (Math.max(txt.length, 1) * 0.64))));
+    const disp = larguraLinha - rowH - 40 - (j.posicao ? 30 + j.posicao.length * 12 : 0);
+    return Math.max(20, Math.min(Math.round(rowH * 0.46), Math.floor(disp / (Math.max(txt.length, 1) * 0.64))));
   };
-  // mesmo tamanho de letra pra todos os atletas do time (o menor que cabe pro nome mais longo)
-  const fsComum = Math.min(...(jogs.length ? jogs : [{}]).map(fsApelido));
-  const linha = (j) => (
-    <div key={j.id || `${j.numero}${j.apelido}`} style={{ display: "flex", alignItems: "center", gap: 22, height: rowH, background: "rgba(255,255,255,0.06)", borderRadius: 18, padding: "0 22px 0 0", overflow: "hidden", border: "1px solid rgba(255,255,255,0.08)" }}>
-      <div style={{ width: rowH, height: "100%", background: `linear-gradient(135deg, ${laranja}, ${amarelo})`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: f, fontWeight: 800, fontSize: Math.round(rowH * 0.56), color: "#0B0F1C", flexShrink: 0 }}>
-        {j.numero || "–"}
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontFamily: f, fontWeight: 800, fontSize: fsComum, lineHeight: 1.05, color: "#fff", overflowWrap: "anywhere" }}>
-          {j.apelido || j.nome || ""}
-        </div>
-      </div>
-      {j.posicao && (
-        <div style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 20, letterSpacing: 2, textTransform: "uppercase", color: amarelo, border: `2px solid ${amarelo}`, borderRadius: 999, padding: "6px 16px", flexShrink: 0 }}>
-          {j.posicao}
-        </div>
-      )}
+  const fs = Math.min(...[...jogs, {}].map(fsDe));
+  const linha = (j, i) => (
+    <div key={j.id || i} style={{ display: "flex", alignItems: "center", gap: 18, height: rowH, background: "rgba(255,255,255,0.07)", borderRadius: 12, paddingRight: 20, overflow: "hidden", border: "1px solid rgba(255,255,255,0.08)" }}>
+      <div style={{ width: Math.round(rowH * 0.95), height: "100%", background: "rgba(255,255,255,0.10)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: f, fontWeight: 800, fontSize: Math.round(rowH * 0.42), color: "#fff", flexShrink: 0 }}>{j.numero || "–"}</div>
+      <div style={{ flex: 1, minWidth: 0, fontFamily: f, fontWeight: 700, fontSize: fs, lineHeight: 1.05, color: "#fff", overflowWrap: "anywhere" }}>{j.apelido || j.nome || ""}</div>
+      {j.posicao && <div style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 15, letterSpacing: 1.5, textTransform: "uppercase", color: "rgba(255,255,255,0.7)", border: "1.5px solid rgba(255,255,255,0.3)", borderRadius: 999, padding: "3px 12px", flexShrink: 0 }}>{j.posicao}</div>}
     </div>
   );
   return (
     <div
       style={{
         width: CARD_W, height: CARD_H, position: "relative", overflow: "hidden", fontFamily: f, color: "#fff",
-        background: fundo ? `radial-gradient(900px 700px at 18% 40%, rgba(255,107,43,0.35), transparent 70%), radial-gradient(800px 600px at 90% 100%, rgba(255,196,0,0.12), transparent 70%), #0B0F1C` : "transparent",
+        background: fundo ? `radial-gradient(900px 750px at 18% 40%, color-mix(in srgb, ${cor} 38%, transparent), transparent 70%), #0B0F1C` : "transparent",
       }}
     >
-      {/* faixa lateral */}
-      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 14, background: `linear-gradient(${laranja}, ${amarelo})` }} />
-      {/* esquerda: identidade do time */}
+      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 14, background: cor }} />
       <div style={{ position: "absolute", left: 80, top: 70, width: 640, bottom: 70, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
-        <div style={{ fontWeight: 700, fontSize: 26, letterSpacing: 8, color: amarelo, marginBottom: 28 }}>
+        <div style={{ fontWeight: 700, fontSize: 26, letterSpacing: 8, color: "rgba(255,255,255,0.8)", marginBottom: 28 }}>
           {EDITION_ROMAN} COPA CSU EX-ALUNOS
         </div>
         {escudo && <img src={escudo} alt="" style={{ width: 400, height: 400, objectFit: "contain", filter: "drop-shadow(0 20px 40px rgba(0,0,0,0.5))" }} />}
         <div style={{ fontWeight: 800, fontSize: /^\d/.test(team.nome) ? 84 : 96, lineHeight: 1, marginTop: 28, letterSpacing: -2, whiteSpace: "nowrap" }}>
           {/^\d/.test(team.nome) ? `Seleção ${team.nome}` : team.nome}
         </div>
+        <div style={{ width: 200, height: 7, borderRadius: 4, background: cor, marginTop: 18 }} />
         {apelidoTime && (
-          <div style={{ fontWeight: 600, fontSize: 36, color: amarelo, marginTop: 14, fontStyle: "italic" }}>“{apelidoTime}”</div>
+          <div style={{ fontWeight: 600, fontSize: 36, color: "rgba(255,255,255,0.85)", marginTop: 16, fontStyle: "italic" }}>“{apelidoTime}”</div>
         )}
         {grupo && (
-          <div style={{ marginTop: 28, background: laranja, color: "#0B0F1C", fontWeight: 800, fontSize: 30, letterSpacing: 4, padding: "10px 34px", borderRadius: 999 }}>
+          <div style={{ marginTop: 26, background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.25)", color: "#fff", fontWeight: 800, fontSize: 28, letterSpacing: 4, padding: "8px 30px", borderRadius: 999 }}>
             {grupo.toUpperCase()}
           </div>
         )}
       </div>
-      {/* direita: elenco */}
-      <div style={{ position: "absolute", left: 760, right: 70, top: 70, bottom: 70, display: "flex", flexDirection: "column" }}>
-        <div style={{ marginBottom: 26 }}>
-          <div style={{ fontWeight: 800, fontSize: 54, letterSpacing: 1 }}>ELENCO</div>
-        </div>
-        <div style={{ flex: 1, display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", columnGap: 26, alignContent: "start" }}>
-          {colunas.map((col, i) => (
-            <div key={i} style={{ display: "flex", flexDirection: "column", gap: 14 }}>{col.map(linha)}</div>
-          ))}
-        </div>
-        <div style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 22, color: "rgba(255,255,255,0.45)", letterSpacing: 3, marginTop: 20 }}>
-          GINÁSIO CSU · APRESENTAÇÃO DOS TIMES
+      <div style={{ position: "absolute", left: 760, right: 70, top: 60, bottom: 60, display: "flex", flexDirection: "column" }}>
+        <div style={{ fontWeight: 800, fontSize: 48, letterSpacing: 2, marginBottom: 20 }}>ELENCO</div>
+        <div style={{ padding: 20, borderRadius: 24, borderRight: `8px solid ${cor}`, background: `linear-gradient(225deg, color-mix(in srgb, ${cor} 28%, transparent), rgba(0,0,0,0.30) 65%)`, border: `1px solid color-mix(in srgb, ${cor} 45%, transparent)`, display: "flex", flexDirection: "column", gap: 9 }}>
+          {jogs.map(linha)}
         </div>
       </div>
     </div>
