@@ -612,15 +612,42 @@ function carimbarLoteContratado(jogadores) {
 // Valor de um jogador específico: usa o lote carimbado nele; se não tiver
 // (jogador cadastrado antes dessa carimbagem existir), cai no cálculo
 // antigo por data do time inteiro, pra não quebrar dado histórico.
-// Jogador sem carimbo adicionado DEPOIS do pagamento do time (ainda fora da
-// lista de confirmados) paga o lote vigente hoje, não o lote da inscrição do time.
+// REGRA: o lote de quem já pagou é definido pela DATA DO PAGAMENTO
+// (até 10/09 = Lote 1, até 20/09 = Lote 2, de 21/09 em diante = Lote 3).
+// Cada confirmação de pagamento (historicoPagamentos) cobre um grupo de
+// jogadores: pelos ids gravados na confirmação (novas) ou, nas antigas,
+// pela ordem do elenco (a 1ª confirmação cobre os primeiros "qtd" jogadores etc).
+function pagamentoDoJogador(jogador, team) {
+  if (!jogador || !team || !team.pago) return null;
+  const jogadores = Array.isArray(team.jogadores) ? team.jogadores : [];
+  let hist = Array.isArray(team.historicoPagamentos) ? team.historicoPagamentos.filter((h) => h && h.data) : [];
+  if (!hist.length && team.pagoEm) hist = [{ data: team.pagoEm, qtd: jogadores.length }];
+  const porId = hist.find((h) => Array.isArray(h.ids) && h.ids.includes(jogador.id));
+  if (porId) return porId;
+  const idx = jogadores.findIndex((j) => j.id === jogador.id);
+  if (idx < 0) return null;
+  let inicio = 0;
+  for (const h of hist) {
+    if (Array.isArray(h.ids)) continue;
+    const qtd = Number(h.qtd) || 0;
+    if (idx >= inicio && idx < inicio + qtd) return h;
+    inicio += qtd;
+  }
+  return null;
+}
+// Jogador que ainda não tem pagamento confirmado paga o lote vigente hoje.
 function entrouDepoisDoPagamento(jogador, team) {
-  return !!(jogador && team && team.pago && Array.isArray(team.jogadoresConfirmadosPagos) && !team.jogadoresConfirmadosPagos.includes(jogador.id));
+  return !!(jogador && team && team.pago && !pagamentoDoJogador(jogador, team));
+}
+function loteDoJogador(jogador, team) {
+  const pag = pagamentoDoJogador(jogador, team);
+  if (pag) return loteNaData(pag.data);
+  if (jogador && jogador.loteContratado) return jogador.loteContratado;
+  if (entrouDepoisDoPagamento(jogador, team)) return loteNaData(new Date());
+  return loteNaData(dataParaCalculoDeLote(team));
 }
 function valorDoJogador(jogador, team) {
-  if (jogador && jogador.loteContratado) return valorPorLote(jogador.loteContratado);
-  if (entrouDepoisDoPagamento(jogador, team)) return valorPorAtletaNaData(new Date());
-  return valorPorAtletaNaData(dataParaCalculoDeLote(team));
+  return valorPorLote(loteDoJogador(jogador, team));
 }
 
 // Resumo financeiro do time: total a pagar e o detalhamento por lote
@@ -631,7 +658,7 @@ function resumoValorTime(team) {
   const jogadores = Array.isArray(team.jogadores) ? team.jogadores : [];
   const porLote = {};
   jogadores.forEach((j) => {
-    const nomeLote = j.loteContratado || (entrouDepoisDoPagamento(j, team) ? loteNaData(new Date()) : loteNaData(dataParaCalculoDeLote(team)));
+    const nomeLote = loteDoJogador(j, team);
     const valor = valorDoJogador(j, team);
     if (!porLote[nomeLote]) porLote[nomeLote] = { nome: nomeLote, qtd: 0, valorUnitario: valor, subtotal: 0 };
     porLote[nomeLote].qtd += 1;
@@ -9132,7 +9159,8 @@ function StatusAprovacaoPagamento({ teams, saveTeams }) {
             {
               data: agora,
               qtd: jogadoresAtuais.length,
-              lote: resumoValorTime({ ...t, jogadores: jogadoresAtuais }).detalhamento.map((d) => d.nome).join(" + "),
+              lote: loteNaData(agora),
+              ids: jogadoresAtuais.map((j) => j.id),
             },
           ],
         };
@@ -9145,7 +9173,6 @@ function StatusAprovacaoPagamento({ teams, saveTeams }) {
       (atuais || []).map((t) => {
         if (t.id !== team.id) return t;
         const agora = new Date().toISOString();
-        const resumoPendentes = resumoValorTime({ ...t, jogadores: pendentes });
         return {
           ...t,
           pago: true,
@@ -9156,7 +9183,8 @@ function StatusAprovacaoPagamento({ teams, saveTeams }) {
             {
               data: agora,
               qtd: pendentes.length,
-              lote: resumoPendentes.detalhamento.map((d) => d.nome).join(" + "),
+              lote: loteNaData(agora),
+              ids: pendentes.map((j) => j.id),
             },
           ],
         };
@@ -9171,7 +9199,7 @@ function StatusAprovacaoPagamento({ teams, saveTeams }) {
       (atuais || []).map((t) => {
         if (t.id !== team.id) return t;
         const historico = [...(t.historicoPagamentos || [])];
-        if (historico[indice]) historico[indice] = { ...historico[indice], data: novaData };
+        if (historico[indice]) historico[indice] = { ...historico[indice], data: novaData, lote: loteNaData(novaData) };
         // O campo antigo (pagoEm) acompanha a data mais recente do
         // histórico, pra quem ainda depende dele (ex: filtros antigos).
         const maisRecente = historico.reduce((max, h) => (!max || h.data > max ? h.data : max), null);
@@ -9264,7 +9292,7 @@ function StatusAprovacaoPagamento({ teams, saveTeams }) {
                     {(t.historicoPagamentos || []).map((h, i) => (
                       <div key={i} className="flex items-center gap-2 text-xs flex-wrap" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
                         <span>
-                          Pago em {h.qtd} atleta(s) ({h.lote || "—"}):
+                          Pago em {h.qtd} atleta(s) ({h.data ? loteNaData(h.data) : h.lote || "—"}):
                         </span>
                         <input
                           type="date"
