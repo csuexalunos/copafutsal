@@ -3969,68 +3969,131 @@ function nomeCardTime(team) {
   return /^\d/.test(team.nome) ? `Seleção ${team.nome}` : team.nome;
 }
 
+// Cor predominante do escudo (pra personalizar o card de cada lado).
+const _cacheCorEscudo = {};
+function corDominanteEscudo(src) {
+  return new Promise((resolve) => {
+    if (!src) return resolve(null);
+    if (_cacheCorEscudo[src] !== undefined) return resolve(_cacheCorEscudo[src]);
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      try {
+        const c = document.createElement("canvas");
+        c.width = c.height = 64;
+        const ctx = c.getContext("2d");
+        ctx.drawImage(img, 0, 0, 64, 64);
+        const d = ctx.getImageData(0, 0, 64, 64).data;
+        const B = 24;
+        const bk = Array.from({ length: B }, () => ({ sc: 0, r: 0, g: 0, b: 0, n: 0 }));
+        for (let i = 0; i < d.length; i += 4) {
+          if (d[i + 3] < 200) continue;
+          const r = d[i] / 255, g = d[i + 1] / 255, bl = d[i + 2] / 255;
+          const mx = Math.max(r, g, bl), mn = Math.min(r, g, bl), l = (mx + mn) / 2, dl = mx - mn;
+          if (dl === 0) continue;
+          const sat = dl / (1 - Math.abs(2 * l - 1));
+          if (sat < 0.35 || l < 0.15 || l > 0.9) continue;
+          let h = mx === r ? ((g - bl) / dl) % 6 : mx === g ? (bl - r) / dl + 2 : (r - g) / dl + 4;
+          h = (h * 60 + 360) % 360;
+          const k = bk[Math.floor(h / (360 / B)) % B];
+          k.sc += sat * (1 - Math.abs(l - 0.5));
+          k.r += d[i]; k.g += d[i + 1]; k.b += d[i + 2]; k.n++;
+        }
+        const best = bk.reduce((m, k) => (k.sc > m.sc ? k : m), bk[0]);
+        if (!best.n) { _cacheCorEscudo[src] = null; return resolve(null); }
+        // clareia/escurece pra ficar legível no fundo escuro
+        let r = best.r / best.n / 255, g = best.g / best.n / 255, bl = best.b / best.n / 255;
+        const mx = Math.max(r, g, bl), mn = Math.min(r, g, bl);
+        let l = (mx + mn) / 2;
+        const dl = mx - mn;
+        let sat = dl === 0 ? 0 : dl / (1 - Math.abs(2 * l - 1));
+        let h = dl === 0 ? 0 : mx === r ? (((g - bl) / dl) % 6) * 60 : mx === g ? ((bl - r) / dl + 2) * 60 : ((r - g) / dl + 4) * 60;
+        h = (h + 360) % 360;
+        sat = Math.max(sat, 0.6);
+        l = Math.min(0.6, Math.max(0.42, l));
+        const cor = `hsl(${Math.round(h)}, ${Math.round(sat * 100)}%, ${Math.round(l * 100)}%)`;
+        _cacheCorEscudo[src] = cor;
+        resolve(cor);
+      } catch (e) { _cacheCorEscudo[src] = null; resolve(null); }
+    };
+    img.onerror = () => { _cacheCorEscudo[src] = null; resolve(null); };
+    img.src = src;
+  });
+}
+
+function useCorEscudo(src, padrao) {
+  const [cor, setCor] = useState(_cacheCorEscudo[src] || null);
+  useEffect(() => {
+    let vivo = true;
+    corDominanteEscudo(src).then((c) => { if (vivo) setCor(c); });
+    return () => { vivo = false; };
+  }, [src]);
+  return cor || padrao;
+}
+
 function CardConfronto({ match, timeA, timeB, fundo = true }) {
   const f = "'Sora', 'Inter', sans-serif";
-  const laranja = "#FF6B2B";
-  const amarelo = "#FFC400";
+  const escudoDe = (t) => (t && (ESCUDOS_TIMES[t.nome] || t.escudoUrl)) || null;
+  const corA = useCorEscudo(escudoDe(timeA), "#FF6B2B");
+  const corB = useCorEscudo(escudoDe(timeB), "#FFC400");
   const jA = timeA ? jogadoresParaCard(timeA) : [];
   const jB = timeB ? jogadoresParaCard(timeB) : [];
   const maxN = Math.max(jA.length, jB.length, 1);
-  const duasCol = maxN > 9;
+  const duasCol = false; // um nome embaixo do outro
   const nLin = duasCol ? Math.ceil(maxN / 2) : maxN;
-  const areaH = 590;
-  const rowH = Math.max(40, Math.min(88, Math.floor((areaH - (nLin - 1) * 10) / nLin)));
+  const areaH = 580;
+  const rowH = Math.max(30, Math.min(60, Math.floor((areaH - (nLin - 1) * 8) / nLin)));
   const larguraPainel = 880;
   const larguraLinha = duasCol ? (larguraPainel - 40 - 14) / 2 : larguraPainel - 40;
   const fsDe = (j) => {
     const txt = j.apelido || j.nome || "";
-    const disp = larguraLinha - rowH - 36 - (j.posicao ? 20 + j.posicao.length * 11 : 0);
-    return Math.max(18, Math.min(Math.round(rowH * 0.5), Math.floor(disp / (Math.max(txt.length, 1) * 0.64))));
+    const disp = larguraLinha - rowH - 32 - (j.posicao ? 20 + j.posicao.length * 10 : 0);
+    return Math.max(18, Math.min(Math.round(rowH * 0.46), Math.floor(disp / (Math.max(txt.length, 1) * 0.64))));
   };
   const fs = Math.min(...[...jA, ...jB, {}].map(fsDe));
-  const linha = (j, i) => (
-    <div key={j.id || i} style={{ display: "flex", alignItems: "center", gap: 18, height: rowH, background: "rgba(255,255,255,0.06)", borderRadius: 12, paddingRight: 16, overflow: "hidden", border: "1px solid rgba(255,255,255,0.08)" }}>
-      <div style={{ width: rowH + 6, height: "100%", background: `linear-gradient(135deg, ${laranja}, ${amarelo})`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: f, fontWeight: 800, fontSize: Math.round(rowH * 0.52), color: "#0B0F1C", flexShrink: 0 }}>{j.numero || "–"}</div>
-      <div style={{ flex: 1, minWidth: 0, fontFamily: f, fontWeight: 800, fontSize: fs, lineHeight: 1.05, color: "#fff", overflowWrap: "anywhere" }}>{j.apelido || j.nome || ""}</div>
-      {j.posicao && <div style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 15, letterSpacing: 1.5, textTransform: "uppercase", color: amarelo, border: `2px solid ${amarelo}`, borderRadius: 999, padding: "3px 11px", flexShrink: 0 }}>{j.posicao}</div>}
+  const linha = (cor) => (j, i) => (
+    <div key={j.id || i} style={{ display: "flex", alignItems: "center", gap: 14, height: rowH, background: "rgba(255,255,255,0.07)", borderRadius: 10, paddingRight: 14, overflow: "hidden", border: "1px solid rgba(255,255,255,0.08)" }}>
+      <div style={{ width: Math.round(rowH * 0.95), height: "100%", background: "rgba(255,255,255,0.10)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: f, fontWeight: 800, fontSize: Math.round(rowH * 0.42), color: "#fff", flexShrink: 0 }}>{j.numero || "–"}</div>
+      <div style={{ flex: 1, minWidth: 0, fontFamily: f, fontWeight: 700, fontSize: fs, lineHeight: 1.05, color: "#fff", overflowWrap: "anywhere" }}>{j.apelido || j.nome || ""}</div>
+      {j.posicao && <div style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 13, letterSpacing: 1.5, textTransform: "uppercase", color: "rgba(255,255,255,0.7)", border: "1.5px solid rgba(255,255,255,0.3)", borderRadius: 999, padding: "2px 10px", flexShrink: 0 }}>{j.posicao}</div>}
     </div>
   );
-  const painel = (team, jogs, lado) => {
+  const painel = (jogs, cor, lado) => {
     const metade = Math.ceil(jogs.length / 2);
     const cols = duasCol ? [jogs.slice(0, metade), jogs.slice(metade)] : [jogs];
     return (
-      <div style={{ width: larguraPainel, padding: 20, borderRadius: 24, background: "rgba(0,0,0,0.28)", border: "1px solid rgba(255,255,255,0.08)", boxSizing: "border-box", display: "flex", gap: 14, alignContent: "flex-start", [lado === "A" ? "borderLeft" : "borderRight"]: `8px solid ${laranja}` }}>
+      <div style={{ width: larguraPainel, padding: 18, borderRadius: 22, background: `linear-gradient(${lado === "A" ? "135deg" : "225deg"}, color-mix(in srgb, ${cor} 28%, transparent), rgba(0,0,0,0.30) 65%)`, border: `1px solid color-mix(in srgb, ${cor} 45%, transparent)`, boxSizing: "border-box", display: "flex", gap: 14, [lado === "A" ? "borderLeft" : "borderRight"]: `8px solid ${cor}` }}>
         {cols.map((c, i) => (
-          <div key={i} style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 10 }}>{c.map(linha)}</div>
+          <div key={i} style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 8 }}>{c.map(linha(cor))}</div>
         ))}
       </div>
     );
   };
-  const escudo = (t) => (t && (ESCUDOS_TIMES[t.nome] || t.escudoUrl)) || null;
   const { dia, hora } = dataHoraCard(match && match.horario);
-  const lado = (t) => (
+  const lado = (t, cor) => (
     <div style={{ width: 560, display: "flex", flexDirection: "column", alignItems: "center" }}>
-      {escudo(t) ? <img src={escudo(t)} alt="" style={{ width: 210, height: 210, objectFit: "contain", filter: "drop-shadow(0 14px 30px rgba(0,0,0,0.5))" }} /> : <div style={{ width: 210, height: 210 }} />}
+      {escudoDe(t) ? <img src={escudoDe(t)} alt="" style={{ width: 210, height: 210, objectFit: "contain", filter: "drop-shadow(0 14px 30px rgba(0,0,0,0.5))" }} /> : <div style={{ width: 210, height: 210 }} />}
       <div style={{ fontWeight: 800, fontSize: 52, marginTop: 10, whiteSpace: "nowrap" }}>{nomeCardTime(t)}</div>
+      <div style={{ width: 160, height: 6, borderRadius: 3, background: cor, marginTop: 10 }} />
     </div>
   );
   return (
     <div style={{ width: CARD_W, height: CARD_H, position: "relative", overflow: "hidden", fontFamily: f, color: "#fff",
-      background: fundo ? `radial-gradient(1000px 600px at 20% 0%, rgba(255,107,43,0.30), transparent 70%), radial-gradient(1000px 600px at 80% 0%, rgba(255,196,0,0.14), transparent 70%), #0B0F1C` : "transparent" }}>
-      <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: 10, background: `linear-gradient(90deg, ${laranja}, ${amarelo})` }} />
+      background: fundo ? `radial-gradient(1000px 650px at 12% 0%, color-mix(in srgb, ${corA} 38%, transparent), transparent 70%), radial-gradient(1000px 650px at 88% 0%, color-mix(in srgb, ${corB} 38%, transparent), transparent 70%), #0B0F1C` : "transparent" }}>
+      <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: 10, background: `linear-gradient(90deg, ${corA}, ${corB})` }} />
       <div style={{ position: "absolute", left: 40, right: 40, top: 34, height: 300, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        {lado(timeA)}
+        {lado(timeA, corA)}
         <div style={{ textAlign: "center", flex: 1 }}>
-          <div style={{ fontWeight: 700, fontSize: 22, letterSpacing: 6, color: amarelo }}>{EDITION_ROMAN} COPA CSU EX-ALUNOS</div>
-          <div style={{ fontWeight: 800, fontSize: 130, lineHeight: 1, margin: "6px 0", background: `linear-gradient(135deg, ${laranja}, ${amarelo})`, WebkitBackgroundClip: "text", color: "transparent" }}>X</div>
-          {match && match.fase && <div style={{ display: "inline-block", background: laranja, color: "#0B0F1C", fontWeight: 800, fontSize: 24, letterSpacing: 3, padding: "6px 24px", borderRadius: 999 }}>{match.fase.toUpperCase()}</div>}
+          <div style={{ fontWeight: 700, fontSize: 22, letterSpacing: 6, color: "rgba(255,255,255,0.8)" }}>{EDITION_ROMAN} COPA CSU EX-ALUNOS</div>
+          <div style={{ fontWeight: 800, fontSize: 130, lineHeight: 1, margin: "6px auto", display: "table", backgroundImage: `linear-gradient(90deg, ${corA}, ${corB})`, WebkitBackgroundClip: "text", backgroundClip: "text", WebkitTextFillColor: "transparent", color: "transparent" }}>X</div>
+          {match && match.fase && <div style={{ display: "inline-block", background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.25)", color: "#fff", fontWeight: 800, fontSize: 24, letterSpacing: 3, padding: "6px 24px", borderRadius: 999 }}>{match.fase.toUpperCase()}</div>}
           <div style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 24, color: "rgba(255,255,255,0.75)", marginTop: 12, letterSpacing: 2 }}>{[dia, hora, "GINÁSIO CSU"].filter(Boolean).join("  ·  ")}</div>
         </div>
-        {lado(timeB)}
+        {lado(timeB, corB)}
       </div>
-      <div style={{ position: "absolute", left: 40, right: 40, bottom: 56, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-        {painel(timeA, jA, "A")}
-        {painel(timeB, jB, "B")}
+      <div style={{ position: "absolute", left: 40, right: 40, top: 392, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        {painel(jA, corA, "A")}
+        {painel(jB, corB, "B")}
       </div>
       <div style={{ position: "absolute", left: 0, right: 0, bottom: 16, textAlign: "center", fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 18, color: "rgba(255,255,255,0.4)", letterSpacing: 4 }}>ELENCOS · APRESENTAÇÃO DO CONFRONTO</div>
     </div>
