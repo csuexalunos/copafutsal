@@ -2494,6 +2494,199 @@ function AddPlayerForm({ onAdd, turma, onCancel }) {
   );
 }
 
+// Painel simples do representante depois que o time já foi inscrito: um cartão com
+// o resumo e o botão "Editar time". Ali muda número, apelido, nome e posição direto;
+// jogador novo só entra por solicitação à comissão (a organização aprova ou recusa).
+function MeuTimeRepresentante({ team, saveTeams, avaliacoes, saveAvaliacoes }) {
+  const [aberto, setAberto] = useState(false);
+  const [edits, setEdits] = useState({});
+  const [removidos, setRemovidos] = useState([]);
+  const [contatoEd, setContatoEd] = useState(null);
+  const [mostrarSolicitar, setMostrarSolicitar] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  const [msg, setMsg] = useState("");
+  const travado = detalhesTravados(team);
+  const jogadores = (team.jogadores || []).filter((j) => !removidos.includes(j.id));
+  const valor = (j, k) => (edits[j.id] && edits[j.id][k] !== undefined ? edits[j.id][k] : j[k] || "");
+  const mudar = (j, k, v) => setEdits((e) => ({ ...e, [j.id]: { ...(e[j.id] || {}), [k]: v } }));
+  const contato = contatoEd ?? (team.contato || "");
+  const pedidos = (avaliacoes || []).filter((a) => a.timeNome === team.nome && a.tipo === "inclusao");
+  const escudo = ESCUDOS_TIMES[team.nome] || team.escudoUrl;
+
+  const salvar = async () => {
+    setSalvando(true);
+    setMsg("");
+    const final = (team.jogadores || [])
+      .filter((j) => !removidos.includes(j.id))
+      .map((j) => {
+        const e = edits[j.id] || {};
+        const aplicado = { ...j };
+        ["nome", "apelido", "numero", "posicao"].forEach((k) => {
+          if (e[k] === undefined) return;
+          if (travado && (k === "apelido" || k === "numero" || k === "posicao")) return; // prazo encerrado
+          aplicado[k] = e[k];
+        });
+        return aplicado;
+      });
+    try {
+      await saveTeams((atuais) =>
+        (atuais || []).map((t) => {
+          if (t.id !== team.id) return t;
+          const porId = new Map(final.map((j) => [j.id, j]));
+          // parte do elenco MAIS RECENTE do banco; só aplica as edições e remoções
+          const jogs = (t.jogadores || [])
+            .filter((j) => !removidos.includes(j.id))
+            .map((j) => {
+              const f = porId.get(j.id);
+              return f ? { ...j, nome: f.nome, apelido: f.apelido, numero: f.numero, posicao: f.posicao } : j;
+            });
+          return { ...t, jogadores: jogs, contato: contato.trim() || t.contato };
+        })
+      );
+      await confirmarElencoNoBanco({ id: team.id, jogadores: final });
+      const linhas = descreverAlteracoesElenco(team.jogadores, final);
+      if (contato.trim() !== (team.contato || "")) linhas.push(`✏️ Contato: "${team.contato || "—"}" → "${contato.trim()}"`);
+      if (linhas.length) {
+        registrarAlteracaoRep({ tipo: "elenco", timeId: team.id, timeNome: team.nome, linhas });
+        avisarOrg("elenco", `👥 Time alterado: ${team.nome}`, linhas.slice(0, 4).join(" · ") + (linhas.length > 4 ? ` · +${linhas.length - 4}` : ""));
+      }
+      setEdits({});
+      setRemovidos([]);
+      setContatoEd(null);
+      setMsg("✓ Salvo! A organização foi avisada.");
+    } catch (e) {
+      console.error("Falha ao salvar time", e);
+      setMsg("NÃO foi salvo — o banco não confirmou. Confira a internet e toque em Salvar de novo.");
+    }
+    setSalvando(false);
+  };
+
+  const solicitarInclusao = async (novo) => {
+    const { cpf, ...dados } = novo;
+    const caso = {
+      id: `aval_${Date.now()}`,
+      tipo: "inclusao",
+      timeNome: team.nome,
+      jogadorId: novo.id,
+      jogadorApelido: novo.apelido,
+      jogadorNome: novo.nome,
+      anoConclusao: novo.anoConclusao,
+      jogadorDados: dados,
+      status: "pendente",
+      criadoEm: new Date().toISOString(),
+    };
+    try {
+      await saveAvaliacoes((atuais) => [...(atuais || avaliacoes || []), caso]);
+      if (cpf) await salvarCpfsEmLote([{ team_id: team.id, jogador_id: novo.id, cpf }]).catch((e) => console.error("CPF", e));
+      registrarAlteracaoRep({ tipo: "elenco", timeId: team.id, timeNome: team.nome, linhas: [`🙋 Pediu para incluir: ${novo.apelido || novo.nome}`] });
+      avisarOrg("avaliacao", `🙋 Pedido de inclusão: ${team.nome}`, `${novo.apelido || novo.nome} — aguardando a comissão`);
+      setMsg("✓ Pedido enviado à comissão. Quando aprovado, o jogador entra no time.");
+    } catch (e) {
+      setMsg("Não foi possível enviar o pedido. Tente de novo.");
+    }
+  };
+
+  const inp = { backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" };
+  return (
+    <div>
+      <SectionLabel eyebrow="Seu time" title="Meu time" />
+      <div className="rounded-2xl p-5 max-w-2xl" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+        <div className="flex items-center gap-4">
+          {escudo && <img src={escudo} alt="" className="w-14 h-14 object-contain shrink-0" />}
+          <div className="flex-1 min-w-0">
+            <div className="text-lg font-bold" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>{team.nome}</div>
+            <div className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+              {(team.jogadores || []).length} jogadores · {team.pago ? "inscrição confirmada ✓" : "aguardando confirmação de pagamento"}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setAberto((v) => !v)}
+            className="px-4 py-2 rounded-xl text-sm font-semibold shrink-0"
+            style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}
+          >
+            {aberto ? "Fechar" : "Editar time"}
+          </button>
+        </div>
+
+        {aberto && (
+          <div className="mt-5">
+            {travado && (
+              <div className="rounded-lg px-3 py-2 mb-3 text-xs" style={{ backgroundColor: COLORS.accentSoft, color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
+                🔒 O prazo para alterar apelido, número e posição terminou em 02/11. Para mudar, peça liberação à organização.
+              </div>
+            )}
+            <div className="mb-3">
+              <label className="block text-[11px] font-semibold uppercase tracking-wide mb-1" style={{ color: COLORS.slate }}>Contato (WhatsApp)</label>
+              <input value={contato} onChange={(e) => setContatoEd(e.target.value)} className="w-full px-3 py-2 rounded-lg text-sm" style={inp} />
+            </div>
+            <div className="space-y-2">
+              {jogadores.map((j) => (
+                <div key={j.id} className="rounded-xl p-2.5 grid grid-cols-12 gap-1.5 items-center" style={{ backgroundColor: COLORS.zebra }}>
+                  <input value={valor(j, "numero")} onChange={(e) => mudar(j, "numero", e.target.value)} disabled={travado} placeholder="Nº" inputMode="numeric"
+                    className="col-span-2 px-2 py-2 rounded-lg text-sm text-center font-bold" style={inp} />
+                  <input value={valor(j, "apelido")} onChange={(e) => mudar(j, "apelido", e.target.value)} disabled={travado} placeholder="Apelido"
+                    className="col-span-4 px-2 py-2 rounded-lg text-sm" style={inp} />
+                  <select value={valor(j, "posicao")} onChange={(e) => mudar(j, "posicao", e.target.value)} disabled={travado}
+                    className="col-span-4 px-1.5 py-2 rounded-lg text-sm" style={inp}>
+                    <option value="">Posição</option>
+                    <option value="Goleiro">Goleiro</option>
+                    <option value="Fixo">Fixo</option>
+                    <option value="Ala">Ala</option>
+                    <option value="Pivô">Pivô</option>
+                  </select>
+                  <button type="button" aria-label="Remover jogador" className="col-span-2 flex justify-center"
+                    onClick={() => { if (window.confirm(`Remover ${j.apelido || j.nome} do time?`)) setRemovidos((r) => [...r, j.id]); }}>
+                    <X size={15} color={COLORS.slate} />
+                  </button>
+                  <input value={valor(j, "nome")} onChange={(e) => mudar(j, "nome", e.target.value)} placeholder="Nome completo"
+                    className="col-span-12 px-2 py-2 rounded-lg text-xs" style={inp} />
+                </div>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 mt-4">
+              <button type="button" onClick={salvar} disabled={salvando}
+                className="px-5 py-2.5 rounded-xl font-semibold text-sm" style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}>
+                {salvando ? "Salvando..." : "Salvar alterações"}
+              </button>
+              <button type="button" onClick={() => setMostrarSolicitar((v) => !v)} className="text-sm font-semibold underline" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
+                + Solicitar inclusão de jogador
+              </button>
+            </div>
+            <p className="text-[11px] mt-2" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+              Número, apelido, posição e nome mudam na hora. Jogador novo precisa da aprovação da comissão.
+            </p>
+            {mostrarSolicitar && (
+              <div className="mt-3">
+                <AddPlayerForm onAdd={solicitarInclusao} turma={team.nome} onCancel={() => setMostrarSolicitar(false)} />
+              </div>
+            )}
+          </div>
+        )}
+
+        {msg && <p className="text-xs mt-3 font-semibold" style={{ color: msg.startsWith("✓") ? "#4ADE80" : "#DC2626", fontFamily: "'Inter', sans-serif" }}>{msg}</p>}
+
+        {pedidos.length > 0 && (
+          <div className="mt-5">
+            <div className="text-[11px] font-bold uppercase tracking-widest mb-1.5" style={{ color: COLORS.slate }}>Pedidos de inclusão</div>
+            <ul className="space-y-1">
+              {pedidos.slice(-8).reverse().map((a) => (
+                <li key={a.id} className="text-xs" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+                  {a.jogadorApelido || a.jogadorNome} —{" "}
+                  <b style={{ color: a.status === "aprovada" ? "#4ADE80" : a.status === "recusada" ? "#DC2626" : COLORS.accent }}>
+                    {a.status === "aprovada" ? "aprovado" : a.status === "recusada" ? "recusado" : "aguardando a comissão"}
+                  </b>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes, config }) {
   const prazoInscricaoTexto = (config && config.prazoInscricao) || PRAZO_INSCRICAO;
   const isAdmin = sessao && sessao.tipo === "admin";
@@ -2828,6 +3021,10 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes, confi
   const timeDoRepresentante = !isAdmin && turmaFixa ? teams.find((t) => t.nome === turmaFixa) : null;
   const edicaoDoTimeAberta =
     !!timeDoRepresentante && (agoraReal() < PRAZO_EDICAO_DETALHES.getTime() || !!timeDoRepresentante.edicaoLiberada);
+  // Time já inscrito: só o painel simples "Meu time" (resumo + botão Editar time).
+  if (timeDoRepresentante && (edicaoDoTimeAberta || inscricaoAberta(config, turmaFixa))) {
+    return <MeuTimeRepresentante team={timeDoRepresentante} saveTeams={saveTeams} avaliacoes={avaliacoes} saveAvaliacoes={saveAvaliacoes} />;
+  }
   if (!inscricaoAberta(config, turmaFixa) && !edicaoDoTimeAberta) {
     return (
       <div>
@@ -8845,7 +9042,7 @@ function DiagnosticoIrregularidades({ teams, avaliacoes, aprovarExcecao, manterI
                   {(() => {
                     const t = teams.find((x) => x.nome === a.timeNome);
                     const j = t && (t.jogadores || []).find((x) => x.id === a.jogadorId);
-                    const { motivo, artigo } = motivoIrregularidadeJogador(t, j, a);
+                    const { motivo, artigo } = a.tipo === "inclusao" ? { motivo: "Pedido de inclusão de jogador novo no time", artigo: "" } : motivoIrregularidadeJogador(t, j, a);
                     return (
                       <div className="text-[11px] mt-0.5" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
                         <strong>Motivo:</strong> {motivo}
