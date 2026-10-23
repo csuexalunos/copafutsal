@@ -617,11 +617,51 @@ function carimbarLoteContratado(jogadores) {
 // Cada confirmação de pagamento (historicoPagamentos) cobre um grupo de
 // jogadores: pelos ids gravados na confirmação (novas) ou, nas antigas,
 // pela ordem do elenco (a 1ª confirmação cobre os primeiros "qtd" jogadores etc).
+// Data que vale para definir o lote de um pagamento. Pagamentos antigos (sem
+// "ids") que ninguém corrigiu à mão: o 1º costuma ter sido confirmado dias
+// depois do pagamento real (a data gravada é a do clique), então vale a data de
+// inscrição do time, se for anterior. Depois que a organização corrige a data
+// no card ("corrigida"), vale exatamente a data informada.
+function dataEfetivaPagamento(h, team, indice) {
+  if (!h) return null;
+  if (!h.corrigida && indice === 0 && !Array.isArray(h.ids) && team && team.inscritoEm && new Date(team.inscritoEm) < new Date(h.data)) return team.inscritoEm;
+  return h.data;
+}
+function loteDoPagamentoEntrada(h, team) {
+  const hist = Array.isArray(team && team.historicoPagamentos) ? team.historicoPagamentos : [];
+  const i = hist.indexOf(h);
+  return loteNaData(dataEfetivaPagamento(h, team, i < 0 ? 0 : i));
+}
+// Planilha de inscrições de 03/10/2026 (conferida pela organização): lote e
+// quantidade do 1º pagamento de cada time. Vale para os primeiros jogadores do
+// elenco enquanto a data de pagamento não for corrigida à mão no card; quem
+// entrou depois segue a data do próprio pagamento.
+const PAGAMENTO_INICIAL_03OUT = {
+  "2010": [[11, "Lote 1"]], "2021": [[7, "Lote 1"], [2, "Lote 2"]], "2015": [[7, "Lote 1"]], "2016": [[10, "Lote 1"]],
+  "2009": [[7, "Lote 1"]], "2018": [[8, "Lote 1"]], "2007/06": [[14, "Lote 1"]], "2022.2": [[7, "Lote 3"]],
+  "2008": [[10, "Lote 1"]], "2022.1": [[11, "Lote 1"]], "2003/04": [[8, "Lote 3"]], "2001/02": [[11, "Lote 1"]],
+  "2020": [[11, "Lote 1"]], "2014": [[13, "Lote 1"]], "2012": [[12, "Lote 3"]], "2025": [[11, "Lote 3"]],
+  "2024": [[9, "Lote 3"]], "2019": [[7, "Lote 3"]], "2013": [[7, "Lote 3"]], "2022.3": [[9, "Lote 3"]],
+};
+function loteInicialPlanilha(jogador, team, pag) {
+  const seg = team && PAGAMENTO_INICIAL_03OUT[String(team.nome).trim()];
+  if (!seg || !jogador) return null;
+  if (pag && (pag.corrigida || Array.isArray(pag.ids))) return null;
+  const jogadores = Array.isArray(team.jogadores) ? team.jogadores : [];
+  const idx = jogadores.findIndex((j) => j.id === jogador.id);
+  if (idx < 0) return null;
+  let acc = 0;
+  for (const [qtd, lote] of seg) {
+    acc += qtd;
+    if (idx < acc) return lote;
+  }
+  return null;
+}
 function pagamentoDoJogador(jogador, team) {
   if (!jogador || !team || !team.pago) return null;
   const jogadores = Array.isArray(team.jogadores) ? team.jogadores : [];
   let hist = Array.isArray(team.historicoPagamentos) ? team.historicoPagamentos.filter((h) => h && h.data) : [];
-  if (!hist.length && team.pagoEm) hist = [{ data: team.pagoEm, qtd: jogadores.length }];
+  if (!hist.length && team.pagoEm) hist = [{ data: team.pagoEm, qtd: jogadores.length, corrigida: !!team.pagoEmCorrigido }];
   const porId = hist.find((h) => Array.isArray(h.ids) && h.ids.includes(jogador.id));
   if (porId) return porId;
   const idx = jogadores.findIndex((j) => j.id === jogador.id);
@@ -641,7 +681,9 @@ function entrouDepoisDoPagamento(jogador, team) {
 }
 function loteDoJogador(jogador, team) {
   const pag = pagamentoDoJogador(jogador, team);
-  if (pag) return loteNaData(pag.data);
+  const ini = team && team.pago ? loteInicialPlanilha(jogador, team, pag) : null;
+  if (ini) return ini;
+  if (pag) return loteDoPagamentoEntrada(pag, team);
   if (jogador && jogador.loteContratado) return jogador.loteContratado;
   if (entrouDepoisDoPagamento(jogador, team)) return loteNaData(new Date());
   return loteNaData(dataParaCalculoDeLote(team));
@@ -9199,7 +9241,7 @@ function StatusAprovacaoPagamento({ teams, saveTeams }) {
       (atuais || []).map((t) => {
         if (t.id !== team.id) return t;
         const historico = [...(t.historicoPagamentos || [])];
-        if (historico[indice]) historico[indice] = { ...historico[indice], data: novaData, lote: loteNaData(novaData) };
+        if (historico[indice]) historico[indice] = { ...historico[indice], data: novaData, lote: loteNaData(novaData), corrigida: true };
         // O campo antigo (pagoEm) acompanha a data mais recente do
         // histórico, pra quem ainda depende dele (ex: filtros antigos).
         const maisRecente = historico.reduce((max, h) => (!max || h.data > max ? h.data : max), null);
@@ -9213,7 +9255,7 @@ function StatusAprovacaoPagamento({ teams, saveTeams }) {
   const corrigirDataPagamentoAntigo = async (team, novaDataYYYYMMDD) => {
     if (!novaDataYYYYMMDD) return;
     const novaData = new Date(novaDataYYYYMMDD + "T12:00:00").toISOString();
-    await saveTeams((atuais) => (atuais || []).map((t) => (t.id === team.id ? { ...t, pagoEm: novaData } : t)));
+    await saveTeams((atuais) => (atuais || []).map((t) => (t.id === team.id ? { ...t, pagoEm: novaData, pagoEmCorrigido: true } : t)));
   };
 
   const times = teams.map((t) => ({
@@ -9292,7 +9334,7 @@ function StatusAprovacaoPagamento({ teams, saveTeams }) {
                     {(t.historicoPagamentos || []).map((h, i) => (
                       <div key={i} className="flex items-center gap-2 text-xs flex-wrap" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
                         <span>
-                          Pago em {h.qtd} atleta(s) ({h.data ? loteNaData(h.data) : h.lote || "—"}):
+                          Pago em {h.qtd} atleta(s) ({h.data ? loteDoPagamentoEntrada(h, t) : h.lote || "—"}):
                         </span>
                         <input
                           type="date"
