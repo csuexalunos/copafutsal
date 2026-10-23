@@ -1,3 +1,4 @@
+import { toPng } from "html-to-image";
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Trophy,
@@ -3812,6 +3813,207 @@ function AvisosOrganizacaoCard() {
         </button>
       )}
       {erro && <p className="text-xs mt-2" style={{ color: "#DC2626" }}>{erro}</p>}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Card de apresentação do time (transmissão) — 1920x1080, pra OBS ou PNG
+// ---------------------------------------------------------------------------
+const CARD_W = 1920;
+const CARD_H = 1080;
+function jogadoresParaCard(team) {
+  const base = Array.isArray(team.jogadores) && team.jogadores.length > 0 ? team.jogadores : ELENCOS_2025[team.nome] || [];
+  const ordemPos = { Goleiro: 0, Fixo: 1, Ala: 2, "Pivô": 3 };
+  return base
+    .slice(0, 16)
+    .sort((a, b) => (ordemPos[a.posicao] ?? 9) - (ordemPos[b.posicao] ?? 9) || (Number(a.numero) || 999) - (Number(b.numero) || 999));
+}
+
+function CardApresentacaoTime({ team, grupo, fundo = true }) {
+  const jogs = jogadoresParaCard(team);
+  const escudo = ESCUDOS_TIMES[team.nome] || team.escudoUrl;
+  const apelidoTime = (TURMAS_HISTORICAS.find((t) => t.turma === team.nome) || {}).apelido || "";
+  const f = "'Sora', 'Inter', sans-serif";
+  const laranja = "#FF6B2B";
+  const amarelo = "#FFC400";
+  const colunas = [jogs.slice(0, Math.ceil(jogs.length / 2)), jogs.slice(Math.ceil(jogs.length / 2))];
+  // altura das linhas se ajusta à quantidade de atletas (5 a 8 linhas por coluna)
+  const nLinhas = Math.max(1, colunas[0].length);
+  const rowH = Math.min(124, Math.floor((730 - (nLinhas - 1) * 14) / nLinhas));
+  const linha = (j) => (
+    <div key={j.id || `${j.numero}${j.apelido}`} style={{ display: "flex", alignItems: "center", gap: 22, height: rowH, background: "rgba(255,255,255,0.06)", borderRadius: 18, padding: "0 22px 0 0", overflow: "hidden", border: "1px solid rgba(255,255,255,0.08)" }}>
+      <div style={{ width: rowH, height: "100%", background: `linear-gradient(135deg, ${laranja}, ${amarelo})`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: f, fontWeight: 800, fontSize: Math.round(rowH * 0.56), color: "#0B0F1C", flexShrink: 0 }}>
+        {j.numero || "–"}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontFamily: f, fontWeight: 800, fontSize: Math.round(rowH * 0.42), lineHeight: 1.05, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {j.apelido || (j.nome || "").split(" ")[0]}
+        </div>
+        <div style={{ fontFamily: "'Inter', sans-serif", fontWeight: 500, fontSize: Math.round(rowH * 0.23), color: "rgba(255,255,255,0.6)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: 4 }}>
+          {j.apelido ? j.nome : ""}
+        </div>
+      </div>
+      {j.posicao && (
+        <div style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 20, letterSpacing: 2, textTransform: "uppercase", color: amarelo, border: `2px solid ${amarelo}`, borderRadius: 999, padding: "6px 16px", flexShrink: 0 }}>
+          {j.posicao}
+        </div>
+      )}
+    </div>
+  );
+  return (
+    <div
+      style={{
+        width: CARD_W, height: CARD_H, position: "relative", overflow: "hidden", fontFamily: f, color: "#fff",
+        background: fundo ? `radial-gradient(900px 700px at 18% 40%, rgba(255,107,43,0.35), transparent 70%), radial-gradient(800px 600px at 90% 100%, rgba(255,196,0,0.12), transparent 70%), #0B0F1C` : "transparent",
+      }}
+    >
+      {/* faixa lateral */}
+      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 14, background: `linear-gradient(${laranja}, ${amarelo})` }} />
+      {/* esquerda: identidade do time */}
+      <div style={{ position: "absolute", left: 80, top: 70, width: 640, bottom: 70, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
+        <div style={{ fontWeight: 700, fontSize: 26, letterSpacing: 8, color: amarelo, marginBottom: 28 }}>
+          {EDITION_ROMAN} COPA CSU EX-ALUNOS
+        </div>
+        {escudo && <img src={escudo} alt="" style={{ width: 400, height: 400, objectFit: "contain", filter: "drop-shadow(0 20px 40px rgba(0,0,0,0.5))" }} />}
+        <div style={{ fontWeight: 800, fontSize: /^\d/.test(team.nome) ? 150 : 96, lineHeight: 1, marginTop: 28, letterSpacing: -2 }}>
+          {team.nome}
+        </div>
+        {apelidoTime && (
+          <div style={{ fontWeight: 600, fontSize: 36, color: amarelo, marginTop: 14, fontStyle: "italic" }}>“{apelidoTime}”</div>
+        )}
+        {grupo && (
+          <div style={{ marginTop: 28, background: laranja, color: "#0B0F1C", fontWeight: 800, fontSize: 30, letterSpacing: 4, padding: "10px 34px", borderRadius: 999 }}>
+            {grupo.toUpperCase()}
+          </div>
+        )}
+      </div>
+      {/* direita: elenco */}
+      <div style={{ position: "absolute", left: 760, right: 70, top: 70, bottom: 70, display: "flex", flexDirection: "column" }}>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 26 }}>
+          <div style={{ fontWeight: 800, fontSize: 54, letterSpacing: 1 }}>ELENCO</div>
+          <div style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 24, color: "rgba(255,255,255,0.6)" }}>
+            {jogs.length} atletas{team.capitao ? ` · Representante: ${team.capitao}` : ""}
+          </div>
+        </div>
+        <div style={{ flex: 1, display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", columnGap: 26, alignContent: "start" }}>
+          {colunas.map((col, i) => (
+            <div key={i} style={{ display: "flex", flexDirection: "column", gap: 14 }}>{col.map(linha)}</div>
+          ))}
+        </div>
+        <div style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 22, color: "rgba(255,255,255,0.45)", letterSpacing: 3, marginTop: 20 }}>
+          GINÁSIO CSU · APRESENTAÇÃO DOS TIMES
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Escala o card 1920x1080 pra caber na área disponível.
+function CardEscalado({ team, grupo, fundo = true, larguraMax }) {
+  const [w, setW] = useState(larguraMax || window.innerWidth);
+  useEffect(() => {
+    if (larguraMax) return;
+    const f = () => setW(window.innerWidth);
+    window.addEventListener("resize", f);
+    return () => window.removeEventListener("resize", f);
+  }, [larguraMax]);
+  const k = Math.min(w / CARD_W, larguraMax ? 9 : window.innerHeight / CARD_H);
+  return (
+    <div style={{ width: CARD_W * k, height: CARD_H * k, overflow: "hidden" }}>
+      <div style={{ width: CARD_W, height: CARD_H, transform: `scale(${k})`, transformOrigin: "top left" }}>
+        <CardApresentacaoTime team={team} grupo={grupo} fundo={fundo} />
+      </div>
+    </div>
+  );
+}
+
+function grupoDoTime(team, matches) {
+  const m = (matches || []).find((x) => (x.fase || "").startsWith("Grupo") && (x.timeA === team.id || x.timeB === team.id));
+  return m ? m.fase : "";
+}
+
+// Página cheia (?card=2009) — usada como "Fonte de navegador" no OBS (fundo=0 deixa transparente).
+function PaginaCardTime({ turma, teams, matches, fundo }) {
+  const team = teams.find((t) => t.nome === turma) || { id: turma, nome: turma, jogadores: [] };
+  useEffect(() => {
+    if (fundo) return;
+    const antes = [document.documentElement.style.background, document.body.style.background];
+    document.documentElement.style.background = "transparent";
+    document.body.style.background = "transparent";
+    return () => {
+      document.documentElement.style.background = antes[0];
+      document.body.style.background = antes[1];
+    };
+  }, [fundo]);
+  return (
+    <div style={{ background: fundo ? "#0B0F1C" : "transparent", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+      <CardEscalado team={team} grupo={grupoDoTime(team, matches)} fundo={fundo} />
+    </div>
+  );
+}
+
+// Seção da Organização: pré-visualiza, baixa PNG e copia o link pro OBS.
+function PainelCardsTransmissao({ teams, matches }) {
+  const [sel, setSel] = useState(null);
+  const [baixando, setBaixando] = useState("");
+  const [copiado, setCopiado] = useState("");
+  const refCard = React.useRef(null);
+  const base = window.location.origin + window.location.pathname;
+  const baixar = async (team, comFundo) => {
+    setBaixando(team.id);
+    try {
+      const no = refCard.current && refCard.current.querySelector("[data-card]");
+      const url = await toPng(no, { width: CARD_W, height: CARD_H, pixelRatio: 1, cacheBust: true, style: { transform: "none" } });
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `card-${team.nome.replace(/[^\w.-]+/g, "_")}.png`;
+      a.click();
+    } catch (e) {
+      console.error("Falha ao gerar PNG do card", e);
+      alert("Não consegui gerar o PNG. Use o link do OBS ou tire print da pré-visualização.");
+    }
+    setBaixando("");
+  };
+  const copiar = async (team) => {
+    const link = `${base}?card=${encodeURIComponent(team.nome)}&fundo=0`;
+    try { await navigator.clipboard.writeText(link); setCopiado(team.id); setTimeout(() => setCopiado(""), 2000); } catch (e) { window.prompt("Copie o link:", link); }
+  };
+  const lista = teams.filter(timeInscritoOficialmente);
+  const atual = teams.find((t) => t.id === sel);
+  return (
+    <div className="mt-4">
+      <p className="text-xs mb-4 max-w-xl" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+        Card 16:9 (1920×1080) de cada time com escudo, grupo e elenco, sempre com os dados atuais. Pra transmissão:
+        use <b>Copiar link pro OBS</b> (Fonte de navegador, 1920×1080, fundo transparente) ou <b>Baixar PNG</b>.
+      </p>
+      <ul className="space-y-2 max-w-xl">
+        {lista.map((t) => (
+          <li key={t.id} className="flex flex-wrap items-center gap-2 px-3 py-2.5 rounded-xl" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+            {(ESCUDOS_TIMES[t.nome] || t.escudoUrl) && <img src={ESCUDOS_TIMES[t.nome] || t.escudoUrl} alt="" className="w-7 h-7 object-contain" />}
+            <span className="font-semibold text-sm mr-auto" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>{t.nome}</span>
+            <button type="button" onClick={() => setSel(sel === t.id ? null : t.id)} className="text-xs font-semibold underline" style={{ color: COLORS.accent }}>
+              {sel === t.id ? "Fechar" : "Ver card"}
+            </button>
+            <button type="button" onClick={() => copiar(t)} className="text-xs font-semibold px-2.5 py-1.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, color: COLORS.ink }}>
+              {copiado === t.id ? "Link copiado!" : "Copiar link pro OBS"}
+            </button>
+          </li>
+        ))}
+      </ul>
+      {atual && (
+        <div className="mt-5 max-w-3xl">
+          <div ref={refCard} className="rounded-xl overflow-hidden" style={{ border: `1px solid ${COLORS.border}` }}>
+            <div data-card style={{ width: CARD_W, height: CARD_H, transformOrigin: "top left", transform: "scale(0.4)", marginBottom: -CARD_H * 0.6, marginRight: -CARD_W * 0.6 }}>
+              <CardApresentacaoTime team={atual} grupo={grupoDoTime(atual, matches)} />
+            </div>
+          </div>
+          <button type="button" onClick={() => baixar(atual)} disabled={!!baixando}
+            className="mt-3 px-4 py-2 rounded-xl text-sm font-semibold" style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}>
+            {baixando ? "Gerando..." : "Baixar PNG (1920×1080)"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -11451,6 +11653,7 @@ const GRUPOS_ORGANIZACAO = [
   { chave: "historico", titulo: "Alterações dos representantes", subtitulo: "Tudo que os times mudaram — sem precisar aprovar", icone: Clock },
   { chave: "times", titulo: "Times e elencos", subtitulo: "Elencos, irregularidades, CPFs, contatos", icone: ShieldCheck },
   { chave: "financeiro", titulo: "Financeiro", subtitulo: "Pagamentos e planilha de inscrições", icone: Wallet },
+  { chave: "cards", titulo: "Cards da transmissão", subtitulo: "Apresentação de cada time e atletas (OBS / PNG)", icone: Video },
   { chave: "jogos", titulo: "Jogos", subtitulo: "Transmissão, mata-mata, tabela", icone: Swords },
   { chave: "local_sorteio", titulo: "Local do sorteio", subtitulo: "Onde e quando é — só representantes veem", icone: MapPin },
   { chave: "documentos", titulo: "Documentos e downloads", subtitulo: "Fichas, súmulas e escudos em HD", icone: Download },
@@ -13326,6 +13529,8 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
         </div>
       )}
 
+      {secaoAtiva === "cards" && <PainelCardsTransmissao teams={teams} matches={matches} />}
+
       {secaoAtiva === "avisos" && <PainelAvisosJogos matches={matches} teams={teams} saveMatches={saveMatches} />}
 
       {secaoAtiva === "historico" && (
@@ -13991,6 +14196,14 @@ export default function App() {
       setFabBusy(false);
     }
   };
+
+  const paramsUrl = new URLSearchParams(window.location.search);
+  const cardTurma = paramsUrl.get("card");
+  if (cardTurma) {
+    // Página só com o card do time (pra Fonte de navegador do OBS).
+    if (loading) return <div />;
+    return <PaginaCardTime turma={cardTurma} teams={teams} matches={matches} fundo={paramsUrl.get("fundo") !== "0"} />;
+  }
 
   if (loading) {
     return (
