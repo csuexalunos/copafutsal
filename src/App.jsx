@@ -3038,10 +3038,10 @@ function BotaoWhatsappJogo({ chave, texto }) {
         window.open(`https://wa.me/?text=${encodeURIComponent(`${texto}\n${url}`)}`, "_blank", "noopener");
         registrarEvento("compartilhamento", chave).catch((err) => console.error("Falha ao registrar compartilhamento", err));
       }}
-      className="absolute top-2 right-2 z-10 w-8 h-8 rounded-full flex items-center justify-center"
-      style={{ backgroundColor: "#25D366" }}
+      className="absolute top-2 right-2 z-10 w-6 h-6 rounded-full flex items-center justify-center opacity-60 hover:opacity-100"
+      style={{ backgroundColor: "transparent", border: `1px solid ${COLORS.border}` }}
     >
-      <svg viewBox="0 0 24 24" width="17" height="17" fill="#fff" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="12" height="12" fill="#25D366" aria-hidden="true">
         <path d="M12.04 2a9.9 9.9 0 0 0-8.4 15.1L2 22l5-1.6A9.9 9.9 0 1 0 12.04 2zm0 1.8a8.1 8.1 0 1 1-4.3 15l-.3-.2-3 .9.9-2.9-.2-.3A8.1 8.1 0 0 1 12.04 3.8zM8.6 7.5c-.2 0-.5.1-.7.3-.3.3-1 1-1 2.4s1 2.8 1.2 3c.1.2 2 3.1 4.9 4.3 2.4 1 2.9.8 3.4.7.6-.1 1.7-.7 1.9-1.4.2-.7.2-1.2.2-1.4-.1-.1-.3-.2-.6-.3l-1.900-.9c-.3-.1-.5-.1-.7.1l-.9 1.100c-.2.200-.3.200-.6.100-.3-.1-1.200-.4-2.300-1.400-.8-.8-1.400-1.700-1.500-2-.2-.3 0-.4.100-.6l.5-.5c.1-.2.200-.3.300-.5.100-.2 0-.4 0-.5l-.9-2.100c-.2-.5-.4-.5-.6-.5z"/>
       </svg>
     </button>
