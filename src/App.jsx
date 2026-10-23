@@ -4003,13 +4003,16 @@ function PainelCardsTransmissao({ teams, matches }) {
       </ul>
       {atual && (
         <div className="mt-5 max-w-3xl">
-          <div ref={refCard} className="rounded-xl overflow-hidden" style={{ border: `1px solid ${COLORS.border}` }}>
-            <div data-card style={{ width: CARD_W, height: CARD_H, transformOrigin: "top left", transform: "scale(0.4)", marginBottom: -CARD_H * 0.6, marginRight: -CARD_W * 0.6 }}>
-              <CardApresentacaoTime team={atual} grupo={grupoDoTime(atual, matches)} />
+          <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${COLORS.border}`, width: CARD_W * 0.4, maxWidth: "100%", height: CARD_H * 0.4, position: "relative", backgroundColor: "#0B0F1C" }}>
+            <div ref={refCard} style={{ position: "absolute", top: 0, left: 0, width: CARD_W, height: CARD_H, transformOrigin: "top left", transform: "scale(0.4)" }}>
+              <div data-card style={{ width: CARD_W, height: CARD_H }}>
+                <CardApresentacaoTime team={atual} grupo={grupoDoTime(atual, matches)} />
+              </div>
             </div>
           </div>
+          <a href={`${base}?card=${encodeURIComponent(atual.nome)}`} target="_blank" rel="noreferrer" className="inline-block mt-2 text-xs font-semibold underline" style={{ color: COLORS.accent }}>Abrir em tela cheia (nova aba)</a>
           <button type="button" onClick={() => baixar(atual)} disabled={!!baixando}
-            className="mt-3 px-4 py-2 rounded-xl text-sm font-semibold" style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}>
+            className="mt-3 block px-4 py-2 rounded-xl text-sm font-semibold" style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}>
             {baixando ? "Gerando..." : "Baixar PNG (1920×1080)"}
           </button>
         </div>
