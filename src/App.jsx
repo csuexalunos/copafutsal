@@ -2610,62 +2610,105 @@ function MeuTimeRepresentante({ team, saveTeams, avaliacoes, saveAvaliacoes }) {
         </div>
 
         {aberto && (
-          <div className="mt-5">
+          <div className="mt-5 pt-5 border-t" style={{ borderColor: COLORS.border }}>
             {travado && (
-              <div className="rounded-lg px-3 py-2 mb-3 text-xs" style={{ backgroundColor: COLORS.accentSoft, color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
+              <div className="rounded-lg px-3 py-2 mb-4 text-xs" style={{ backgroundColor: COLORS.accentSoft, color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
                 🔒 O prazo para alterar apelido, número e posição terminou em 02/11. Para mudar, peça liberação à organização.
               </div>
             )}
-            <div className="mb-3">
-              <label className="block text-[11px] font-semibold uppercase tracking-wide mb-1" style={{ color: COLORS.slate }}>Contato (WhatsApp)</label>
-              <input value={contato} onChange={(e) => setContatoEd(e.target.value)} className="w-full px-3 py-2 rounded-lg text-sm" style={inp} />
-            </div>
-            <div className="space-y-2">
-              {jogadores.map((j) => (
-                <div key={j.id} className="rounded-xl p-2.5 grid grid-cols-12 gap-1.5 items-center" style={{ backgroundColor: COLORS.zebra }}>
-                  <input value={valor(j, "numero")} onChange={(e) => mudar(j, "numero", e.target.value)} disabled={travado} placeholder="Nº" inputMode="numeric"
-                    className="col-span-2 px-2 py-2 rounded-lg text-sm text-center font-bold" style={inp} />
-                  <input value={valor(j, "apelido")} onChange={(e) => mudar(j, "apelido", e.target.value)} disabled={travado} placeholder="Apelido"
-                    className="col-span-4 px-2 py-2 rounded-lg text-sm" style={inp} />
-                  <select value={valor(j, "posicao")} onChange={(e) => mudar(j, "posicao", e.target.value)} disabled={travado}
-                    className="col-span-4 px-1.5 py-2 rounded-lg text-sm" style={inp}>
-                    <option value="">Posição</option>
-                    <option value="Goleiro">Goleiro</option>
-                    <option value="Fixo">Fixo</option>
-                    <option value="Ala">Ala</option>
-                    <option value="Pivô">Pivô</option>
-                  </select>
-                  <button type="button" aria-label="Remover jogador" className="col-span-2 flex justify-center"
-                    onClick={() => { if (window.confirm(`Remover ${j.apelido || j.nome} do time?`)) setRemovidos((r) => [...r, j.id]); }}>
-                    <X size={15} color={COLORS.slate} />
-                  </button>
-                  <input value={valor(j, "nome")} onChange={(e) => mudar(j, "nome", e.target.value)} placeholder="Nome completo"
-                    className="col-span-12 px-2 py-2 rounded-lg text-xs" style={inp} />
-                </div>
-              ))}
+
+            <div className="mb-6">
+              <div className="text-[11px] font-bold uppercase tracking-widest mb-2" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                Contato do representante
+              </div>
+              <input value={contato} onChange={(e) => setContatoEd(e.target.value)} placeholder="WhatsApp com DDD" className="w-full sm:w-72 px-3 py-2.5 rounded-lg text-sm" style={inp} />
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 mt-4">
-              <button type="button" onClick={salvar} disabled={salvando}
-                className="px-5 py-2.5 rounded-xl font-semibold text-sm" style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}>
-                {salvando ? "Salvando..." : "Salvar alterações"}
-              </button>
-              <button type="button" onClick={() => setMostrarSolicitar((v) => !v)} className="text-sm font-semibold underline" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
-                + Solicitar inclusão de jogador
-              </button>
+            <div className="flex items-baseline justify-between mb-2">
+              <div className="text-[11px] font-bold uppercase tracking-widest" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                Jogadores ({jogadores.length})
+              </div>
+              <div className="text-[11px]" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>Toque no campo para editar</div>
             </div>
-            <p className="text-[11px] mt-2" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-              Número, apelido, posição e nome mudam na hora. Jogador novo precisa da aprovação da comissão.
-            </p>
+
+            <div className="space-y-3">
+              {jogadores.map((j, idx) => {
+                const rot = { color: COLORS.slate, fontFamily: "'Inter', sans-serif" };
+                return (
+                  <div key={j.id} className="rounded-xl p-3" style={{ backgroundColor: COLORS.zebra, border: `1px solid ${COLORS.border}` }}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+                        Jogador {idx + 1}
+                      </span>
+                      <button
+                        type="button"
+                        className="text-[11px] font-semibold underline"
+                        style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+                        onClick={() => { if (window.confirm(`Remover ${j.apelido || j.nome} do time?`)) setRemovidos((r) => [...r, j.id]); }}
+                      >
+                        Remover
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-6 gap-x-3 gap-y-2.5">
+                      <label className="col-span-2 sm:col-span-1">
+                        <span className="block text-[10px] font-semibold uppercase tracking-wide mb-1" style={rot}>Nº</span>
+                        <input value={valor(j, "numero")} onChange={(e) => mudar(j, "numero", e.target.value)} disabled={travado} inputMode="numeric"
+                          className="w-full px-2 py-2 rounded-lg text-sm text-center font-bold disabled:opacity-60" style={inp} />
+                      </label>
+                      <label className="col-span-4 sm:col-span-2">
+                        <span className="block text-[10px] font-semibold uppercase tracking-wide mb-1" style={rot}>Apelido</span>
+                        <input value={valor(j, "apelido")} onChange={(e) => mudar(j, "apelido", e.target.value)} disabled={travado}
+                          className="w-full px-3 py-2 rounded-lg text-sm disabled:opacity-60" style={inp} />
+                      </label>
+                      <label className="col-span-6 sm:col-span-3">
+                        <span className="block text-[10px] font-semibold uppercase tracking-wide mb-1" style={rot}>Posição</span>
+                        <select value={valor(j, "posicao")} onChange={(e) => mudar(j, "posicao", e.target.value)} disabled={travado}
+                          className="w-full px-2 py-2 rounded-lg text-sm disabled:opacity-60" style={inp}>
+                          <option value="">Escolha</option>
+                          <option value="Goleiro">Goleiro</option>
+                          <option value="Fixo">Fixo</option>
+                          <option value="Ala">Ala</option>
+                          <option value="Pivô">Pivô</option>
+                        </select>
+                      </label>
+                      <label className="col-span-6">
+                        <span className="block text-[10px] font-semibold uppercase tracking-wide mb-1" style={rot}>Nome completo</span>
+                        <input value={valor(j, "nome")} onChange={(e) => mudar(j, "nome", e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg text-sm" style={inp} />
+                      </label>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setMostrarSolicitar((v) => !v)}
+              className="w-full mt-4 px-4 py-3 rounded-xl text-sm font-semibold"
+              style={{ border: `1.5px dashed ${COLORS.accent}`, color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}
+            >
+              + Solicitar inclusão de jogador <span className="font-normal text-xs">(a comissão aprova)</span>
+            </button>
             {mostrarSolicitar && (
               <div className="mt-3">
                 <AddPlayerForm onAdd={solicitarInclusao} turma={team.nome} onCancel={() => setMostrarSolicitar(false)} />
               </div>
             )}
+
+            <div className="sticky bottom-0 -mx-5 -mb-5 mt-5 px-5 py-3 rounded-b-2xl flex items-center gap-3" style={{ backgroundColor: COLORS.card, borderTop: `1px solid ${COLORS.border}` }}>
+              <button type="button" onClick={salvar} disabled={salvando}
+                className="px-6 py-2.5 rounded-xl font-semibold text-sm" style={{ backgroundColor: COLORS.accent, color: "#0B1220", fontFamily: "'Inter', sans-serif" }}>
+                {salvando ? "Salvando..." : "Salvar alterações"}
+              </button>
+              <span className="text-xs font-semibold" style={{ color: msg ? (msg.startsWith("✓") ? "#4ADE80" : "#DC2626") : COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                {msg || "Mudanças valem na hora e a organização é avisada."}
+              </span>
+            </div>
           </div>
         )}
 
-        {msg && <p className="text-xs mt-3 font-semibold" style={{ color: msg.startsWith("✓") ? "#4ADE80" : "#DC2626", fontFamily: "'Inter', sans-serif" }}>{msg}</p>}
+        {msg && !aberto && <p className="text-xs mt-3 font-semibold" style={{ color: msg.startsWith("✓") ? "#4ADE80" : "#DC2626", fontFamily: "'Inter', sans-serif" }}>{msg}</p>}
 
         {pedidos.length > 0 && (
           <div className="mt-5">
