@@ -3847,13 +3847,15 @@ function CardApresentacaoTime({ team, grupo, fundo = true }) {
     const disp = 532 - rowH - 44 - (j.posicao ? 40 + j.posicao.length * 14 : 0);
     return Math.max(22, Math.min(Math.round(rowH * 0.5), Math.floor(disp / (Math.max(txt.length, 1) * 0.64))));
   };
+  // mesmo tamanho de letra pra todos os atletas do time (o menor que cabe pro nome mais longo)
+  const fsComum = Math.min(...(jogs.length ? jogs : [{}]).map(fsApelido));
   const linha = (j) => (
     <div key={j.id || `${j.numero}${j.apelido}`} style={{ display: "flex", alignItems: "center", gap: 22, height: rowH, background: "rgba(255,255,255,0.06)", borderRadius: 18, padding: "0 22px 0 0", overflow: "hidden", border: "1px solid rgba(255,255,255,0.08)" }}>
       <div style={{ width: rowH, height: "100%", background: `linear-gradient(135deg, ${laranja}, ${amarelo})`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: f, fontWeight: 800, fontSize: Math.round(rowH * 0.56), color: "#0B0F1C", flexShrink: 0 }}>
         {j.numero || "–"}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontFamily: f, fontWeight: 800, fontSize: fsApelido(j), lineHeight: 1.05, color: "#fff", overflowWrap: "anywhere" }}>
+        <div style={{ fontFamily: f, fontWeight: 800, fontSize: fsComum, lineHeight: 1.05, color: "#fff", overflowWrap: "anywhere" }}>
           {j.apelido || j.nome || ""}
         </div>
       </div>
@@ -3879,8 +3881,8 @@ function CardApresentacaoTime({ team, grupo, fundo = true }) {
           {EDITION_ROMAN} COPA CSU EX-ALUNOS
         </div>
         {escudo && <img src={escudo} alt="" style={{ width: 400, height: 400, objectFit: "contain", filter: "drop-shadow(0 20px 40px rgba(0,0,0,0.5))" }} />}
-        <div style={{ fontWeight: 800, fontSize: /^\d/.test(team.nome) ? 150 : 96, lineHeight: 1, marginTop: 28, letterSpacing: -2 }}>
-          {team.nome}
+        <div style={{ fontWeight: 800, fontSize: /^\d/.test(team.nome) ? 84 : 96, lineHeight: 1, marginTop: 28, letterSpacing: -2, whiteSpace: "nowrap" }}>
+          {/^\d/.test(team.nome) ? `Seleção ${team.nome}` : team.nome}
         </div>
         {apelidoTime && (
           <div style={{ fontWeight: 600, fontSize: 36, color: amarelo, marginTop: 14, fontStyle: "italic" }}>“{apelidoTime}”</div>
