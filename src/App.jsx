@@ -10936,13 +10936,16 @@ function RankingMetricas({ titulo, icone: Icone, itens, rotular, vazio }) {
       ) : (
         <ul className="space-y-2">
           {itens.map((item) => {
-            const pct = maior > 0 ? Math.max(6, Math.round((Number(item.total || 0) / maior) * 100)) : 0;
+            const pct = maior > 0 ? Math.max(1, (Number(item.total || 0) / maior) * 100) : 0;
             return (
               <li key={item.nome} className="text-sm" style={{ fontFamily: "'Inter', sans-serif" }}>
                 <div className="flex items-center justify-between gap-2 mb-1">
                   <span style={{ color: COLORS.ink }}>{rotular ? rotular(item.nome) : item.nome}</span>
-                  <span className="font-mono text-xs shrink-0" style={{ color: COLORS.slate }}>
+                  <span className="font-mono text-sm font-bold shrink-0" style={{ color: COLORS.ink }}>
                     {Number(item.total || 0).toLocaleString("pt-BR")}
+                    <span className="text-[11px] font-normal ml-1.5" style={{ color: COLORS.slate }}>
+                      ({total > 0 ? ((Number(item.total || 0) / total) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) : 0}%)
+                    </span>
                   </span>
                 </div>
                 <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: COLORS.zebra }}>
@@ -13077,12 +13080,15 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
                 <h4 className="font-semibold mb-3" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
                   Acessos nos últimos 7 dias
                 </h4>
-                <div className="flex items-end gap-2 h-24">
+                <div className="flex items-end gap-2" style={{ height: "112px" }}>
                   {metricas.acessosUltimos7Dias.map((d) => {
                     const maxDia = Math.max(...metricas.acessosUltimos7Dias.map((x) => Number(x.total || 0)), 1);
-                    const altura = Math.max(6, Math.round((Number(d.total || 0) / maxDia) * 100));
+                    const altura = Math.max(1, (Number(d.total || 0) / maxDia) * 100);
                     return (
                       <div key={d.data} className="flex-1 flex flex-col items-center gap-1">
+                        <span className="text-[11px] font-bold font-mono" style={{ color: COLORS.ink }}>
+                          {Number(d.total || 0).toLocaleString("pt-BR")}
+                        </span>
                         <div className="w-full flex items-end" style={{ height: "72px" }}>
                           <div
                             className="w-full rounded-t-md"
