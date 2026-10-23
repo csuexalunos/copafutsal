@@ -940,6 +940,19 @@ async function storageSet(key, value) {
   await writeKey(key, value);
 }
 
+// Depois de salvar, lê o banco de novo e confere se o elenco gravado é mesmo o
+// que foi enviado — se não for (falha de rede/permissão), avisa em vez de
+// mostrar "Salvo!" à toa.
+async function confirmarElencoNoBanco(atualizado) {
+  const gravados = await storageGet("copasu:teams");
+  const t = (gravados || []).find((x) => x.id === atualizado.id);
+  const idsGravados = new Set((t?.jogadores || []).map((j) => j.id));
+  const faltando = (atualizado.jogadores || []).filter((j) => !idsGravados.has(j.id));
+  if (!t || faltando.length > 0) {
+    throw new Error("O banco não confirmou o salvamento do elenco.");
+  }
+}
+
 function useSharedStorage(key, initialValue, pollMs) {
   const [value, setValue] = useState(initialValue);
   const [loading, setLoading] = useState(true);
@@ -1953,7 +1966,13 @@ function RosterEditor({ team, onSave, autenticado = true }) {
     // CPF nunca vai pro registro público do time — fica só na tabela
     // protegida (cpfs_jogadores), separada.
     const semCpf = carimbarLoteContratado(jogadores.map(({ cpf, ...resto }) => resto));
-    await onSave({ ...team, jogadores: semCpf });
+    try {
+      await onSave({ ...team, jogadores: semCpf });
+    } catch (e) {
+      console.error("Falha ao salvar elenco", e);
+      setAvisoCpf("NÃO foi salvo — o banco não confirmou. Confira a internet e toque em Salvar de novo.");
+      return;
+    }
     if (autenticado) {
       try {
         await salvarCpfsEmLote(
@@ -2083,6 +2102,7 @@ function EditarMeuTime({ teams, saveTeams }) {
     await saveTeams((atuais) =>
       (atuais || []).map((t) => (t.id === atualizado.id ? { ...t, jogadores: atualizado.jogadores } : t))
     );
+    await confirmarElencoNoBanco(atualizado);
   };
 
   if (!open) {
@@ -8877,6 +8897,7 @@ function GerenciarElencos({ teams, saveTeams }) {
     await saveTeams((atuais) =>
       (atuais || []).map((t) => (t.id === atualizado.id ? { ...t, jogadores: atualizado.jogadores } : t))
     );
+    await confirmarElencoNoBanco(atualizado);
   };
 
   return (
