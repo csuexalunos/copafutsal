@@ -45,6 +45,40 @@ export function timesSalvos() {
 }
 
 // times = [] significa "todos os jogos"; senão, só jogos desses times (nomes).
+async function inscreverAparelho() {
+  if (!pushSuportado()) throw new Error("Este navegador não suporta notificações.");
+  const perm = await Notification.requestPermission();
+  if (perm !== "granted") throw new Error("Permissão de notificação negada.");
+  const reg = await registro();
+  let sub = await reg.pushManager.getSubscription();
+  if (!sub) {
+    sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ParaUint8(VAPID_PUBLIC_KEY) });
+  }
+  return sub.toJSON();
+}
+
+// Avisos da ORGANIZAÇÃO: este aparelho recebe notificação de tudo que
+// acontece no app (time novo, elenco alterado, foto postada...). Só admin
+// consegue (a função do banco confere).
+export async function ativarPushAdmin() {
+  const j = await inscreverAparelho();
+  const { error } = await supabase.rpc("salvar_push_admin", { p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth });
+  if (error) throw error;
+  try { localStorage.setItem("copasu:push_admin", "1"); } catch (e) { /* ok */ }
+}
+export function pushAdminAtivo() {
+  try { return localStorage.getItem("copasu:push_admin") === "1"; } catch (e) { return false; }
+}
+export async function desativarPushAdmin() {
+  await desativarPush();
+  try { localStorage.removeItem("copasu:push_admin"); } catch (e) { /* ok */ }
+}
+// Dispara aviso pra organização (chamado por qualquer visitante/representante).
+export async function avisarOrganizacao(tipo, titulo, corpo) {
+  const { error } = await supabase.functions.invoke("avisar-admin", { body: { tipo, titulo, corpo } });
+  if (error) throw error;
+}
+
 export async function ativarPush(times = []) {
   if (!pushSuportado()) throw new Error("Este navegador não suporta notificações.");
   const perm = await Notification.requestPermission();

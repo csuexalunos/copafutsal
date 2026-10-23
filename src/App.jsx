@@ -47,7 +47,7 @@ import {
   registrarAcesso, contarAcessos, registrarEvento as registrarEventoBruto, buscarMetricasDetalhadas, esqueciSenha, definirNovaSenha, supabase,
   buscarCpfsDoTime, salvarCpfJogador, salvarCpfsEmLote, excluirCpfsDoJogador,
 } from "./lib/supabase.js";
-import { pushSuportado, ehIosNaoInstalado, inscricaoAtual, timesSalvos, ativarPush, desativarPush, avisarInicioJogo } from "./lib/push.js";
+import { pushSuportado, ehIosNaoInstalado, inscricaoAtual, timesSalvos, ativarPush, desativarPush, avisarInicioJogo, avisarOrganizacao, ativarPushAdmin, desativarPushAdmin, pushAdminAtivo } from "./lib/push.js";
 
 // Link oficial pra finalizar a inscrição (anexar ficha em PDF e pagar),
 // depois que o time é aprovado pela comissão.
@@ -82,6 +82,12 @@ try {
 function registrarEvento(tipo, detalhe) {
   if (ignorarMetricas) return Promise.resolve();
   return registrarEventoBruto(tipo, detalhe);
+}
+// Avisa a organização (push no celular dos admins). Não avisa quando quem fez
+// a ação é o próprio organizador (aparelho marcado como "meu").
+function avisarOrg(tipo, titulo, corpo) {
+  if (ignorarMetricas) return;
+  avisarOrganizacao(tipo, titulo, corpo).catch((e) => console.error("Falha ao avisar organização", e));
 }
 
 const COLORS = {
@@ -1966,8 +1972,20 @@ function RosterEditor({ team, onSave, autenticado = true }) {
     // CPF nunca vai pro registro público do time — fica só na tabela
     // protegida (cpfs_jogadores), separada.
     const semCpf = carimbarLoteContratado(jogadores.map(({ cpf, ...resto }) => resto));
+    const antesIds = new Set((team.jogadores || []).map((j) => j.id));
+    const depoisIds = new Set(semCpf.map((j) => j.id));
+    const novos = semCpf.filter((j) => !antesIds.has(j.id));
+    const removidos = (team.jogadores || []).filter((j) => !depoisIds.has(j.id));
     try {
       await onSave({ ...team, jogadores: semCpf });
+      if (novos.length || removidos.length) {
+        const nm = (j) => j.apelido || j.nome || "?";
+        avisarOrg(
+          "elenco",
+          `👥 Elenco alterado: ${team.nome}`,
+          [novos.length ? `+ ${novos.map(nm).join(", ")}` : "", removidos.length ? `− ${removidos.map(nm).join(", ")}` : ""].filter(Boolean).join(" · ")
+        );
+      }
     } catch (e) {
       console.error("Falha ao salvar elenco", e);
       setAvisoCpf("NÃO foi salvo — o banco não confirmou. Confira a internet e toque em Salvar de novo.");
@@ -2100,7 +2118,14 @@ function EditarMeuTime({ teams, saveTeams }) {
     // time — antes gravava o time inteiro como estava na tela, o que podia
     // desfazer pagamento/aprovação feitos pela organização nesse meio-tempo.
     await saveTeams((atuais) =>
-      (atuais || []).map((t) => (t.id === atualizado.id ? { ...t, jogadores: atualizado.jogadores } : t))
+      (atuais || []).map((t) => {
+        if (t.id !== atualizado.id) return t;
+        // Time pago antes de existir a lista de "já confirmados": congela agora
+        // o elenco ANTERIOR como confirmado, pra quem entrar depois aparecer
+        // como pendência no Financeiro.
+        const base = t.pago && t.jogadoresConfirmadosPagos === undefined ? { jogadoresConfirmadosPagos: (t.jogadores || []).map((j) => j.id) } : {};
+        return { ...t, ...base, jogadores: atualizado.jogadores };
+      })
     );
     await confirmarElencoNoBanco(atualizado);
   };
@@ -2571,6 +2596,7 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes, confi
       criadoEm: new Date().toISOString(),
     };
     await saveAvaliacoes((atuais) => [...(atuais || avaliacoes), caso]);
+    avisarOrg("avaliacao", `🔎 Avaliação pedida: ${nomeTime}`, `${jogador.apelido || jogador.nome || "Jogador"} precisa ser avaliado`);
     updateJogador({ ...jogador, avaliacaoPendente: true });
   };
 
@@ -2599,6 +2625,7 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes, confi
     setSaving(true);
     let codigo = null;
     let idParaCpfs = null;
+    let timeNovoCriado = null;
     const jogadoresSemCpf = carimbarLoteContratado(form.jogadores.map(({ cpf, ...resto }) => resto));
     await saveTeams((atuais) => {
       const lista = atuais || [];
@@ -2629,8 +2656,10 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes, confi
         codigo,
         inscritoEm: new Date().toISOString(),
       };
+      timeNovoCriado = novoTime;
       return [...lista, novoTime];
     });
+    if (timeNovoCriado) avisarOrg("time_novo", `🆕 Time novo: ${timeNovoCriado.nome}`, `${(timeNovoCriado.jogadores || []).length} jogadores · representante ${timeNovoCriado.capitao || "—"}`);
     // CPF nunca vai pro registro público do time — fica só na tabela
     // protegida (cpfs_jogadores), separada.
     if (idParaCpfs) {
@@ -3397,6 +3426,55 @@ function AvisosJogos({ teams }) {
   );
 }
 
+// Card (só admin): liga as notificações da ORGANIZAÇÃO neste aparelho — chega
+// push de tudo que acontece no app (time novo, elenco alterado, foto, pedidos...).
+function AvisosOrganizacaoCard() {
+  const [ativo, setAtivo] = useState(false);
+  const [ocupado, setOcupado] = useState(false);
+  const [erro, setErro] = useState("");
+  useEffect(() => { inscricaoAtual().then((s) => setAtivo(!!s && pushAdminAtivo())); }, []);
+  if (!pushSuportado() && !ehIosNaoInstalado()) return null;
+  const ligar = async () => {
+    setOcupado(true); setErro("");
+    try { await ativarPushAdmin(); setAtivo(true); } catch (e) { setErro(e.message || "Não foi possível ativar."); }
+    setOcupado(false);
+  };
+  const desligar = async () => {
+    setOcupado(true);
+    try { await desativarPushAdmin(); setAtivo(false); } catch (e) { setErro(e.message || "Erro."); }
+    setOcupado(false);
+  };
+  return (
+    <div className="rounded-2xl p-5 mb-5" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+      <h3 className="font-semibold mb-1 flex items-center gap-2" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
+        <Bell size={16} color={COLORS.accent} /> Avisos da organização no celular
+      </h3>
+      <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+        Receba uma notificação neste aparelho quando acontecer algo no app: time novo inscrito, elenco alterado
+        (jogador que entrou ou saiu), pedido pra ser organizador, avaliação pedida, novo cadastro e fotos publicadas.
+        Suas próprias ações não geram aviso.
+      </p>
+      {ehIosNaoInstalado() ? (
+        <p className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+          No iPhone: abra no Safari → Compartilhar → "Adicionar à Tela de Início", abra o app pelo ícone e volte aqui.
+        </p>
+      ) : ativo ? (
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-semibold" style={{ color: "#4ADE80", fontFamily: "'Inter', sans-serif" }}>✓ Ligado neste aparelho</span>
+          <button type="button" onClick={desligar} disabled={ocupado} className="text-xs underline" style={{ color: COLORS.slate }}>Desligar</button>
+        </div>
+      ) : (
+        <button type="button" onClick={ligar} disabled={ocupado}
+          className="px-4 py-2 rounded-xl text-sm font-semibold"
+          style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}>
+          {ocupado ? "Ativando..." : "Ativar avisos da organização"}
+        </button>
+      )}
+      {erro && <p className="text-xs mt-2" style={{ color: "#DC2626" }}>{erro}</p>}
+    </div>
+  );
+}
+
 function Chaveamento({ matches, teams, sessao, saveMatches, config }) {
   const faseRank = (f) => {
     if (f.startsWith("Grupo")) return 0;
@@ -4150,6 +4228,7 @@ function Comunidade({ posts, savePosts, sessao }) {
         20000,
         "Demorou demais pra publicar (conexão fraca?). Tenta de novo."
       );
+      avisarOrg("foto", "📸 Nova publicação em Fotos e Vídeos", `${novo.autor?.nome || "Alguém"} publicou${novo.legenda ? `: ${novo.legenda.slice(0, 80)}` : ""}`);
       setSent(true);
       setLegenda("");
       setVideoStaged(null);
@@ -8895,7 +8974,14 @@ function GerenciarElencos({ teams, saveTeams }) {
     // time — antes gravava o time inteiro como estava na tela, o que podia
     // desfazer pagamento/aprovação feitos pela organização nesse meio-tempo.
     await saveTeams((atuais) =>
-      (atuais || []).map((t) => (t.id === atualizado.id ? { ...t, jogadores: atualizado.jogadores } : t))
+      (atuais || []).map((t) => {
+        if (t.id !== atualizado.id) return t;
+        // Time pago antes de existir a lista de "já confirmados": congela agora
+        // o elenco ANTERIOR como confirmado, pra quem entrar depois aparecer
+        // como pendência no Financeiro.
+        const base = t.pago && t.jogadoresConfirmadosPagos === undefined ? { jogadoresConfirmadosPagos: (t.jogadores || []).map((j) => j.id) } : {};
+        return { ...t, ...base, jogadores: atualizado.jogadores };
+      })
     );
     await confirmarElencoNoBanco(atualizado);
   };
@@ -9149,6 +9235,7 @@ function Cadastro({ onVoltar }) {
           nascimento: form.nascimento,
           status: "pendente",
         });
+        avisarOrg("perfil", "👤 Novo cadastro no app", `${form.nome.trim()} (${form.tipo}${form.tipo === "jogador" && form.turma ? ` · ${form.turma}` : ""})`);
       }
       setSaving(false);
       setSent(true);
@@ -11971,6 +12058,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
       criadoEm: new Date().toISOString(),
     };
     await saveAdminRequests([...adminRequests, nova]);
+    avisarOrg("solicitacao_org", "🙋 Pedido pra ser organizador", `${nova.nome || "Alguém"} (${nova.turma || "sem turma"})`);
     setReqNome("");
     setReqEmail("");
     setReqWhats("");
@@ -12326,11 +12414,14 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
             avisos: contarAvisosJogos(matches, teams),
             times: avaliacoes.filter((a) => a.status === "pendente").length,
             fotos: (posts || []).filter(postPendente).length,
-            financeiro: teams.filter(
-              (t) =>
-                t.inscritoEm &&
-                (!config?.ultimaVisualizacaoTimes || new Date(t.inscritoEm) > new Date(config.ultimaVisualizacaoTimes))
-            ).length,
+            financeiro:
+              teams.filter(
+                (t) =>
+                  t.inscritoEm &&
+                  (!config?.ultimaVisualizacaoTimes || new Date(t.inscritoEm) > new Date(config.ultimaVisualizacaoTimes))
+              ).length +
+              // atletas novos de times já pagos esperando confirmação de pagamento
+              teams.filter((t) => t.pago && t.aprovadoComissao).reduce((n, t) => n + jogadoresPendentesDePagamento(t).length, 0),
           }}
         />
       )}
@@ -13160,6 +13251,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
 
       {secaoAtiva === "sistema" && (
       <div className="mt-8">
+        <AvisosOrganizacaoCard />
         <div
           className="rounded-2xl p-5 mb-5"
           style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
@@ -13464,6 +13556,7 @@ export default function App() {
         criadoEm: new Date().toISOString(),
       };
       await savePosts([...posts, novo]);
+      avisarOrg("foto", "📸 Nova foto publicada", "Enviada pelo botão da câmera.");
       setFabDone(true);
       setTimeout(() => setFabDone(false), 2500);
     } catch (err) {
