@@ -3841,17 +3841,20 @@ function CardApresentacaoTime({ team, grupo, fundo = true }) {
   // altura das linhas se ajusta à quantidade de atletas (5 a 8 linhas por coluna)
   const nLinhas = Math.max(1, colunas[0].length);
   const rowH = Math.min(124, Math.floor((730 - (nLinhas - 1) * 14) / nLinhas));
+  // apelido sempre completo: reduz a fonte conforme o tamanho (e quebra linha só em último caso)
+  const fsApelido = (j) => {
+    const txt = j.apelido || j.nome || "";
+    const disp = 532 - rowH - 44 - (j.posicao ? 40 + j.posicao.length * 14 : 0);
+    return Math.max(22, Math.min(Math.round(rowH * 0.5), Math.floor(disp / (Math.max(txt.length, 1) * 0.64))));
+  };
   const linha = (j) => (
     <div key={j.id || `${j.numero}${j.apelido}`} style={{ display: "flex", alignItems: "center", gap: 22, height: rowH, background: "rgba(255,255,255,0.06)", borderRadius: 18, padding: "0 22px 0 0", overflow: "hidden", border: "1px solid rgba(255,255,255,0.08)" }}>
       <div style={{ width: rowH, height: "100%", background: `linear-gradient(135deg, ${laranja}, ${amarelo})`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: f, fontWeight: 800, fontSize: Math.round(rowH * 0.56), color: "#0B0F1C", flexShrink: 0 }}>
         {j.numero || "–"}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontFamily: f, fontWeight: 800, fontSize: Math.round(rowH * 0.42), lineHeight: 1.05, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {j.apelido || (j.nome || "").split(" ")[0]}
-        </div>
-        <div style={{ fontFamily: "'Inter', sans-serif", fontWeight: 500, fontSize: Math.round(rowH * 0.23), color: "rgba(255,255,255,0.6)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: 4 }}>
-          {j.apelido ? j.nome : ""}
+        <div style={{ fontFamily: f, fontWeight: 800, fontSize: fsApelido(j), lineHeight: 1.05, color: "#fff", overflowWrap: "anywhere" }}>
+          {j.apelido || j.nome || ""}
         </div>
       </div>
       {j.posicao && (
@@ -3890,11 +3893,8 @@ function CardApresentacaoTime({ team, grupo, fundo = true }) {
       </div>
       {/* direita: elenco */}
       <div style={{ position: "absolute", left: 760, right: 70, top: 70, bottom: 70, display: "flex", flexDirection: "column" }}>
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 26 }}>
+        <div style={{ marginBottom: 26 }}>
           <div style={{ fontWeight: 800, fontSize: 54, letterSpacing: 1 }}>ELENCO</div>
-          <div style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 24, color: "rgba(255,255,255,0.6)" }}>
-            {jogs.length} atletas{team.capitao ? ` · Representante: ${team.capitao}` : ""}
-          </div>
         </div>
         <div style={{ flex: 1, display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", columnGap: 26, alignContent: "start" }}>
           {colunas.map((col, i) => (
