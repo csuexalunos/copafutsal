@@ -2682,17 +2682,36 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes, confi
     let codigo = null;
     let idParaCpfs = null;
     let timeNovoCriado = null;
+    let antesTime = null;
+    let jogadoresFinais = null;
     const jogadoresSemCpf = carimbarLoteContratado(form.jogadores.map(({ cpf, ...resto }) => resto));
     await saveTeams((atuais) => {
       const lista = atuais || [];
       if (timeExistente) {
         const existenteReal = lista.find((t) => t.nome === nomeTime) || timeExistente;
         idParaCpfs = existenteReal.id;
+        antesTime = existenteReal;
+        // Depois do prazo (02/11) o representante não muda apelido/número/posição
+        // de quem já estava no time — só a organização (ou com liberação).
+        const travar = !isAdmin && detalhesTravados(existenteReal);
+        const origs = new Map((existenteReal.jogadores || []).map((j) => [j.id, j]));
+        jogadoresFinais = travar
+          ? jogadoresSemCpf.map((j) => {
+              const o = origs.get(j.id);
+              return o ? { ...j, apelido: o.apelido, numero: o.numero, posicao: o.posicao } : j;
+            })
+          : jogadoresSemCpf;
+        // Time pago antes de existir a lista de "já confirmados": congela o elenco
+        // ANTERIOR como confirmado, pra quem entrar agora virar pendência no Financeiro.
+        const base = existenteReal.pago && existenteReal.jogadoresConfirmadosPagos === undefined
+          ? { jogadoresConfirmadosPagos: (existenteReal.jogadores || []).map((j) => j.id) }
+          : {};
         const atualizado = {
           ...existenteReal,
+          ...base,
           capitao: form.capitao.trim(),
           contato: form.contato.trim(),
-          jogadores: jogadoresSemCpf,
+          jogadores: jogadoresFinais,
           escudoUrl: form.escudoUrl,
           formaPagamento: form.formaPagamento,
         };
@@ -2717,6 +2736,24 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes, confi
     });
     if (timeNovoCriado) registrarAlteracaoRep({ tipo: "time_novo", timeId: timeNovoCriado.id, timeNome: timeNovoCriado.nome, linhas: [`🆕 Time inscrito com ${(timeNovoCriado.jogadores || []).length} jogadores`] });
     if (timeNovoCriado) avisarOrg("time_novo", `🆕 Time novo: ${timeNovoCriado.nome}`, `${(timeNovoCriado.jogadores || []).length} jogadores · representante ${timeNovoCriado.capitao || "—"}`);
+    if (antesTime && jogadoresFinais) {
+      // confere no banco que o elenco foi gravado de verdade
+      try {
+        await confirmarElencoNoBanco({ id: antesTime.id, jogadores: jogadoresFinais });
+      } catch (err) {
+        console.error("Falha ao confirmar elenco", err);
+        setSaving(false);
+        setError("NÃO foi salvo — o banco não confirmou. Confira a internet e toque em Salvar de novo.");
+        return;
+      }
+      const linhasAlt = descreverAlteracoesElenco(antesTime.jogadores, jogadoresFinais);
+      if (form.capitao.trim() !== (antesTime.capitao || "")) linhasAlt.push(`✏️ Representante: "${antesTime.capitao || "—"}" → "${form.capitao.trim()}"`);
+      if (form.contato.trim() !== (antesTime.contato || "")) linhasAlt.push(`✏️ Contato: "${antesTime.contato || "—"}" → "${form.contato.trim()}"`);
+      if (linhasAlt.length) {
+        registrarAlteracaoRep({ tipo: "elenco", timeId: antesTime.id, timeNome: antesTime.nome, linhas: linhasAlt });
+        avisarOrg("elenco", `👥 Time alterado: ${antesTime.nome}`, linhasAlt.slice(0, 4).join(" · ") + (linhasAlt.length > 4 ? ` · +${linhasAlt.length - 4}` : ""));
+      }
+    }
     // CPF nunca vai pro registro público do time — fica só na tabela
     // protegida (cpfs_jogadores), separada.
     if (idParaCpfs) {
@@ -2974,6 +3011,7 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes, confi
                         onRemove={() => removeJogador(j.id)}
                         turmaTime={nomeTime}
                         onSolicitarAvaliacao={solicitarAvaliacao}
+                        travarDetalhes={!isAdmin && timeExistente && detalhesTravados(timeExistente) && (timeExistente.jogadores || []).some((x) => x.id === j.id)}
                       />
                     ))}
                   </div>
