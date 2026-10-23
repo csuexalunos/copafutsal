@@ -612,8 +612,14 @@ function carimbarLoteContratado(jogadores) {
 // Valor de um jogador específico: usa o lote carimbado nele; se não tiver
 // (jogador cadastrado antes dessa carimbagem existir), cai no cálculo
 // antigo por data do time inteiro, pra não quebrar dado histórico.
+// Jogador sem carimbo adicionado DEPOIS do pagamento do time (ainda fora da
+// lista de confirmados) paga o lote vigente hoje, não o lote da inscrição do time.
+function entrouDepoisDoPagamento(jogador, team) {
+  return !!(jogador && team && team.pago && Array.isArray(team.jogadoresConfirmadosPagos) && !team.jogadoresConfirmadosPagos.includes(jogador.id));
+}
 function valorDoJogador(jogador, team) {
   if (jogador && jogador.loteContratado) return valorPorLote(jogador.loteContratado);
+  if (entrouDepoisDoPagamento(jogador, team)) return valorPorAtletaNaData(new Date());
   return valorPorAtletaNaData(dataParaCalculoDeLote(team));
 }
 
@@ -625,7 +631,7 @@ function resumoValorTime(team) {
   const jogadores = Array.isArray(team.jogadores) ? team.jogadores : [];
   const porLote = {};
   jogadores.forEach((j) => {
-    const nomeLote = j.loteContratado || loteNaData(dataParaCalculoDeLote(team));
+    const nomeLote = j.loteContratado || (entrouDepoisDoPagamento(j, team) ? loteNaData(new Date()) : loteNaData(dataParaCalculoDeLote(team)));
     const valor = valorDoJogador(j, team);
     if (!porLote[nomeLote]) porLote[nomeLote] = { nome: nomeLote, qtd: 0, valorUnitario: valor, subtotal: 0 };
     porLote[nomeLote].qtd += 1;
@@ -13070,7 +13076,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
         if (!jaNoElenco && caso.jogadorDados) {
           return {
             ...t,
-            jogadores: [...lista, { ...caso.jogadorDados, id: caso.jogadorId, excecaoAprovada: true, avaliacaoPendente: false }],
+            jogadores: [...lista, { ...caso.jogadorDados, id: caso.jogadorId, excecaoAprovada: true, avaliacaoPendente: false, loteContratado: caso.jogadorDados.loteContratado || loteNaData(new Date()) }],
           };
         }
         const jogadoresAtualizados = lista.map((j) =>
