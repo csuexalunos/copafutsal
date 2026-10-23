@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Trophy,
   Users,
@@ -550,6 +550,12 @@ const HALL_DA_FAMA = {
 // Data e prazo desta edição — atualizar quando a organização confirmar.
 const DATA_EVENTO = "6, 7 e 8 de novembro";
 const PRAZO_INSCRICAO = "de 01 a 30 de setembro";
+// Representantes podem mexer em apelido, número e posição dos jogadores até o
+// fim do dia 02/11/2026; depois só com liberação da organização (team.edicaoLiberada).
+const PRAZO_EDICAO_DETALHES = new Date("2026-11-03T00:00:00-03:00");
+function detalhesTravados(team) {
+  return !team?.edicaoLiberada && agoraReal() >= PRAZO_EDICAO_DETALHES.getTime();
+}
 const VALOR_INSCRICAO_ATLETA = "R$ 110,00 a R$ 140,00 por atleta, conforme o lote";
 // Lotes de inscrição — o valor por atleta aumenta conforme a data em que
 // o time se inscreve (Art. 8º, Parágrafo 1º do regulamento).
@@ -1630,7 +1636,7 @@ function jogadoresDaTurma(turma) {
   return [];
 }
 
-function PlayerRow({ player, onChange, onRemove, turmaTime, onSolicitarAvaliacao }) {
+function PlayerRow({ player, onChange, onRemove, turmaTime, onSolicitarAvaliacao, travarDetalhes }) {
   const [expanded, setExpanded] = useState(false);
   const titulo = player.apelido || player.nome || "Jogador sem nome";
   const regular = anoConclusaoRegular(player.anoConclusao, turmaTime);
@@ -1749,6 +1755,7 @@ function PlayerRow({ player, onChange, onRemove, turmaTime, onSolicitarAvaliacao
               placeholder="Como vai ser chamado nas transmissões"
               value={player.apelido || ""}
               onChange={(e) => onChange({ ...player, apelido: e.target.value })}
+              disabled={!!travarDetalhes}
               className="w-full px-2.5 py-2 rounded-lg text-sm"
               style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
             />
@@ -1765,6 +1772,7 @@ function PlayerRow({ player, onChange, onRemove, turmaTime, onSolicitarAvaliacao
               placeholder="Ex: 10"
               value={player.numero}
               onChange={(e) => onChange({ ...player, numero: e.target.value })}
+              disabled={!!travarDetalhes}
               className="w-full px-2.5 py-2 rounded-lg text-sm"
               style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
             />
@@ -1779,6 +1787,7 @@ function PlayerRow({ player, onChange, onRemove, turmaTime, onSolicitarAvaliacao
             <select
               value={player.posicao || ""}
               onChange={(e) => onChange({ ...player, posicao: e.target.value })}
+              disabled={!!travarDetalhes}
               className="w-full px-2.5 py-2 rounded-lg text-sm"
               style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
             >
@@ -1932,6 +1941,10 @@ function EscudoPicker({ value, onChange }) {
 // ---------------------------------------------------------------------------
 function RosterEditor({ team, onSave, autenticado = true }) {
   const [jogadores, setJogadores] = useState(team.jogadores || []);
+  const originaisRef = useRef(new Map((team.jogadores || []).map((j) => [j.id, j])));
+  // Depois do prazo, o representante (autenticado=false) não altera apelido/número/posição
+  // de quem já está no time; jogador recém-adicionado (ainda não salvo) pode ser preenchido.
+  const travado = !autenticado && detalhesTravados(team);
   const [saved, setSaved] = useState(false);
   const [avisoCpf, setAvisoCpf] = useState("");
   const [mostrarForm, setMostrarForm] = useState(false);
@@ -1971,7 +1984,13 @@ function RosterEditor({ team, onSave, autenticado = true }) {
     }
     // CPF nunca vai pro registro público do time — fica só na tabela
     // protegida (cpfs_jogadores), separada.
-    const semCpf = carimbarLoteContratado(jogadores.map(({ cpf, ...resto }) => resto));
+    const semCpf = carimbarLoteContratado(
+      jogadores.map(({ cpf, ...resto }) => {
+        const orig = originaisRef.current.get(resto.id);
+        // trava de segurança: se o prazo passou, mantém os valores originais
+        return travado && orig ? { ...resto, apelido: orig.apelido, numero: orig.numero, posicao: orig.posicao } : resto;
+      })
+    );
     const antesIds = new Set((team.jogadores || []).map((j) => j.id));
     const depoisIds = new Set(semCpf.map((j) => j.id));
     const novos = semCpf.filter((j) => !antesIds.has(j.id));
@@ -2028,6 +2047,14 @@ function RosterEditor({ team, onSave, autenticado = true }) {
         </span>
       </div>
 
+      {travado && (
+        <div className="rounded-lg px-3 py-2 mb-3 text-xs" style={{ backgroundColor: COLORS.accentSoft, color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
+          🔒 O prazo para alterar apelido, número e posição terminou em 02/11. Para mudar, peça a liberação à organização.{" "}
+          <a href={linkWhatsapp(WHATSAPP_ORGANIZACAO, `Olá! Sou representante do time ${team.nome} e preciso de liberação para alterar apelido/número/posição de jogadores.`)} target="_blank" rel="noreferrer" className="underline font-semibold">
+            Pedir liberação no WhatsApp
+          </a>
+        </div>
+      )}
       <div className="space-y-2.5 mb-5">
         {jogadores.length === 0 && (
           <p className="text-sm py-4 text-center" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
@@ -2035,7 +2062,7 @@ function RosterEditor({ team, onSave, autenticado = true }) {
           </p>
         )}
         {jogadores.map((j) => (
-          <PlayerRow key={j.id} player={j} onChange={updateJogador} onRemove={() => removeJogador(j.id)} turmaTime={team.nome} />
+          <PlayerRow key={j.id} player={j} onChange={updateJogador} onRemove={() => removeJogador(j.id)} turmaTime={team.nome} travarDetalhes={travado && originaisRef.current.has(j.id)} />
         ))}
       </div>
 
@@ -9007,6 +9034,21 @@ function GerenciarElencos({ teams, saveTeams }) {
           </option>
         ))}
       </select>
+      {time && (
+        <label className="flex items-start gap-2 mb-4 text-xs cursor-pointer" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+          <input
+            type="checkbox"
+            checked={!!time.edicaoLiberada}
+            onChange={(e) =>
+              saveTeams((atuais) => (atuais || []).map((t) => (t.id === time.id ? { ...t, edicaoLiberada: e.target.checked } : t)))
+            }
+            className="mt-0.5"
+          />
+          <span>
+            <b>Liberar edição de apelido, número e posição</b> para o representante deste time (depois do prazo de 02/11).
+          </span>
+        </label>
+      )}
       {time && <RosterEditor key={time.id} team={time} onSave={salvarTime} />}
     </div>
   );
