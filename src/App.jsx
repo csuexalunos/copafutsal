@@ -3932,6 +3932,54 @@ function PaginaCardTime({ turma, teams, matches, fundo }) {
   );
 }
 
+// Gera vários cards em PNG e entrega tudo num .zip só.
+// itens: [{ chave, arquivo, node }] — node é o card (com [data-card]) a renderizar.
+function BotaoZipCards({ itens, nomeZip, rotulo, pequeno = false }) {
+  const [prog, setProg] = useState(null);
+  const [atual, setAtual] = useState(null);
+  const ref = React.useRef(null);
+  const gerar = async () => {
+    if (!itens.length || prog) return;
+    try {
+      const { default: JSZip } = await import("jszip");
+      const zip = new JSZip();
+      for (let i = 0; i < itens.length; i++) {
+        setProg(`${i + 1}/${itens.length}`);
+        setAtual(itens[i]);
+        await new Promise((r) => setTimeout(r, 1100));
+        const no = ref.current && ref.current.querySelector("[data-card]");
+        const url = await toPng(no, { width: CARD_W, height: CARD_H, pixelRatio: 1, cacheBust: true });
+        zip.file(`${String(i + 1).padStart(2, "0")}-${itens[i].arquivo}.png`.replace(/[^\w.-]+/g, "_"), url.split(",")[1], { base64: true });
+      }
+      const blob = await zip.generateAsync({ type: "blob" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `${nomeZip}.zip`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    } catch (e) {
+      console.error("Falha ao gerar o zip dos cards", e);
+      alert("Não consegui gerar o arquivo com todos os cards. Tente baixar um por um.");
+    }
+    setAtual(null);
+    setProg(null);
+  };
+  return (
+    <>
+      <button type="button" onClick={gerar} disabled={!itens.length || !!prog}
+        className={pequeno ? "text-xs font-semibold px-2.5 py-1.5 rounded-lg" : "px-4 py-2 rounded-xl text-sm font-semibold"}
+        style={pequeno ? { border: `1px solid ${COLORS.border}`, color: COLORS.ink } : { backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif", opacity: itens.length ? 1 : 0.5 }}>
+        {prog ? `Gerando ${prog}...` : rotulo}
+      </button>
+      {atual && (
+        <div ref={ref} aria-hidden="true" style={{ position: "fixed", left: -10000, top: 0, width: CARD_W, height: CARD_H, pointerEvents: "none" }}>
+          <div data-card key={atual.chave} style={{ width: CARD_W, height: CARD_H }}>{atual.node}</div>
+        </div>
+      )}
+    </>
+  );
+}
+
 // ---------- Cards de CONFRONTO (dois elencos) ----------
 function dataHoraCard(horario) {
   const h = horario ? new Date(horario) : null;
@@ -4117,6 +4165,16 @@ function PainelCardsConfrontos({ teams, matches }) {
     });
   const nome = (id) => nomeCardTime(teams.find((t) => t.id === id));
   const atual = lista.find((m) => m.id === sel);
+  const rotuloRodada = (m) => ((m.fase || "").startsWith("Grupo") ? `${m.rodada || 1}ª Rodada` : m.fase || "Outros");
+  const ordemFase = ["Oitavas", "Quartas", "Semifinal", "3º Lugar", "Final"];
+  const chaveOrdem = (r) => (/^\d+ª Rodada$/.test(r) ? parseInt(r, 10) : 100 + (ordemFase.indexOf(r) === -1 ? 99 : ordemFase.indexOf(r)));
+  const grupos = Object.entries(lista.reduce((acc, m) => { (acc[rotuloRodada(m)] = acc[rotuloRodada(m)] || []).push(m); return acc; }, {}))
+    .sort((a, b) => chaveOrdem(a[0]) - chaveOrdem(b[0]));
+  const itensZip = (jogos) => jogos.map((m) => ({
+    chave: m.id,
+    arquivo: `${nome(m.timeA)}-x-${nome(m.timeB)}`,
+    node: <CardConfronto match={m} timeA={teams.find((t) => t.id === m.timeA)} timeB={teams.find((t) => t.id === m.timeB)} />,
+  }));
   const baixar = async () => {
     setBaixando(true);
     try {
@@ -4142,21 +4200,36 @@ function PainelCardsConfrontos({ teams, matches }) {
         Card 16:9 (1920×1080) do confronto, com os dois elencos, fase, data e horário. Os jogos que ainda vão acontecer aparecem primeiro.
       </p>
       {lista.length === 0 && <p className="text-sm" style={{ color: COLORS.slate }}>Nenhum jogo com os dois times definidos ainda.</p>}
-      <ul className="space-y-2 max-w-xl">
-        {lista.map((m) => {
-          const { dia, hora } = dataHoraCard(m.horario);
-          return (
-            <li key={m.id} className="flex flex-wrap items-center gap-2 px-3 py-2.5 rounded-xl" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
-              <div className="mr-auto min-w-0">
-                <div className="font-semibold text-sm" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>{nome(m.timeA)} x {nome(m.timeB)}</div>
-                <div className="text-[11px]" style={{ color: COLORS.slate }}>{[m.fase, dia, hora.replace("H", ":")].filter(Boolean).join(" · ")}{m.status === "encerrado" ? " · encerrado" : ""}</div>
-              </div>
-              <button type="button" onClick={() => setSel(sel === m.id ? null : m.id)} className="text-xs font-semibold underline" style={{ color: COLORS.accent }}>{sel === m.id ? "Fechar" : "Ver card"}</button>
-              <button type="button" onClick={() => copiar(m)} className="text-xs font-semibold px-2.5 py-1.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, color: COLORS.ink }}>{copiado === m.id ? "Link copiado!" : "Copiar link pro OBS"}</button>
-            </li>
-          );
-        })}
-      </ul>
+      {lista.length > 0 && (
+        <div className="mb-5">
+          <BotaoZipCards nomeZip="cards-confrontos-transmissao" rotulo={`Baixar todos os cards dos confrontos (${lista.length}) — .zip`} itens={itensZip(lista)} />
+        </div>
+      )}
+      <div className="space-y-6 max-w-xl">
+        {grupos.map(([rot, jogos]) => (
+          <section key={rot}>
+            <div className="flex items-center gap-2 mb-2">
+              <h3 className="font-bold text-sm mr-auto" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>{rot} <span className="font-normal text-xs" style={{ color: COLORS.slate }}>· {jogos.length} {jogos.length === 1 ? "jogo" : "jogos"}</span></h3>
+              <BotaoZipCards pequeno nomeZip={`cards-${rot}`} rotulo="Baixar esta rodada (.zip)" itens={itensZip(jogos)} />
+            </div>
+            <ul className="space-y-2">
+              {jogos.map((m) => {
+                const { dia, hora } = dataHoraCard(m.horario);
+                return (
+                  <li key={m.id} className="flex flex-wrap items-center gap-2 px-3 py-2.5 rounded-xl" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+                    <div className="mr-auto min-w-0">
+                      <div className="font-semibold text-sm" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>{nome(m.timeA)} x {nome(m.timeB)}</div>
+                      <div className="text-[11px]" style={{ color: COLORS.slate }}>{[(m.fase || "").startsWith("Grupo") ? m.fase : "", dia, hora.replace("H", ":")].filter(Boolean).join(" · ")}{m.status === "encerrado" ? " · encerrado" : ""}</div>
+                    </div>
+                    <button type="button" onClick={() => setSel(sel === m.id ? null : m.id)} className="text-xs font-semibold underline" style={{ color: COLORS.accent }}>{sel === m.id ? "Fechar" : "Ver card"}</button>
+                    <button type="button" onClick={() => copiar(m)} className="text-xs font-semibold px-2.5 py-1.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, color: COLORS.ink }}>{copiado === m.id ? "Link copiado!" : "Copiar link pro OBS"}</button>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        ))}
+      </div>
       {atual && (
         <div className="mt-5 max-w-3xl">
           <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${COLORS.border}`, width: CARD_W * 0.4, maxWidth: "100%", height: CARD_H * 0.4, position: "relative", backgroundColor: "#0B0F1C" }}>
@@ -4221,6 +4294,12 @@ function PainelCardsTransmissao({ teams, matches }) {
         Card 16:9 (1920×1080) de cada time com escudo, grupo e elenco, sempre com os dados atuais. Pra transmissão:
         use <b>Copiar link pro OBS</b> (Fonte de navegador, 1920×1080, fundo transparente) ou <b>Baixar PNG</b>.
       </p>
+      {lista.length > 0 && (
+        <div className="mb-4">
+          <BotaoZipCards nomeZip="cards-elencos-times" rotulo={`Baixar todos os elencos (${lista.length}) — .zip`}
+            itens={lista.map((t) => ({ chave: t.id, arquivo: nomeCardTime(t), node: <CardApresentacaoTime team={t} grupo={grupoDoTime(t, matches)} /> }))} />
+        </div>
+      )}
       <ul className="space-y-2 max-w-xl">
         {lista.map((t) => (
           <li key={t.id} className="flex flex-wrap items-center gap-2 px-3 py-2.5 rounded-xl" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
