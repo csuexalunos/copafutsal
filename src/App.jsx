@@ -965,6 +965,42 @@ async function confirmarElencoNoBanco(atualizado) {
   }
 }
 
+// Histórico de alterações feitas por representantes — a organização vê tudo
+// (sem precisar aprovar) e recebe notificação. Guarda as últimas 400.
+async function registrarAlteracaoRep(entrada) {
+  if (ignorarMetricas) return;
+  try {
+    const atual = (await storageGet("copasu:historico")) || [];
+    const nova = { id: `alt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, em: new Date().toISOString(), ...entrada };
+    await storageSet("copasu:historico", [...atual, nova].slice(-400));
+  } catch (e) {
+    console.error("Falha ao registrar alteração", e);
+  }
+}
+
+// Compara o elenco antes/depois e descreve o que mudou, jogador a jogador.
+function descreverAlteracoesElenco(antes, depois) {
+  const nm = (j) => j.apelido || j.nome || "?";
+  const mapaAntes = new Map((antes || []).map((j) => [j.id, j]));
+  const idsDepois = new Set((depois || []).map((j) => j.id));
+  const linhas = [];
+  (depois || []).forEach((j) => {
+    const o = mapaAntes.get(j.id);
+    if (!o) {
+      linhas.push(`➕ Entrou: ${nm(j)}${j.numero ? ` (nº ${j.numero})` : ""}`);
+      return;
+    }
+    const campos = [["nome", "nome"], ["apelido", "apelido"], ["numero", "número"], ["posicao", "posição"]];
+    campos.forEach(([k, rotulo]) => {
+      if ((o[k] || "") !== (j[k] || "")) linhas.push(`✏️ ${nm(o)}: ${rotulo} "${o[k] || "—"}" → "${j[k] || "—"}"`);
+    });
+  });
+  (antes || []).forEach((j) => {
+    if (!idsDepois.has(j.id)) linhas.push(`➖ Saiu: ${nm(j)}`);
+  });
+  return linhas;
+}
+
 function useSharedStorage(key, initialValue, pollMs) {
   const [value, setValue] = useState(initialValue);
   const [loading, setLoading] = useState(true);
@@ -1991,19 +2027,12 @@ function RosterEditor({ team, onSave, autenticado = true }) {
         return travado && orig ? { ...resto, apelido: orig.apelido, numero: orig.numero, posicao: orig.posicao } : resto;
       })
     );
-    const antesIds = new Set((team.jogadores || []).map((j) => j.id));
-    const depoisIds = new Set(semCpf.map((j) => j.id));
-    const novos = semCpf.filter((j) => !antesIds.has(j.id));
-    const removidos = (team.jogadores || []).filter((j) => !depoisIds.has(j.id));
+    const linhasAlt = descreverAlteracoesElenco(team.jogadores, semCpf);
     try {
       await onSave({ ...team, jogadores: semCpf });
-      if (novos.length || removidos.length) {
-        const nm = (j) => j.apelido || j.nome || "?";
-        avisarOrg(
-          "elenco",
-          `👥 Elenco alterado: ${team.nome}`,
-          [novos.length ? `+ ${novos.map(nm).join(", ")}` : "", removidos.length ? `− ${removidos.map(nm).join(", ")}` : ""].filter(Boolean).join(" · ")
-        );
+      if (linhasAlt.length) {
+        registrarAlteracaoRep({ tipo: "elenco", timeId: team.id, timeNome: team.nome, linhas: linhasAlt });
+        avisarOrg("elenco", `👥 Elenco alterado: ${team.nome}`, linhasAlt.slice(0, 4).join(" · ") + (linhasAlt.length > 4 ? ` · +${linhasAlt.length - 4}` : ""));
       }
     } catch (e) {
       console.error("Falha ao salvar elenco", e);
@@ -2686,6 +2715,7 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes, confi
       timeNovoCriado = novoTime;
       return [...lista, novoTime];
     });
+    if (timeNovoCriado) registrarAlteracaoRep({ tipo: "time_novo", timeId: timeNovoCriado.id, timeNome: timeNovoCriado.nome, linhas: [`🆕 Time inscrito com ${(timeNovoCriado.jogadores || []).length} jogadores`] });
     if (timeNovoCriado) avisarOrg("time_novo", `🆕 Time novo: ${timeNovoCriado.nome}`, `${(timeNovoCriado.jogadores || []).length} jogadores · representante ${timeNovoCriado.capitao || "—"}`);
     // CPF nunca vai pro registro público do time — fica só na tabela
     // protegida (cpfs_jogadores), separada.
@@ -11134,6 +11164,7 @@ const GRUPOS_ORGANIZACAO = [
   { chave: "pessoas", titulo: "Pessoas e acesso", subtitulo: "Inscritos, representantes, avaliações", icone: Users },
   { chave: "fotos", titulo: "Fotos e vídeos", subtitulo: "Aprovar o que a galera enviou pra Comunidade", icone: Camera },
   { chave: "liberacoes", titulo: "Liberações", subtitulo: "Libere uma turma até uma data, fora do prazo geral", icone: Clock },
+  { chave: "historico", titulo: "Alterações dos representantes", subtitulo: "Tudo que os times mudaram — sem precisar aprovar", icone: Clock },
   { chave: "times", titulo: "Times e elencos", subtitulo: "Elencos, irregularidades, CPFs, contatos", icone: ShieldCheck },
   { chave: "financeiro", titulo: "Financeiro", subtitulo: "Pagamentos e planilha de inscrições", icone: Wallet },
   { chave: "jogos", titulo: "Jogos", subtitulo: "Transmissão, mata-mata, tabela", icone: Swords },
@@ -11941,6 +11972,18 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   const [carregandoPainel, setCarregandoPainel] = useState(true);
   const [buscaInscritos, setBuscaInscritos] = useState("");
   const [secaoAtiva, setSecaoAtiva] = useState(() => (restritoAJogos ? "jogos" : null));
+  const [historico, , loadingHistorico] = useSharedStorage("copasu:historico", [], 10000);
+  const novasAlteracoes = (historico || []).filter(
+    (h) => !config?.ultimaVisualizacaoHistorico || new Date(h.em) > new Date(config.ultimaVisualizacaoHistorico)
+  ).length;
+  // marca como visto ~4s depois de abrir a seção
+  useEffect(() => {
+    if (secaoAtiva !== "historico") return;
+    const t = setTimeout(() => {
+      saveConfig((atual) => ({ ...(atual || {}), ultimaVisualizacaoHistorico: new Date().toISOString() }));
+    }, 4000);
+    return () => clearTimeout(t);
+  }, [secaoAtiva]);
   const [subAbaPessoas, setSubAbaPessoas] = useState("inscritos");
   const [subAbaTimes, setSubAbaTimes] = useState("elencos");
   const [subAbaDownloads, setSubAbaDownloads] = useState("documentos");
@@ -12454,6 +12497,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
               perfis.filter((p) => p.status !== "aprovado" && p.status !== "recusado" && !p.visualizado).length +
               (souSuperAdmin ? adminRequests.filter((r) => r.status === "pendente").length : 0),
             avisos: contarAvisosJogos(matches, teams),
+            historico: novasAlteracoes,
             times: avaliacoes.filter((a) => a.status === "pendente").length,
             fotos: (posts || []).filter(postPendente).length,
             financeiro:
@@ -12976,6 +13020,39 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
       )}
 
       {secaoAtiva === "avisos" && <PainelAvisosJogos matches={matches} teams={teams} saveMatches={saveMatches} />}
+
+      {secaoAtiva === "historico" && (
+        <div className="mt-4 max-w-xl">
+          <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Tudo que os representantes alteraram no time deles (jogadores que entraram/saíram, mudanças de nome,
+            apelido, número e posição). Não precisa aprovar — é só acompanhar. Cada alteração também gera um aviso
+            no celular de quem ativou os avisos da organização.
+          </p>
+          {loadingHistorico ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (historico || []).length === 0 ? (
+            <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>Nenhuma alteração registrada ainda.</p>
+          ) : (
+            <ul className="space-y-2.5">
+              {[...historico].reverse().map((h) => (
+                <li key={h.id} className="rounded-xl p-3" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <span className="text-sm font-semibold" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>{h.timeNome}</span>
+                    <span className="text-[11px]" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                      {new Date(h.em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+                  <ul className="space-y-0.5">
+                    {(h.linhas || []).map((l, i) => (
+                      <li key={i} className="text-xs" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>{l}</li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {secaoAtiva === "jogos" && (
       <>
