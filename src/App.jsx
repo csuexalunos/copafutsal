@@ -1071,6 +1071,44 @@ function ModalElencoTime({ team, onClose, matches, teams }) {
   return <ModalTimeConteudo team={team} onClose={onClose} matches={matches} teams={teams} />;
 }
 
+// Compartilha um conteúdo (jogo, time, classificação...) e registra a métrica
+// com o nome do que foi compartilhado — é assim que sai o ranking de "qual
+// jogo foi mais compartilhado". Devolve true se copiou o link (sem share nativo).
+async function compartilharConteudo({ chave, titulo, texto }) {
+  const url = window.location.origin + window.location.pathname;
+  try {
+    let copiou = false;
+    if (navigator.share) {
+      await navigator.share({ title: titulo, text: texto, url });
+    } else if (navigator.clipboard) {
+      await navigator.clipboard.writeText(`${texto}\n${url}`);
+      copiou = true;
+    }
+    registrarEvento("compartilhamento", chave).catch((e) => console.error("Falha ao registrar compartilhamento", e));
+    return copiou;
+  } catch (e) {
+    return false; // cancelou
+  }
+}
+
+function BotaoCompartilhar({ chave, titulo, texto, rotulo = "Compartilhar", className = "" }) {
+  const [copiado, setCopiado] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={async (e) => {
+        e.stopPropagation();
+        const c = await compartilharConteudo({ chave, titulo, texto });
+        if (c) { setCopiado(true); setTimeout(() => setCopiado(false), 2200); }
+      }}
+      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold ${className}`}
+      style={{ color: COLORS.accent, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+    >
+      <Share2 size={12} /> {copiado ? "Link copiado!" : rotulo}
+    </button>
+  );
+}
+
 function ModalTimeConteudo({ team, onClose, matches, teams }) {
   const [aba, setAba] = useState("elenco");
   const jogadores = Array.isArray(team.jogadores) ? team.jogadores : [];
@@ -1164,6 +1202,14 @@ function ModalTimeConteudo({ team, onClose, matches, teams }) {
           <button type="button" onClick={onClose} aria-label="Fechar">
             <X size={18} color={COLORS.slate} />
           </button>
+        </div>
+        <div className="mb-3">
+          <BotaoCompartilhar
+            chave={`time:${team.nome}`}
+            titulo={`${team.nome} — Copa Santa Úrsula`}
+            texto={`Olha o elenco e os jogos do time ${team.nome} na Copa de Ex-Alunos de Futsal do Santa Úrsula!`}
+            rotulo="Compartilhar time"
+          />
         </div>
 
         {abas.length > 1 && (
@@ -3074,6 +3120,20 @@ function MatchCardExpansivel({ match, teams, sessao, saveMatches, matches, confi
         )}
       </button>
 
+      {!match.virtual && timeA && timeB && (
+        <div className="px-4 pb-3 flex justify-center">
+          <BotaoCompartilhar
+            chave={`jogo:${nomeA} x ${nomeB}`}
+            titulo={`${nomeA} x ${nomeB} — Copa Santa Úrsula`}
+            texto={
+              played
+                ? `${nomeA} ${match.golsA} x ${match.golsB} ${nomeB} — ${status === "encerrado" ? "fim de jogo" : "ao vivo"} na Copa de Ex-Alunos de Futsal do Santa Úrsula!`
+                : `${nomeA} x ${nomeB} — acompanhe na Copa de Ex-Alunos de Futsal do Santa Úrsula!`
+            }
+            rotulo="Compartilhar jogo"
+          />
+        </div>
+      )}
       {expanded && (
         <div className="px-4 pb-3 pt-1 border-t" style={{ borderColor: COLORS.border }}>
           {(match.eventos || []).length > 0 && (
@@ -3630,6 +3690,14 @@ function Classificacao({ matches, teams }) {
   return (
     <div>
       <SectionLabel eyebrow="Tabela" title="Classificação" />
+      <div className="mb-3">
+        <BotaoCompartilhar
+          chave="classificacao"
+          titulo="Classificação — Copa Santa Úrsula"
+          texto="Veja a classificação, artilharia e cartões da Copa de Ex-Alunos de Futsal do Santa Úrsula!"
+          rotulo="Compartilhar classificação"
+        />
+      </div>
       <div className="flex gap-2 overflow-x-auto pb-2 mb-4">
         {abas.map((a) => (
           <button
@@ -10928,6 +10996,7 @@ const ROTULOS_CLIQUES = {
 };
 const ROTULOS_COMPARTILHAMENTOS = {
   home: "Página inicial",
+  classificacao: "Classificação",
 };
 
 function RankingMetricas({ titulo, icone: Icone, itens, rotular, vazio }) {
@@ -13087,10 +13156,14 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
               vazio="Ainda sem cliques registrados."
             />
             <RankingMetricas
-              titulo="De onde vieram os compartilhamentos"
+              titulo="O que foi mais compartilhado"
               icone={Share2}
               itens={metricas?.compartilhamentos}
-              rotular={(chave) => ROTULOS_COMPARTILHAMENTOS[chave] || chave}
+              rotular={(chave) =>
+                ROTULOS_COMPARTILHAMENTOS[chave] ||
+                (String(chave).startsWith("jogo:") ? `Jogo: ${String(chave).slice(5)}` :
+                 String(chave).startsWith("time:") ? `Time: ${String(chave).slice(5)}` : chave)
+              }
               vazio="Ainda ninguém compartilhou pelo botão do app."
             />
             {metricas?.acessosUltimos7Dias && (
