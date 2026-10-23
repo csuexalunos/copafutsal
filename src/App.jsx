@@ -3833,7 +3833,6 @@ function jogadoresParaCard(team) {
 function CardApresentacaoTime({ team, grupo, fundo = true }) {
   const jogs = jogadoresParaCard(team);
   const escudo = ESCUDOS_TIMES[team.nome] || team.escudoUrl;
-  const apelidoTime = (TURMAS_HISTORICAS.find((t) => t.turma === team.nome) || {}).apelido || "";
   const f = "'Sora', 'Inter', sans-serif";
   const cor = useCorEscudo(escudo, "#FF6B2B");
   const nLinhas = Math.max(1, jogs.length);
@@ -3865,13 +3864,10 @@ function CardApresentacaoTime({ team, grupo, fundo = true }) {
           {EDITION_ROMAN} COPA CSU EX-ALUNOS
         </div>
         {escudo && <img src={escudo} alt="" style={{ width: 400, height: 400, objectFit: "contain", filter: "drop-shadow(0 20px 40px rgba(0,0,0,0.5))" }} />}
-        <div style={{ fontWeight: 800, fontSize: /^\d/.test(team.nome) ? 84 : 96, lineHeight: 1, marginTop: 28, letterSpacing: -2, whiteSpace: "nowrap" }}>
+        <div style={{ fontWeight: 800, fontSize: /^\d/.test(team.nome) ? 66 : 76, lineHeight: 1, marginTop: 28, letterSpacing: -2, whiteSpace: "nowrap" }}>
           {/^\d/.test(team.nome) ? `Seleção ${team.nome}` : team.nome}
         </div>
         <div style={{ width: 200, height: 7, borderRadius: 4, background: cor, marginTop: 18 }} />
-        {apelidoTime && (
-          <div style={{ fontWeight: 600, fontSize: 36, color: "rgba(255,255,255,0.85)", marginTop: 16, fontStyle: "italic" }}>“{apelidoTime}”</div>
-        )}
         {grupo && (
           <div style={{ marginTop: 26, background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.25)", color: "#fff", fontWeight: 800, fontSize: 28, letterSpacing: 4, padding: "8px 30px", borderRadius: 999 }}>
             {grupo.toUpperCase()}
