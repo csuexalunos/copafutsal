@@ -2822,7 +2822,13 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes, confi
     );
   }
 
-  if (!inscricaoAberta(config, turmaFixa)) {
+  // Mesmo com o período de INSCRIÇÃO de times encerrado, o representante de um time
+  // que já existe continua podendo editar o elenco dele até 02/11 (ou depois, se a
+  // organização liberar o time). Só a criação de times novos fica fechada.
+  const timeDoRepresentante = !isAdmin && turmaFixa ? teams.find((t) => t.nome === turmaFixa) : null;
+  const edicaoDoTimeAberta =
+    !!timeDoRepresentante && (agoraReal() < PRAZO_EDICAO_DETALHES.getTime() || !!timeDoRepresentante.edicaoLiberada);
+  if (!inscricaoAberta(config, turmaFixa) && !edicaoDoTimeAberta) {
     return (
       <div>
         <SectionLabel eyebrow="Participe" title="Inscrição de time" />
