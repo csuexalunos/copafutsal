@@ -643,15 +643,17 @@ function jogadoresPendentesDePagamento(team) {
   return jogadores.filter((j) => !confirmados.includes(j.id));
 }
 
-// A inscrição só é considerada CONCLUÍDA quando o time está marcado como
-// pago e não tem nenhum jogador com pagamento pendente. Times que ainda
+// A inscrição é considerada CONCLUÍDA quando o time está marcado como pago. Times que ainda
 // não pagaram (mesmo já aprovados pela comissão) não contam como
 // "inscritos" nas telas públicas/oficiais — Início, lista de inscritos,
 // Sorteio (potes/grupos) e Classificação. Eles continuam aparecendo
 // normalmente nas telas de gestão da Organização (aprovação, pagamento,
 // elencos), que precisam ver todo mundo pra poder cobrar.
 function timeInscritoOficialmente(team) {
-  return !!(team.pago && jogadoresPendentesDePagamento(team).length === 0);
+  // Depois do primeiro pagamento o time continua inscrito mesmo que entrem
+  // novos atletas — eles só ficam com o pagamento pendente de confirmação
+  // (visível na Organização), sem tirar o time da lista de inscritos.
+  return !!team.pago;
 }
 
 const LOCAL_NOME = "Ginásio Poliesportivo do Colégio Santa Úrsula";
@@ -6296,7 +6298,7 @@ async function baixarFichaTodosTimes(teams) {
   // Só os times totalmente pagos (sem jogador novo pendente), do mais
   // antigo pro mais novo (mesma lógica de ordenação por ano usada na
   // lista de turmas históricas).
-  const elegiveis = teams.filter((t) => t.pago && jogadoresPendentesDePagamento(t).length === 0);
+  const elegiveis = teams.filter(timeInscritoOficialmente);
   const ordenados = [...elegiveis].sort((a, b) => {
     const anosA = anosDaTurma(a.nome);
     const anosB = anosDaTurma(b.nome);
@@ -6712,7 +6714,7 @@ function PlanilhaInscricoes({ teams }) {
 
 function DocumentosOrganizacao({ teams, matches }) {
   const [secaoDoc, setSecaoDoc] = useState("fichas");
-  const timesPagos = teams.filter((t) => t.pago && jogadoresPendentesDePagamento(t).length === 0).length;
+  const timesPagos = teams.filter(timeInscritoOficialmente).length;
 
   return (
     <div className="rounded-2xl p-5 mt-8" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
@@ -8240,8 +8242,9 @@ function StatusAprovacaoPagamento({ teams, saveTeams }) {
       <p className="text-xs mb-4" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
         Marque o time como aprovado depois que a comissão revisar o cadastro, e marque
         "Pagamento confirmado" quando identificar o Pix/comprovante ou o link pago. Se o
-        representante adicionar jogador novo depois, o time volta a aparecer com pendência — só
-        do valor referente a quem entrou depois, no lote vigente na hora. O e-mail de aviso pra
+        representante adicionar jogador novo depois, o time continua inscrito e fica só com a
+        pendência do valor de quem entrou depois (no lote vigente na hora) — é só confirmar o
+        pagamento desse atleta. O e-mail de aviso pra
         cada time fica na aba Comunicação.
       </p>
 
