@@ -3025,6 +3025,38 @@ function MatchCard({ match, teamsById }) {
 // os eventos (gols/assistências/cartões) já registrados. Só quem está
 // logado como admin vê os controles pra editar — pros demais é só
 // leitura, mas já mostra tudo em tempo real.
+// Botãozinho verde que manda o jogo direto pro WhatsApp (e conta na métrica).
+function BotaoWhatsappJogo({ chave, texto }) {
+  return (
+    <button
+      type="button"
+      aria-label="Compartilhar no WhatsApp"
+      title="Compartilhar no WhatsApp"
+      onClick={(e) => {
+        e.stopPropagation();
+        const url = window.location.origin + window.location.pathname;
+        window.open(`https://wa.me/?text=${encodeURIComponent(`${texto}\n${url}`)}`, "_blank", "noopener");
+        registrarEvento("compartilhamento", chave).catch((err) => console.error("Falha ao registrar compartilhamento", err));
+      }}
+      className="absolute top-2 right-2 z-10 w-8 h-8 rounded-full flex items-center justify-center"
+      style={{ backgroundColor: "#25D366" }}
+    >
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="#fff" aria-hidden="true">
+        <path d="M12.04 2a9.9 9.9 0 0 0-8.4 15.1L2 22l5-1.6A9.9 9.9 0 1 0 12.04 2zm0 1.8a8.1 8.1 0 1 1-4.3 15l-.3-.2-3 .9.9-2.9-.2-.3A8.1 8.1 0 0 1 12.04 3.8zM8.6 7.5c-.2 0-.5.1-.7.3-.3.3-1 1-1 2.4s1 2.8 1.2 3c.1.2 2 3.1 4.9 4.3 2.4 1 2.9.8 3.4.7.6-.1 1.7-.7 1.9-1.4.2-.7.2-1.2.2-1.4-.1-.1-.3-.2-.6-.3l-1.900-.9c-.3-.1-.5-.1-.7.1l-.9 1.100c-.2.200-.3.200-.6.100-.3-.1-1.200-.4-2.300-1.400-.8-.8-1.400-1.700-1.500-2-.2-.3 0-.4.100-.6l.5-.5c.1-.2.200-.3.300-.5.100-.2 0-.4 0-.5l-.9-2.100c-.2-.5-.4-.5-.6-.5z"/>
+      </svg>
+    </button>
+  );
+}
+
+function textoCompartilharJogo(nomeA, nomeB, match) {
+  const jogou = match.golsA !== "" && match.golsB !== "" && match.golsA != null && match.golsB != null;
+  const st = match.status || "agendado";
+  if (jogou) return `⚽ ${nomeA} ${match.golsA} x ${match.golsB} ${nomeB} — ${st === "encerrado" ? "fim de jogo" : "ao vivo"} na Copa de Ex-Alunos de Futsal do Santa Úrsula!`;
+  const h = match.horario ? new Date(match.horario) : null;
+  const quando = h ? ` — ${String(h.getDate()).padStart(2, "0")}/${String(h.getMonth() + 1).padStart(2, "0")} às ${String(h.getHours()).padStart(2, "0")}:${String(h.getMinutes()).padStart(2, "0")}` : "";
+  return `⚽ ${nomeA} x ${nomeB}${quando} — Copa de Ex-Alunos de Futsal do Santa Úrsula. Acompanhe ao vivo!`;
+}
+
 function MatchCardExpansivel({ match, teams, sessao, saveMatches, matches, config }) {
   const [expanded, setExpanded] = useState(false);
   const [timeModal, setTimeModal] = useState(null);
@@ -3043,7 +3075,10 @@ function MatchCardExpansivel({ match, teams, sessao, saveMatches, matches, confi
       await saveMatches(gerarMataMataAutomatico(atualizado, teams, horariosDoConfig(config)));
     };
     return (
-      <div className="w-full">
+      <div className="w-full relative">
+        {timeA && timeB && (
+          <BotaoWhatsappJogo chave={`jogo:${nomeA} x ${nomeB}`} texto={textoCompartilharJogo(nomeA, nomeB, match)} />
+        )}
         <MatchAdminRow match={match} teams={teams} onUpdate={onUpdate} cartao suspensosJogo={calcularSuspensoes(matches, teams).porJogo[match.id]} />
       </div>
     );
@@ -3088,7 +3123,10 @@ function MatchCardExpansivel({ match, teams, sessao, saveMatches, matches, confi
   );
 
   return (
-    <div className="w-full rounded-2xl overflow-hidden mt-4" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+    <div className="w-full rounded-2xl overflow-hidden mt-4 relative" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+      {!match.virtual && timeA && timeB && (
+        <BotaoWhatsappJogo chave={`jogo:${nomeA} x ${nomeB}`} texto={textoCompartilharJogo(nomeA, nomeB, match)} />
+      )}
       <button type="button" onClick={() => !match.virtual && setExpanded((v) => !v)} className="w-full text-center px-2 pt-4 pb-3">
         <div className="text-[11px] font-bold uppercase tracking-widest mb-3" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
           {match.horario ? `${String(new Date(match.horario).getHours()).padStart(2, "0")}:${String(new Date(match.horario).getMinutes()).padStart(2, "0")} · ` : ""}{match.fase || "Fase"}
@@ -3120,20 +3158,6 @@ function MatchCardExpansivel({ match, teams, sessao, saveMatches, matches, confi
         )}
       </button>
 
-      {!match.virtual && timeA && timeB && (
-        <div className="px-4 pb-3 flex justify-center">
-          <BotaoCompartilhar
-            chave={`jogo:${nomeA} x ${nomeB}`}
-            titulo={`${nomeA} x ${nomeB} — Copa Santa Úrsula`}
-            texto={
-              played
-                ? `${nomeA} ${match.golsA} x ${match.golsB} ${nomeB} — ${status === "encerrado" ? "fim de jogo" : "ao vivo"} na Copa de Ex-Alunos de Futsal do Santa Úrsula!`
-                : `${nomeA} x ${nomeB} — acompanhe na Copa de Ex-Alunos de Futsal do Santa Úrsula!`
-            }
-            rotulo="Compartilhar jogo"
-          />
-        </div>
-      )}
       {expanded && (
         <div className="px-4 pb-3 pt-1 border-t" style={{ borderColor: COLORS.border }}>
           {(match.eventos || []).length > 0 && (
