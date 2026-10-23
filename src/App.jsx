@@ -1069,12 +1069,15 @@ function EmptyState({ children }) {
 // time (na Classificação ou no Sorteio), a lista de jogadores. Só número,
 // apelido e posição — nunca CPF nem outros dados sensíveis.
 // ---------------------------------------------------------------------------
-function ModalElencoTime({ team, onClose, matches, teams }) {
+function ModalElencoTime({ team, onClose, matches, teams, timesAoVivo }) {
   useEffect(() => {
     if (team?.nome) registrarEvento("clique_time", team.nome).catch(() => {});
   }, [team?.id]);
   if (!team) return null;
-  return <ModalTimeConteudo team={team} onClose={onClose} matches={matches} teams={teams} />;
+  // Sempre mostra a versão mais recente do time (o modal guarda só a "seleção";
+  // se o representante mexer no elenco enquanto está aberto, atualiza sozinho).
+  const atual = (timesAoVivo || teams || []).find((t) => t.id === team.id) || team;
+  return <ModalTimeConteudo team={atual} onClose={onClose} matches={matches} teams={teams} />;
 }
 
 // Compartilha um conteúdo (jogo, time, classificação...) e registra a métrica
@@ -2072,7 +2075,12 @@ function EditarMeuTime({ teams, saveTeams }) {
   };
 
   const salvarTime = async (atualizado) => {
-    await saveTeams((atuais) => (atuais || []).map((t) => (t.id === atualizado.id ? atualizado : t)));
+    // Grava só o elenco (e o carimbo de lote) em cima da versão MAIS RECENTE do
+    // time — antes gravava o time inteiro como estava na tela, o que podia
+    // desfazer pagamento/aprovação feitos pela organização nesse meio-tempo.
+    await saveTeams((atuais) =>
+      (atuais || []).map((t) => (t.id === atualizado.id ? { ...t, jogadores: atualizado.jogadores } : t))
+    );
   };
 
   if (!open) {
@@ -5666,7 +5674,7 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
           })()}
         </div>
       )}
-      <ModalElencoTime team={timeModal} onClose={() => setTimeModal(null)} />
+      <ModalElencoTime team={timeModal} onClose={() => setTimeModal(null)} timesAoVivo={teams} />
     </div>
   );
 }
@@ -8860,7 +8868,12 @@ function GerenciarElencos({ teams, saveTeams }) {
   const time = teams.find((t) => t.id === timeId);
 
   const salvarTime = async (atualizado) => {
-    await saveTeams((atuais) => (atuais || []).map((t) => (t.id === atualizado.id ? atualizado : t)));
+    // Grava só o elenco (e o carimbo de lote) em cima da versão MAIS RECENTE do
+    // time — antes gravava o time inteiro como estava na tela, o que podia
+    // desfazer pagamento/aprovação feitos pela organização nesse meio-tempo.
+    await saveTeams((atuais) =>
+      (atuais || []).map((t) => (t.id === atualizado.id ? { ...t, jogadores: atualizado.jogadores } : t))
+    );
   };
 
   return (
@@ -10635,7 +10648,7 @@ function Sorteio({ teams, sorteio, saveSorteio, matches, saveMatches, sessao, co
           onFechar={() => setPalcoAberto(false)}
         />
       )}
-      <ModalElencoTime team={timeSelecionado} onClose={() => setTimeSelecionado(null)} />
+      <ModalElencoTime team={timeSelecionado} onClose={() => setTimeSelecionado(null)} timesAoVivo={teams} />
     </div>
   );
 }
