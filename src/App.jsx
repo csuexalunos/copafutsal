@@ -72,7 +72,13 @@ const PIX_CHAVE_TEXTO = "12.516.746/0001-31 (CNPJ do Colégio Santa Úrsula)";
 
 // Métricas: cliques de organizadores (e deste aparelho, se marcado) não contam.
 let ignorarMetricas = false;
-try { ignorarMetricas = localStorage.getItem("copasu:ignorar_metricas") === "1"; } catch (e) { /* sem storage */ }
+try {
+  // Link especial: ...?ignorar=1 marca este aparelho como "meu" (não conta nas métricas); ?ignorar=0 desfaz.
+  const pIgn = new URLSearchParams(window.location.search).get("ignorar");
+  if (pIgn === "1") localStorage.setItem("copasu:ignorar_metricas", "1");
+  if (pIgn === "0") localStorage.removeItem("copasu:ignorar_metricas");
+  ignorarMetricas = localStorage.getItem("copasu:ignorar_metricas") === "1";
+} catch (e) { /* sem storage */ }
 function registrarEvento(tipo, detalhe) {
   if (ignorarMetricas) return Promise.resolve();
   return registrarEventoBruto(tipo, detalhe);
@@ -13296,7 +13302,7 @@ export default function App() {
   useEffect(() => {
     if (acessoRegistradoRef.current) return;
     acessoRegistradoRef.current = true;
-    registrarAcesso().catch((e) => console.error("Falha ao registrar acesso", e));
+    if (!ignorarMetricas) registrarAcesso().catch((e) => console.error("Falha ao registrar acesso", e));
     registrarEvento("acesso", null).catch((e) => console.error("Falha ao registrar evento de acesso", e));
   }, []);
 
