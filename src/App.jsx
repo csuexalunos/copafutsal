@@ -11701,6 +11701,15 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   const [verPendentesAntigos, setVerPendentesAntigos] = useState(false);
   const [acessos, setAcessos] = useState(null);
   const [metricas, setMetricas] = useState(null);
+  // Sempre 7 dias no gráfico — dia sem acesso aparece com 0.
+  const dias7 = useMemo(() => {
+    const porDia = new Map((metricas?.acessosUltimos7Dias || []).map((x) => [x.data, Number(x.total || 0)]));
+    return Array.from({ length: 7 }, (_, i) => {
+      const dt = new Date(Date.now() - (6 - i) * 86400000);
+      const rotulo = dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" });
+      return { data: rotulo, total: porDia.get(rotulo) || 0 };
+    });
+  }, [metricas]);
   const [carregandoMetricas, setCarregandoMetricas] = useState(false);
 
   useEffect(() => {
@@ -13072,7 +13081,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
               rotular={(chave) => ROTULOS_COMPARTILHAMENTOS[chave] || chave}
               vazio="Ainda ninguém compartilhou pelo botão do app."
             />
-            {metricas?.acessosUltimos7Dias && metricas.acessosUltimos7Dias.length > 0 && (
+            {metricas?.acessosUltimos7Dias && (
               <div
                 className="rounded-2xl p-5"
                 style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
@@ -13081,8 +13090,8 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
                   Acessos nos últimos 7 dias
                 </h4>
                 <div className="flex items-end gap-2" style={{ height: "112px" }}>
-                  {metricas.acessosUltimos7Dias.map((d) => {
-                    const maxDia = Math.max(...metricas.acessosUltimos7Dias.map((x) => Number(x.total || 0)), 1);
+                  {dias7.map((d) => {
+                    const maxDia = Math.max(...dias7.map((x) => Number(x.total || 0)), 1);
                     const altura = Math.max(1, (Number(d.total || 0) / maxDia) * 100);
                     return (
                       <div key={d.data} className="flex-1 flex flex-col items-center gap-1">
