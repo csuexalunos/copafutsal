@@ -6603,16 +6603,6 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
                 Iniciar 1º tempo
               </button>
             )}
-            {(match.status === "ao_vivo" || match.status === "agendado") && (
-              <button
-                type="button"
-                onClick={avisarWhatsapp}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold"
-                style={{ backgroundColor: "#22C55E", color: "#0B1220", fontFamily: "'Inter', sans-serif" }}
-              >
-                Avisar no WhatsApp
-              </button>
-            )}
             {match.status === "ao_vivo" && (
               <button
                 type="button"
