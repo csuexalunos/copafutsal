@@ -1224,7 +1224,7 @@ function ModalElencoTime({ team, onClose, matches, teams, timesAoVivo }) {
 // com o nome do que foi compartilhado — é assim que sai o ranking de "qual
 // jogo foi mais compartilhado". Devolve true se copiou o link (sem share nativo).
 async function compartilharConteudo({ chave, titulo, texto }) {
-  const url = window.location.origin + window.location.pathname;
+  const url = window.location.origin + window.location.pathname + window.location.search;
   try {
     let copiou = false;
     if (navigator.share) {
@@ -3517,7 +3517,7 @@ function BotaoWhatsappJogo({ chave, texto }) {
       title="Compartilhar no WhatsApp"
       onClick={(e) => {
         e.stopPropagation();
-        const url = window.location.origin + window.location.pathname;
+        const url = window.location.origin + window.location.pathname + window.location.search;
         window.open(`https://wa.me/?text=${encodeURIComponent(`${texto}\n${url}`)}`, "_blank", "noopener");
         registrarEvento("compartilhamento", chave).catch((err) => console.error("Falha ao registrar compartilhamento", err));
       }}
@@ -14389,7 +14389,21 @@ const TABS = [
 ];
 
 export default function App() {
-  const [tab, setTab] = useState("inicio");
+  // A aba aberta fica na URL (?aba=...), assim o link compartilhado abre na mesma página.
+  const [tab, setTabEstado] = useState(() => {
+    try {
+      const a = new URLSearchParams(window.location.search).get("aba");
+      return a && TABS.some((t) => t.id === a) ? a : "inicio";
+    } catch (e) { return "inicio"; }
+  });
+  const setTab = (id) => {
+    setTabEstado(id);
+    try {
+      const u = new URL(window.location.href);
+      if (id === "inicio") u.searchParams.delete("aba"); else u.searchParams.set("aba", id);
+      window.history.replaceState(null, "", u.pathname + u.search + u.hash);
+    } catch (e) { /* ok */ }
+  };
   const [sessao, setSessao] = useState(null);
   useEffect(() => {
     if (sessao?.tipo === "admin") {
