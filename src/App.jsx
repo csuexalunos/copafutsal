@@ -3508,8 +3508,13 @@ function MatchCard({ match, teamsById }) {
 // os eventos (gols/assistências/cartões) já registrados. Só quem está
 // logado como admin vê os controles pra editar — pros demais é só
 // leitura, mas já mostra tudo em tempo real.
+// Link que abre direto no jogo: aba Jogos ao Vivo, no dia certo, com o jogo aberto.
+function linkDoJogo(jogoId) {
+  const base = window.location.origin + window.location.pathname;
+  return jogoId ? `${base}?aba=chaveamento&jogo=${encodeURIComponent(jogoId)}` : base + window.location.search;
+}
 // Botãozinho verde que manda o jogo direto pro WhatsApp (e conta na métrica).
-function BotaoWhatsappJogo({ chave, texto }) {
+function BotaoWhatsappJogo({ chave, texto, jogoId }) {
   return (
     <button
       type="button"
@@ -3517,7 +3522,7 @@ function BotaoWhatsappJogo({ chave, texto }) {
       title="Compartilhar no WhatsApp"
       onClick={(e) => {
         e.stopPropagation();
-        const url = window.location.origin + window.location.pathname + window.location.search;
+        const url = linkDoJogo(jogoId);
         window.open(`https://wa.me/?text=${encodeURIComponent(`${texto}\n${url}`)}`, "_blank", "noopener");
         registrarEvento("compartilhamento", chave).catch((err) => console.error("Falha ao registrar compartilhamento", err));
       }}
@@ -3540,8 +3545,18 @@ function textoCompartilharJogo(nomeA, nomeB, match) {
   return `⚽ ${nomeA} x ${nomeB}${quando} — Copa de Ex-Alunos de Futsal do Santa Úrsula. Acompanhe ao vivo!`;
 }
 
+function jogoDoLinkAtual() {
+  try { return new URLSearchParams(window.location.search).get("jogo"); } catch (e) { return null; }
+}
 function MatchCardExpansivel({ match, teams, sessao, saveMatches, matches, config }) {
-  const [expanded, setExpanded] = useState(false);
+  const ehAlvo = !!match.id && jogoDoLinkAtual() === String(match.id);
+  const [expanded, setExpanded] = useState(ehAlvo);
+  const refAlvo = useRef(null);
+  useEffect(() => {
+    if (!ehAlvo || !refAlvo.current) return;
+    const t = setTimeout(() => { try { refAlvo.current.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) { /* ok */ } }, 400);
+    return () => clearTimeout(t);
+  }, [ehAlvo]);
   const [timeModal, setTimeModal] = useState(null);
   const isAdmin = sessao && sessao.tipo === "admin";
   const timeA = teams.find((t) => t.id === match.timeA);
@@ -3558,9 +3573,9 @@ function MatchCardExpansivel({ match, teams, sessao, saveMatches, matches, confi
       await saveMatches(gerarMataMataAutomatico(atualizado, teams, horariosDoConfig(config)));
     };
     return (
-      <div className="w-full relative">
+      <div className="w-full relative" ref={refAlvo}>
         {timeA && timeB && (
-          <BotaoWhatsappJogo chave={`jogo:${nomeA} x ${nomeB}`} texto={textoCompartilharJogo(nomeA, nomeB, match)} />
+          <BotaoWhatsappJogo chave={`jogo:${nomeA} x ${nomeB}`} texto={textoCompartilharJogo(nomeA, nomeB, match)} jogoId={match.id} />
         )}
         <MatchAdminRow match={match} teams={teams} onUpdate={onUpdate} cartao suspensosJogo={calcularSuspensoes(matches, teams).porJogo[match.id]} />
       </div>
@@ -3606,9 +3621,9 @@ function MatchCardExpansivel({ match, teams, sessao, saveMatches, matches, confi
   );
 
   return (
-    <div className="w-full rounded-2xl overflow-hidden mt-4 relative" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+    <div ref={refAlvo} className="w-full rounded-2xl overflow-hidden mt-4 relative" style={{ backgroundColor: COLORS.card, border: `1px solid ${ehAlvo ? COLORS.accent : COLORS.border}` }}>
       {!match.virtual && timeA && timeB && (
-        <BotaoWhatsappJogo chave={`jogo:${nomeA} x ${nomeB}`} texto={textoCompartilharJogo(nomeA, nomeB, match)} />
+        <BotaoWhatsappJogo chave={`jogo:${nomeA} x ${nomeB}`} texto={textoCompartilharJogo(nomeA, nomeB, match)} jogoId={match.id} />
       )}
       <button type="button" onClick={() => !match.virtual && setExpanded((v) => !v)} className="w-full text-center px-2 pt-4 pb-3">
         <div className="text-[11px] font-bold uppercase tracking-widest mb-3" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
@@ -4483,7 +4498,9 @@ function Chaveamento({ matches, teams, sessao, saveMatches, config }) {
     return vistos;
   }, [jogosOrdenados]);
   const alvo = jogosOrdenados.find((m) => m.status === "ao_vivo" || m.status === "intervalo") || jogosOrdenados.find((m) => m.status !== "encerrado") || jogosOrdenados[jogosOrdenados.length - 1];
-  const diaAtual = dias.some((d) => d.k === diaSel) ? diaSel : alvo ? chaveDia(alvo) : dias[0]?.k;
+  const jogoLink = jogoDoLinkAtual();
+  const mLink = jogoLink ? jogosOrdenados.find((m) => String(m.id) === jogoLink) : null;
+  const diaAtual = dias.some((d) => d.k === diaSel) ? diaSel : mLink ? chaveDia(mLink) : alvo ? chaveDia(alvo) : dias[0]?.k;
   const jogosVisiveis = jogosOrdenados.filter((m) => chaveDia(m) === diaAtual);
 
   return (
@@ -14400,7 +14417,7 @@ export default function App() {
     setTabEstado(id);
     try {
       const u = new URL(window.location.href);
-      if (id === "inicio") u.searchParams.delete("aba"); else u.searchParams.set("aba", id);
+      u.searchParams.delete("jogo"); if (id === "inicio") u.searchParams.delete("aba"); else u.searchParams.set("aba", id);
       window.history.replaceState(null, "", u.pathname + u.search + u.hash);
     } catch (e) { /* ok */ }
   };
