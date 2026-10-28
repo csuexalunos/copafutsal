@@ -1045,7 +1045,8 @@ async function confirmarElencoNoBanco(atualizado) {
 // Histórico de alterações feitas por representantes — a organização vê tudo
 // (sem precisar aprovar) e recebe notificação. Guarda as últimas 400.
 async function registrarAlteracaoRep(entrada) {
-  if (ignorarMetricas) return;
+  // Ações da organização (por) sempre ficam registradas, mesmo em aparelho com ?ignorar=1.
+  if (ignorarMetricas && !entrada.por) return;
   try {
     const atual = (await storageGet("copasu:historico")) || [];
     const nova = { id: `alt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, em: new Date().toISOString(), ...entrada };
@@ -9976,6 +9977,7 @@ function GerenciarElencos({ teams, saveTeams }) {
     // Grava só o elenco (e o carimbo de lote) em cima da versão MAIS RECENTE do
     // time — antes gravava o time inteiro como estava na tela, o que podia
     // desfazer pagamento/aprovação feitos pela organização nesse meio-tempo.
+    const antesJog = (teams.find((t) => t.id === atualizado.id) || {}).jogadores || [];
     await saveTeams((atuais) =>
       (atuais || []).map((t) => {
         if (t.id !== atualizado.id) return t;
@@ -9987,6 +9989,8 @@ function GerenciarElencos({ teams, saveTeams }) {
       })
     );
     await confirmarElencoNoBanco(atualizado);
+    const linhasOrg = descreverAlteracoesElenco(antesJog, atualizado.jogadores);
+    if (linhasOrg.length > 0) registrarAlteracaoRep({ tipo: "elenco", timeId: atualizado.id, timeNome: (teams.find((t) => t.id === atualizado.id) || {}).nome || "", linhas: linhasOrg, por: "Organização" });
   };
 
   return (
@@ -13215,6 +13219,12 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   };
 
   const aprovarExcecao = async (caso) => {
+    {
+      const tm = (teams || []).find((t) => t.nome === caso.timeNome);
+      const entrou = tm && !(tm.jogadores || []).some((j) => j.id === caso.jogadorId) && caso.jogadorDados;
+      const nomeJ = (caso.jogadorDados && (caso.jogadorDados.apelido || caso.jogadorDados.nome)) || caso.jogador || caso.jogadorNome || "jogador";
+      registrarAlteracaoRep({ tipo: "elenco", timeId: tm ? tm.id : undefined, timeNome: caso.timeNome, linhas: [entrou ? `➕ Entrou (pedido aprovado): ${nomeJ}` : `✅ Exceção aprovada: ${nomeJ}`], por: "Organização" });
+    }
     await saveTeams((atuais) =>
       (atuais || []).map((t) => {
         if (t.nome !== caso.timeNome) return t;
@@ -13262,6 +13272,12 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
     // jogadores (e o valor da inscrição, calculado a partir dela) já
     // atualiza sozinha em todo lugar, porque é sempre recalculada a
     // partir do time.jogadores — não precisa mexer em mais nada.
+    {
+      const tm = (teams || []).find((t) => t.nome === caso.timeNome);
+      const jg = tm && (tm.jogadores || []).find((j) => j.id === caso.jogadorId);
+      const nomeJ = (jg && (jg.apelido || jg.nome)) || caso.jogador || caso.jogadorNome || "jogador";
+      registrarAlteracaoRep({ tipo: "elenco", timeId: tm ? tm.id : undefined, timeNome: caso.timeNome, linhas: [`➖ Saiu (irregularidade mantida): ${nomeJ}`], por: "Organização" });
+    }
     await saveTeams((atuais) =>
       (atuais || []).map((t) => {
         if (t.nome !== caso.timeNome) return t;
@@ -13989,7 +14005,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
       {secaoAtiva === "historico" && (
         <div className="mt-4 max-w-xl">
           <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-            Tudo que os representantes alteraram no time deles (jogadores que entraram/saíram, mudanças de nome,
+            Tudo que os representantes (e a própria organização, pelo painel) alteraram nos times (jogadores que entraram/saíram, mudanças de nome,
             apelido, número e posição). Não precisa aprovar — é só acompanhar. Cada alteração também gera um aviso
             no celular de quem ativou os avisos da organização.
           </p>
@@ -14002,7 +14018,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
               {[...historico].reverse().map((h) => (
                 <li key={h.id} className="rounded-xl p-3" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
                   <div className="flex items-center justify-between gap-2 mb-1">
-                    <span className="text-sm font-semibold" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>{h.timeNome}</span>
+                    <span className="text-sm font-semibold" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>{h.timeNome}{h.por ? <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ backgroundColor: COLORS.navy, color: COLORS.gold }}>{h.por}</span> : null}</span>
                     <span className="text-[11px]" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
                       {new Date(h.em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
                     </span>
