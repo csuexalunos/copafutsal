@@ -46,7 +46,7 @@ import {
   criarPerfil, buscarPerfil, listarPerfis, atualizarPerfil, atualizarPerfilConfirmado, souAdmin, listarAdmins,
   promoverParaAdmin, removerAdmin, subirArquivo, urlAssinada, contarPessoasInscritas, buscarCpfsDaTurma,
   registrarAcesso, contarAcessos, registrarEvento as registrarEventoBruto, buscarMetricasDetalhadas, esqueciSenha, definirNovaSenha, supabase,
-  buscarCpfsDoTime, salvarCpfJogador, salvarCpfsEmLote, excluirCpfsDoJogador, buscarAtletas, salvarAtletas, readStamp, cpfsEmOutrosTimes, sincronizarBancoAtletas,
+  buscarCpfsDoTime, salvarCpfJogador, salvarCpfsEmLote, excluirCpfsDoJogador, buscarAtletas, salvarAtletas, readStamp, subirEscudo, cpfsEmOutrosTimes, sincronizarBancoAtletas,
 } from "./lib/supabase.js";
 import { pushSuportado, ehIosNaoInstalado, inscricaoAtual, timesSalvos, ativarPush, desativarPush, avisarInicioJogo, avisarOrganizacao, testarAvisoOrganizacao, ativarPushAdmin, desativarPushAdmin, pushAdminAtivo } from "./lib/push.js";
 
@@ -2033,8 +2033,13 @@ function EscudoPicker({ value, onChange }) {
     if (!file) return;
     setBusy(true);
     try {
-      const dataUrl = await compressImageFile(file, 400, 0.8);
-      onChange(dataUrl);
+      try {
+        const blob = await comTimeout(compressImageToBlob(file, 400, 0.8), 20000, "Demorou demais ao preparar a imagem");
+        onChange(await comTimeout(subirEscudo(blob), 20000, "Demorou demais ao enviar o escudo"));
+      } catch (e2) {
+        console.error("Upload do escudo falhou, guardando direto", e2);
+        onChange(await compressImageFile(file, 400, 0.8)); // plano B: base64 (migrado depois pela organização)
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -14725,7 +14730,53 @@ export default function App() {
   const [matches, saveMatches, loadingMatches] = useSharedStorage("copasu:matches", [], 5000);
   const [posts, savePosts, loadingPosts] = useSharedStorage("copasu:community", [], 6000);
   const [adminRequests, saveAdminRequests, loadingAdminRequests] = useSharedStorage("copasu:admin_requests", [], 8000);
-  const [sorteio, saveSorteio, loadingSorteio] = useSharedStorage("copasu:sorteio", {}, 6000);
+  const [sorteioBruto, saveSorteioBruto, loadingSorteio] = useSharedStorage("copasu:sorteio", {}, 6000);
+  // O sorteio guardava uma CÓPIA inteira de cada time dentro dos grupos (430 kB, baixados
+  // a cada visita). Agora grava só {id, nome} e reidrata com os times atuais na leitura.
+  const enxugarSorteio = useCallback((v) => {
+    if (!v || !v.grupos || typeof v.grupos !== "object") return v;
+    const g = {};
+    Object.entries(v.grupos).forEach(([nome, arr]) => { g[nome] = (arr || []).map((t) => ({ id: t.id, nome: t.nome })); });
+    return { ...v, grupos: g };
+  }, []);
+  const saveSorteio = useCallback(
+    (v) => saveSorteioBruto(typeof v === "function" ? (a) => enxugarSorteio(v(a)) : enxugarSorteio(v)),
+    [saveSorteioBruto, enxugarSorteio]
+  );
+  const sorteio = useMemo(() => {
+    if (!sorteioBruto || !sorteioBruto.grupos || typeof sorteioBruto.grupos !== "object") return sorteioBruto;
+    const g = {};
+    Object.entries(sorteioBruto.grupos).forEach(([nome, arr]) => {
+      g[nome] = (arr || []).map((t) => (teams || []).find((x) => x.id === t.id) || t);
+    });
+    return { ...sorteioBruto, grupos: g };
+  }, [sorteioBruto, teams]);
+  useEffect(() => {
+    // migração única: se o registro ainda está gordo, qualquer admin logado enxuga.
+    if (loadingSorteio || !sessao || sessao.tipo !== "admin" || !sorteioBruto || !sorteioBruto.grupos) return;
+    const gordo = Object.values(sorteioBruto.grupos).some((arr) => (arr || []).some((t) => t && (t.jogadores || t.escudoUrl)));
+    if (gordo) saveSorteioBruto(enxugarSorteio(sorteioBruto));
+  }, [loadingSorteio, sessao, sorteioBruto, enxugarSorteio, saveSorteioBruto]);
+  // migração única: escudos base64 dos times -> Storage
+  const migrandoEscudos = useRef(false);
+  useEffect(() => {
+    if (loadingTeams || !sessao || sessao.tipo !== "admin" || migrandoEscudos.current) return;
+    const pend = (teamsBanco || []).filter((t) => typeof t.escudoUrl === "string" && t.escudoUrl.startsWith("data:"));
+    if (pend.length === 0) return;
+    migrandoEscudos.current = true;
+    (async () => {
+      const novos = {};
+      for (const t of pend) {
+        try {
+          const blob = await (await fetch(t.escudoUrl)).blob();
+          novos[t.id] = { de: t.escudoUrl, para: await subirEscudo(blob) };
+        } catch (e) { console.error("Migrar escudo", t.nome, e); }
+      }
+      if (Object.keys(novos).length) {
+        await saveTeams((atuais) => (atuais || []).map((t) => (novos[t.id] && t.escudoUrl === novos[t.id].de ? { ...t, escudoUrl: novos[t.id].para } : t)));
+      }
+    })();
+  }, [loadingTeams, sessao, teamsBanco, saveTeams]);
   const [config, saveConfig, loadingConfig] = useSharedStorage("copasu:config", {}, 10000);
   prazoEdicaoAtual = parseDataConfig(config && config.prazoEdicaoTimes, PRAZO_EDICAO_DETALHES);
   const [avaliacoes, saveAvaliacoes, loadingAvaliacoes] = useSharedStorage("copasu:avaliacoes", [], 8000);

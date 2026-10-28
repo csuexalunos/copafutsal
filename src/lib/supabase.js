@@ -315,3 +315,12 @@ export async function sincronizarBancoAtletas(teams) {
   for (let i = 0; i < lista.length; i += 500) await salvarAtletas(lista.slice(i, i + 500));
   return lista.length;
 }
+
+// Escudos dos times: ficam no Storage (público, cacheado pelo navegador) em vez
+// de virar texto base64 dentro do registro dos times (que era baixado a cada visita).
+export async function subirEscudo(blob) {
+  const caminho = `escudos/${Date.now()}_${Math.random().toString(36).slice(2, 7)}.jpg`;
+  const { error } = await supabase.storage.from("fotos").upload(caminho, blob, { contentType: "image/jpeg", upsert: false });
+  if (error) throw error;
+  return supabase.storage.from("fotos").getPublicUrl(caminho).data.publicUrl;
+}
