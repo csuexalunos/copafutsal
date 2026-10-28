@@ -46,7 +46,7 @@ import {
   criarPerfil, buscarPerfil, listarPerfis, atualizarPerfil, atualizarPerfilConfirmado, souAdmin, listarAdmins,
   promoverParaAdmin, removerAdmin, subirArquivo, urlAssinada, contarPessoasInscritas, buscarCpfsDaTurma,
   registrarAcesso, contarAcessos, registrarEvento as registrarEventoBruto, buscarMetricasDetalhadas, esqueciSenha, definirNovaSenha, supabase,
-  buscarCpfsDoTime, salvarCpfJogador, salvarCpfsEmLote, excluirCpfsDoJogador, buscarAtletas, salvarAtletas, cpfsEmOutrosTimes, sincronizarBancoAtletas,
+  buscarCpfsDoTime, salvarCpfJogador, salvarCpfsEmLote, excluirCpfsDoJogador, buscarAtletas, salvarAtletas, readStamp, cpfsEmOutrosTimes, sincronizarBancoAtletas,
 } from "./lib/supabase.js";
 import { pushSuportado, ehIosNaoInstalado, inscricaoAtual, timesSalvos, ativarPush, desativarPush, avisarInicioJogo, avisarOrganizacao, testarAvisoOrganizacao, ativarPushAdmin, desativarPushAdmin, pushAdminAtivo } from "./lib/push.js";
 
@@ -1091,9 +1091,14 @@ function useSharedStorage(key, initialValue, pollMs) {
   const [value, setValue] = useState(initialValue);
   const [loading, setLoading] = useState(true);
 
-  const fetchNow = useCallback(async () => {
+  const stampRef = useRef(null);
+  const fetchNow = useCallback(async (soSeMudou = false) => {
     try {
+      let stamp = null;
+      try { stamp = await readStamp(key); } catch (e) { /* segue sem carimbo */ }
+      if (soSeMudou && stamp && stamp === stampRef.current) return; // nada novo: não baixa o valor
       const v = await storageGet(key);
+      if (stamp) stampRef.current = stamp;
       if (v != null) setValue(v);
     } catch (e) {
       // chave ainda não existe — mantém valor atual
@@ -1116,7 +1121,10 @@ function useSharedStorage(key, initialValue, pollMs) {
   // segundos e assim pegamos o que outras pessoas publicaram.
   useEffect(() => {
     if (!pollMs) return;
-    const id = setInterval(fetchNow, pollMs);
+    const id = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return; // aba em segundo plano: não consulta
+      fetchNow(true);
+    }, pollMs);
     return () => clearInterval(id);
   }, [pollMs, fetchNow]);
 

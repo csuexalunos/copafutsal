@@ -22,6 +22,14 @@ export async function readKey(key) {
   return data ? data.value : null;
 }
 
+// Só o carimbo de atualização (poucos bytes) — o app consulta isso a cada ciclo
+// e só baixa o valor inteiro quando mudou. Economiza muito tráfego (egress).
+export async function readStamp(key) {
+  const { data, error } = await supabase.from("app_data").select("updated_at").eq("key", key).maybeSingle();
+  if (error) throw error;
+  return data ? data.updated_at : null;
+}
+
 export async function writeKey(key, value) {
   const { error } = await supabase.from("app_data").upsert({ key, value, updated_at: new Date().toISOString() });
   if (error) throw error;
