@@ -2856,7 +2856,6 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes, confi
   const [codigoGerado, setCodigoGerado] = useState("");
   // Admin que também é representante: abre direto o painel "Meu time" (como os outros
   // representantes) e pode alternar pro formulário completo da organização.
-  const [verFormAdmin, setVerFormAdmin] = useState(false);
 
   // Se a tela já abre com o time da própria pessoa carregado (turma fixa),
   // busca os CPFs na tabela protegida e completa o formulário.
@@ -3148,25 +3147,8 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes, confi
     !!timeDoRepresentante;
   // Admin que também representa um time: mesmo painel dos representantes.
   const timeDoAdminRep = isAdmin && sessao.representanteAprovado && sessao.turma ? teams.find((t) => t.nome === sessao.turma) : null;
-  if (timeDoAdminRep && !verFormAdmin) {
-    return (
-      <div>
-        <div className="flex items-center justify-between gap-3 flex-wrap mb-4 px-4 py-3 rounded-xl" style={{ backgroundColor: COLORS.accentSoft, border: `1px solid ${COLORS.border}` }}>
-          <span className="text-sm" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
-            Você é admin e também representante do time <strong>{timeDoAdminRep.nome}</strong>.
-          </span>
-          <button
-            type="button"
-            onClick={() => setVerFormAdmin(true)}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold"
-            style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
-          >
-            Abrir inscrição completa (organização)
-          </button>
-        </div>
-        <MeuTimeRepresentante team={timeDoAdminRep} saveTeams={saveTeams} avaliacoes={avaliacoes} saveAvaliacoes={saveAvaliacoes} />
-      </div>
-    );
+  if (timeDoAdminRep) {
+    return <MeuTimeRepresentante team={timeDoAdminRep} saveTeams={saveTeams} avaliacoes={avaliacoes} saveAvaliacoes={saveAvaliacoes} />;
   }
   // Time já inscrito: só o painel simples "Meu time" (resumo + botão Editar time).
   if (timeDoRepresentante && (edicaoDoTimeAberta || inscricaoAberta(config, turmaFixa))) {
@@ -3188,16 +3170,6 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes, confi
   return (
     <div>
       <SectionLabel eyebrow="Participe" title="Inscrição de time" />
-      {timeDoAdminRep && (
-        <button
-          type="button"
-          onClick={() => setVerFormAdmin(false)}
-          className="mb-3 px-3 py-1.5 rounded-lg text-xs font-semibold"
-          style={{ backgroundColor: COLORS.card, color: COLORS.accent, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
-        >
-          ← Voltar para o meu time ({timeDoAdminRep.nome})
-        </button>
-      )}
       <div
         className="text-sm px-4 py-2.5 rounded-xl mb-3 inline-block"
         style={{ backgroundColor: COLORS.accentSoft, color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}
@@ -14741,7 +14713,7 @@ export default function App() {
   // liberação de prazo (Organização → Liberações) depois do sorteio.
   const isAdminLogado = sessao.tipo === "admin";
   const sorteioFeito = !!(sorteio && Array.isArray(sorteio.grupos) && sorteio.grupos.length > 0);
-  const mostrarAbaInscricao = isAdminLogado || !sorteioFeito || inscricaoAberta(config, sessao.turma);
+  const mostrarAbaInscricao = isAdminLogado ? !!(sessao.representanteAprovado && sessao.turma) : !sorteioFeito || inscricaoAberta(config, sessao.turma);
   const mostrarAbaSorteio = isAdminLogado || !sorteioFeito;
   const tabsVisiveis = TABS.filter((t) => {
     if (t.id === "organizacao") return isAdminLogado;
