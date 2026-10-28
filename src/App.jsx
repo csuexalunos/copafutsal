@@ -13004,7 +13004,7 @@ function HistoricoAlteracoes({ historico, loading }) {
   const [abertos, setAbertos] = useState({});
   const lista = useMemo(() => [...(historico || [])].reverse(), [historico]);
   const times = useMemo(() => Array.from(new Set(lista.map((h) => h.timeNome).filter(Boolean))).sort(), [lista]);
-  const origemDe = (h) => (h.por === "Organização" || h.por === "Reconstituído" ? "org" : "rep");
+  const origemDe = (h) => (h.por === "Organização" ? "org" : "rep");
   const filtrada = lista.filter((h) => (!filtroTime || h.timeNome === filtroTime) && (filtroOrigem === "todos" || origemDe(h) === filtroOrigem));
   const dia = (iso) => {
     const d = new Date(iso);
@@ -13122,14 +13122,13 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   const [historico, , loadingHistorico] = useSharedStorage("copasu:historico", [], 10000);
   // Reconstituição única (27/10): alterações do Leite no time 2007/06 que não ficaram registradas.
   useEffect(() => {
-    if (loadingHistorico || !historico || historico.some((h) => h.id === "seed_leite_2007_06")) return;
+    if (loadingHistorico || !historico || historico.some((h) => h.id === "seed_leite_2007_06" && h.v === 2)) return;
     (async () => {
       try {
-        const atual = (await storageGet("copasu:historico")) || [];
-        if (atual.some((h) => h.id === "seed_leite_2007_06")) return;
+        const atual = ((await storageGet("copasu:historico")) || []).filter((h) => h.id !== "seed_leite_2007_06");
         const tm = (teams || []).find((t) => t.nome === "Seleção de 2007/06");
         const nova = {
-          id: "seed_leite_2007_06", tipo: "elenco", em: "2026-10-27T22:00:00-03:00", por: "Reconstituído",
+          id: "seed_leite_2007_06", v: 2, tipo: "elenco", em: "2026-10-27T22:00:00-03:00", por: "Bruno Leite (reconstituído)",
           timeId: tm ? tm.id : undefined, timeNome: "Seleção de 2007/06",
           linhas: [
             '✏️ ABILIO JORGE TENORIO ANTUNES DE MELLO (nº 21): nome → "ELISSON ALBUQUERQUE DE OLIVEIRA" (CPF e período ficaram os do Abilio; corrigidos depois pela organização)',
