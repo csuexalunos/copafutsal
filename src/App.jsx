@@ -2852,6 +2852,9 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes, confi
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [codigoGerado, setCodigoGerado] = useState("");
+  // Admin que também é representante: abre direto o painel "Meu time" (como os outros
+  // representantes) e pode alternar pro formulário completo da organização.
+  const [verFormAdmin, setVerFormAdmin] = useState(false);
 
   // Se a tela já abre com o time da própria pessoa carregado (turma fixa),
   // busca os CPFs na tabela protegida e completa o formulário.
@@ -3141,11 +3144,33 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes, confi
   const timeDoRepresentante = !isAdmin && turmaFixa ? teams.find((t) => t.nome === turmaFixa) : null;
   const edicaoDoTimeAberta =
     !!timeDoRepresentante;
+  // Admin que também representa um time: mesmo painel dos representantes.
+  const timeDoAdminRep = isAdmin && sessao.representanteAprovado && sessao.turma ? teams.find((t) => t.nome === sessao.turma) : null;
+  if (timeDoAdminRep && !verFormAdmin) {
+    return (
+      <div>
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-4 px-4 py-3 rounded-xl" style={{ backgroundColor: COLORS.accentSoft, border: `1px solid ${COLORS.border}` }}>
+          <span className="text-sm" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+            Você é admin e também representante do time <strong>{timeDoAdminRep.nome}</strong>.
+          </span>
+          <button
+            type="button"
+            onClick={() => setVerFormAdmin(true)}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+            style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+          >
+            Abrir inscrição completa (organização)
+          </button>
+        </div>
+        <MeuTimeRepresentante team={timeDoAdminRep} saveTeams={saveTeams} avaliacoes={avaliacoes} saveAvaliacoes={saveAvaliacoes} />
+      </div>
+    );
+  }
   // Time já inscrito: só o painel simples "Meu time" (resumo + botão Editar time).
   if (timeDoRepresentante && (edicaoDoTimeAberta || inscricaoAberta(config, turmaFixa))) {
     return <MeuTimeRepresentante team={timeDoRepresentante} saveTeams={saveTeams} avaliacoes={avaliacoes} saveAvaliacoes={saveAvaliacoes} />;
   }
-  if (!inscricaoAberta(config, turmaFixa) && !edicaoDoTimeAberta) {
+  if (!isAdmin && !inscricaoAberta(config, turmaFixa) && !edicaoDoTimeAberta) {
     return (
       <div>
         <SectionLabel eyebrow="Participe" title="Inscrição de time" />
@@ -3161,6 +3186,16 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes, confi
   return (
     <div>
       <SectionLabel eyebrow="Participe" title="Inscrição de time" />
+      {timeDoAdminRep && (
+        <button
+          type="button"
+          onClick={() => setVerFormAdmin(false)}
+          className="mb-3 px-3 py-1.5 rounded-lg text-xs font-semibold"
+          style={{ backgroundColor: COLORS.card, color: COLORS.accent, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+        >
+          ← Voltar para o meu time ({timeDoAdminRep.nome})
+        </button>
+      )}
       <div
         className="text-sm px-4 py-2.5 rounded-xl mb-3 inline-block"
         style={{ backgroundColor: COLORS.accentSoft, color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}
@@ -11835,7 +11870,15 @@ function LoginGate({ onLogin }) {
 
       const statusAdmin = await souAdmin(user.id);
       if (statusAdmin.admin) {
-        onLogin({ id: user.id, email: user.email, nome: user.email, tipo: "admin", superAdmin: statusAdmin.superAdmin, escopo: statusAdmin.escopo });
+        // Admin que também é representante de time: carrega a turma/aprovação do perfil
+        // pra ele poder abrir o time dele na aba Inscrição como qualquer representante.
+        let perfilAdm = null;
+        try { perfilAdm = await buscarPerfil(user.id); } catch (e) { console.error("Perfil do admin", e); }
+        onLogin({
+          id: user.id, email: user.email, nome: user.email, tipo: "admin", superAdmin: statusAdmin.superAdmin, escopo: statusAdmin.escopo,
+          turma: (perfilAdm && perfilAdm.turma) || "",
+          representanteAprovado: !!(perfilAdm && perfilAdm.status === "aprovado"),
+        });
         return;
       }
 
@@ -14524,7 +14567,13 @@ export default function App() {
     try {
       const statusAdmin = await souAdmin(user.id);
       if (statusAdmin.admin) {
-        setSessao({ id: user.id, email: user.email, nome: user.email, tipo: "admin", superAdmin: statusAdmin.superAdmin, escopo: statusAdmin.escopo });
+        let perfilAdm = null;
+        try { perfilAdm = await buscarPerfil(user.id); } catch (e) { console.error("Perfil do admin", e); }
+        setSessao({
+          id: user.id, email: user.email, nome: user.email, tipo: "admin", superAdmin: statusAdmin.superAdmin, escopo: statusAdmin.escopo,
+          turma: (perfilAdm && perfilAdm.turma) || "",
+          representanteAprovado: !!(perfilAdm && perfilAdm.status === "aprovado"),
+        });
         return;
       }
       const perfil = await buscarPerfil(user.id);
