@@ -1052,7 +1052,9 @@ async function confirmarElencoNoBanco(atualizado) {
 
 // Histórico de alterações feitas por representantes — a organização vê tudo
 // (sem precisar aprovar) e recebe notificação. Guarda as últimas 400.
+let autorAlteracaoAtual = "";
 async function registrarAlteracaoRep(entrada) {
+  if (!entrada.por && autorAlteracaoAtual) entrada = { ...entrada, por: autorAlteracaoAtual };
   // Ações da organização (por) sempre ficam registradas, mesmo em aparelho com ?ignorar=1.
   if (ignorarMetricas && !entrada.por) return;
   try {
@@ -12998,7 +13000,7 @@ function ModeracaoFotos({ posts, savePosts }) {
 }
 
 // Histórico de alterações dos times — agrupado por dia, com filtros por time e origem.
-function HistoricoAlteracoes({ historico, loading }) {
+function HistoricoAlteracoes({ historico, loading, teams }) {
   const [filtroTime, setFiltroTime] = useState("");
   const [filtroOrigem, setFiltroOrigem] = useState("todos");
   const [abertos, setAbertos] = useState({});
@@ -13056,13 +13058,13 @@ function HistoricoAlteracoes({ historico, loading }) {
                     <div className="flex items-center justify-between gap-2 mb-1.5">
                       <span className="text-sm font-semibold min-w-0 truncate" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>{h.timeNome}</span>
                       <span className="flex items-center gap-2 shrink-0">
-                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ backgroundColor: org ? COLORS.navy : COLORS.zebra, color: org ? COLORS.gold : COLORS.slate, fontFamily: "'Inter', sans-serif" }}>{h.por || "Representante"}</span>
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ backgroundColor: org ? COLORS.navy : COLORS.zebra, color: org ? COLORS.gold : COLORS.slate, fontFamily: "'Inter', sans-serif" }}>{h.por || ((teams || []).find((t) => t.nome === h.timeNome) || {}).capitao || "Representante"}</span>
                         <span className="text-[11px]" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>{new Date(h.em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
                       </span>
                     </div>
-                    <ul className="space-y-0.5">
+                    <ul className="space-y-1.5 mt-1">
                       {vis.map((l, i) => (
-                        <li key={i} className="text-xs" style={{ color: iconeLinha(l), fontFamily: "'Inter', sans-serif" }}>{l}</li>
+                        <li key={i} className="text-xs py-1 border-t first:border-t-0" style={{ color: iconeLinha(l), borderColor: COLORS.border, fontFamily: "'Inter', sans-serif" }}>{l}</li>
                       ))}
                     </ul>
                   </li>
@@ -13122,17 +13124,26 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   const [historico, , loadingHistorico] = useSharedStorage("copasu:historico", [], 10000);
   // Reconstituição única (27/10): alterações do Leite no time 2007/06 que não ficaram registradas.
   useEffect(() => {
-    if (loadingHistorico || !historico || historico.some((h) => h.id === "seed_leite_2007_06" && h.v === 2)) return;
+    if (loadingHistorico || !historico || historico.some((h) => h.id === "seed_leite_2007_06" && h.v === 3)) return;
     (async () => {
       try {
         const atual = ((await storageGet("copasu:historico")) || []).filter((h) => h.id !== "seed_leite_2007_06");
         const tm = (teams || []).find((t) => t.nome === "Seleção de 2007/06");
         const nova = {
-          id: "seed_leite_2007_06", v: 2, tipo: "elenco", em: "2026-10-27T22:00:00-03:00", por: "Bruno Leite (reconstituído)",
+          id: "seed_leite_2007_06", v: 3, tipo: "elenco", em: "2026-10-27T22:00:00-03:00", por: "Bruno Leite (reconstituído)",
           timeId: tm ? tm.id : undefined, timeNome: "Seleção de 2007/06",
           linhas: [
             '✏️ ABILIO JORGE TENORIO ANTUNES DE MELLO (nº 21): nome → "ELISSON ALBUQUERQUE DE OLIVEIRA" (CPF e período ficaram os do Abilio; corrigidos depois pela organização)',
-            "🔢 Renumerados: Hildebrando 4→13 · Rodolfo 6→7 · Engels 7→12 · Gabriel 8→89 · Eduardo 69→5 · Felipe 89→11 · Carlos 12→99 · Lucas 55→6 · Helio 7→8 · Elisson 21→22",
+            "🔢 Hildebrando: nº 4 → 13",
+            "🔢 Rodolfo: nº 6 → 7",
+            "🔢 Engels: nº 7 → 12",
+            "🔢 Gabriel: nº 8 → 89",
+            "🔢 Eduardo: nº 69 → 5",
+            "🔢 Felipe: nº 89 → 11",
+            "🔢 Carlos: nº 12 → 99",
+            "🔢 Lucas: nº 55 → 6",
+            "🔢 Helio: nº 7 → 8",
+            "🔢 Elisson (antes Abilio): nº 21 → 22",
             "ℹ️ Reconstituído por comparação de duas listas (antes/depois). Registro automático não existia na época.",
           ],
         };
@@ -14225,7 +14236,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
 
       {secaoAtiva === "avisos" && <PainelAvisosJogos matches={matches} teams={teams} saveMatches={saveMatches} />}
 
-      {secaoAtiva === "historico" && <HistoricoAlteracoes historico={historico} loading={loadingHistorico} />}
+      {secaoAtiva === "historico" && <HistoricoAlteracoes historico={historico} loading={loadingHistorico} teams={teams} />}
 
       {secaoAtiva === "jogos" && (
       <>
@@ -14692,6 +14703,7 @@ export default function App() {
     } catch (e) { /* ok */ }
   };
   const [sessao, setSessao] = useState(null);
+  autorAlteracaoAtual = sessao ? (sessao.nome || sessao.email || "") : "";
   useEffect(() => {
     if (sessao?.tipo === "admin") {
       ignorarMetricas = true;
