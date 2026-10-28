@@ -46,7 +46,7 @@ import {
   criarPerfil, buscarPerfil, listarPerfis, atualizarPerfil, atualizarPerfilConfirmado, souAdmin, listarAdmins,
   promoverParaAdmin, removerAdmin, subirArquivo, urlAssinada, contarPessoasInscritas, buscarCpfsDaTurma,
   registrarAcesso, contarAcessos, registrarEvento as registrarEventoBruto, buscarMetricasDetalhadas, esqueciSenha, definirNovaSenha, supabase,
-  buscarCpfsDoTime, salvarCpfJogador, salvarCpfsEmLote, excluirCpfsDoJogador,
+  buscarCpfsDoTime, salvarCpfJogador, salvarCpfsEmLote, excluirCpfsDoJogador, buscarAtletas, salvarAtletas, cpfsEmOutrosTimes, sincronizarBancoAtletas,
 } from "./lib/supabase.js";
 import { pushSuportado, ehIosNaoInstalado, inscricaoAtual, timesSalvos, ativarPush, desativarPush, avisarInicioJogo, avisarOrganizacao, testarAvisoOrganizacao, ativarPushAdmin, desativarPushAdmin, pushAdminAtivo } from "./lib/push.js";
 
@@ -554,9 +554,17 @@ const PRAZO_INSCRICAO = "de 01 a 30 de setembro";
 // Representantes podem mexer em apelido, número e posição dos jogadores até o
 // fim do dia 02/11/2026; depois só com liberação da organização (team.edicaoLiberada).
 const PRAZO_EDICAO_DETALHES = new Date("2026-11-03T00:00:00-03:00");
+// Prazo final pra representantes alterarem o time (definido pela organização em
+// Organização → Datas; padrão desta edição: fim de 02/11/2026). Depois disso só
+// com pedido à comissão (ela libera o time em "Gerenciar jogadores").
+let prazoEdicaoAtual = PRAZO_EDICAO_DETALHES;
 function detalhesTravados(team) {
-  // Edição liberada para todos os representantes (sem prazo e sem precisar liberar time a time).
-  return false;
+  if (team && team.edicaoLiberada) return false;
+  return new Date() >= prazoEdicaoAtual;
+}
+function prazoEdicaoTexto() {
+  const d = new Date(prazoEdicaoAtual.getTime() - 1000);
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 }
 const VALOR_INSCRICAO_ATLETA = "R$ 110,00 a R$ 140,00 por atleta, conforme o lote";
 // Lotes de inscrição — o valor por atleta aumenta conforme a data em que
@@ -2054,6 +2062,7 @@ function EscudoPicker({ value, onChange }) {
 // (com o código do time) quanto pela organização (com a senha de admin)
 // ---------------------------------------------------------------------------
 function RosterEditor({ team, onSave, autenticado = true }) {
+  const teamsConhecidosRE = React.useContext(JogadoresConhecidosContext);
   const [jogadores, setJogadores] = useState(team.jogadores || []);
   const originaisRef = useRef(new Map((team.jogadores || []).map((j) => [j.id, j])));
   // Depois do prazo, o representante (autenticado=false) não altera apelido/número/posição
@@ -2096,6 +2105,11 @@ function RosterEditor({ team, onSave, autenticado = true }) {
       );
       return;
     }
+    const dupRE = await verificarDuplicidade({ jogadores, teamId: team.id, teamNome: team.nome, teams: teamsConhecidosRE });
+    if (dupRE.length) {
+      setAvisoCpf("NÃO foi salvo: " + dupRE.join(" "));
+      return;
+    }
     // CPF nunca vai pro registro público do time — fica só na tabela
     // protegida (cpfs_jogadores), separada.
     const semCpf = carimbarLoteContratado(
@@ -2122,6 +2136,7 @@ function RosterEditor({ team, onSave, autenticado = true }) {
         await salvarCpfsEmLote(
           jogadores.filter((j) => j.cpf).map((j) => ({ team_id: team.id, jogador_id: j.id, cpf: j.cpf }))
         );
+        salvarAtletas(jogadores, team.nome).catch((e) => console.error("banco de atletas", e));
         setAvisoCpf("");
       } catch (e) {
         console.error("Falha ao salvar CPFs", e);
@@ -2156,8 +2171,8 @@ function RosterEditor({ team, onSave, autenticado = true }) {
 
       {travado && (
         <div className="rounded-lg px-3 py-2 mb-3 text-xs" style={{ backgroundColor: COLORS.accentSoft, color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
-          🔒 O prazo para alterar apelido, número e posição terminou em 02/11. Para mudar, peça a liberação à organização.{" "}
-          <a href={linkWhatsapp(WHATSAPP_ORGANIZACAO, `Olá! Sou representante do time ${team.nome} e preciso de liberação para alterar apelido/número/posição de jogadores.`)} target="_blank" rel="noreferrer" className="underline font-semibold">
+          🔒 O prazo para alterar o time terminou em {prazoEdicaoTexto()}. Para mudar, peça à comissão.{" "}
+          <a href={linkWhatsapp(WHATSAPP_ORGANIZACAO, `Olá! Sou representante do time ${team.nome} e preciso de liberação para alterar jogadores do time.`)} target="_blank" rel="noreferrer" className="underline font-semibold">
             Pedir liberação no WhatsApp
           </a>
         </div>
@@ -2174,7 +2189,7 @@ function RosterEditor({ team, onSave, autenticado = true }) {
       </div>
 
       {mostrarForm ? (
-        <AddPlayerForm onAdd={addJogador} turma={team.nome} onCancel={() => setMostrarForm(false)} />
+        <AddPlayerForm onAdd={addJogador} turma={team.nome} teamId={team.id} existentes={jogadores} onCancel={() => setMostrarForm(false)} />
       ) : (
         <button
           type="button"
@@ -2393,7 +2408,49 @@ async function buscarCpfDoJogadorConhecido(c) {
   }
 }
 
-function AddPlayerForm({ onAdd, turma, onCancel }) {
+// Barra atleta repetido: mesmo CPF ou mesmo nome dentro do time, ou já inscrito
+// em OUTRO time. `jogadores` = lista a validar (com cpf quando houver).
+// Se o banco/RPC não responder, não trava (só avisa no console).
+async function verificarDuplicidade({ jogadores, teamId, teamNome, teams }) {
+  const erros = [];
+  const dig = (v) => String(v || "").replace(/\D/g, "");
+  const vistoCpf = new Map();
+  const vistoNome = new Map();
+  (jogadores || []).forEach((j) => {
+    const c = dig(j.cpf);
+    const n = normalizarBusca(j.nome);
+    const rot = j.apelido || j.nome;
+    if (c.length === 11) {
+      if (vistoCpf.has(c)) erros.push(`CPF repetido no time: ${rot} e ${vistoCpf.get(c)}.`);
+      else vistoCpf.set(c, rot);
+    }
+    if (n) {
+      if (vistoNome.has(n)) erros.push(`Atleta repetido no time: ${rot}.`);
+      else vistoNome.set(n, rot);
+    }
+  });
+  // nome igual em outro time desta edição
+  (teams || []).forEach((t) => {
+    if ((teamId && t.id === teamId) || t.nome === teamNome) return;
+    (t.jogadores || []).forEach((o) => {
+      if (vistoNome.has(normalizarBusca(o.nome))) erros.push(`${vistoNome.get(normalizarBusca(o.nome))} já está inscrito no time ${t.nome}.`);
+    });
+  });
+  // CPF igual em outro time (checagem no banco)
+  try {
+    const cpfs = Array.from(vistoCpf.keys());
+    const achados = await cpfsEmOutrosTimes(teamId, cpfs);
+    achados.forEach((a) => {
+      const t = (teams || []).find((x) => x.id === a.team_id);
+      erros.push(`${vistoCpf.get(dig(a.cpf)) || "Um CPF"} já está inscrito no time ${t ? t.nome : "outro time"} (mesmo CPF).`);
+    });
+  } catch (e) {
+    console.error("Checagem de CPF repetido indisponível", e);
+  }
+  return Array.from(new Set(erros));
+}
+
+function AddPlayerForm({ onAdd, turma, onCancel, existentes = [], teamId = "" }) {
   const vazio = {
     nome: "",
     apelido: "",
@@ -2409,7 +2466,24 @@ function AddPlayerForm({ onAdd, turma, onCancel }) {
   const [campoAtivo, setCampoAtivo] = useState("");
   const [aviso, setAviso] = useState("");
   const teamsConhecidos = React.useContext(JogadoresConhecidosContext);
-  const banco = useMemo(() => montarBancoJogadores(teamsConhecidos), [teamsConhecidos]);
+  const [atletasBanco, setAtletasBanco] = useState([]);
+  useEffect(() => {
+    buscarAtletas()
+      .then((rows) => setAtletasBanco(rows.map((r) => ({ nome: r.nome, apelido: r.apelido || "", nascimento: r.nascimento || "", periodo: r.periodo || "", anoConclusao: r.ano_conclusao || "", turma: r.turma || "banco de atletas", cpf: r.cpf }))))
+      .catch(() => {});
+  }, []);
+  const banco = useMemo(() => {
+    const base = montarBancoJogadores(teamsConhecidos);
+    const nomes = new Set(base.map((c) => normalizarBusca(c.nome)));
+    // atletas já no banco: se o nome também está nos times, junta o CPF nele
+    const extras = [];
+    atletasBanco.forEach((a) => {
+      const i = base.findIndex((c) => normalizarBusca(c.nome) === normalizarBusca(a.nome));
+      if (i >= 0) base[i] = { ...a, ...base[i], cpf: a.cpf };
+      else if (!nomes.has(normalizarBusca(a.nome))) extras.push(a);
+    });
+    return [...base, ...extras];
+  }, [teamsConhecidos, atletasBanco]);
 
   const campo = (key, value) => {
     setNovo({ ...novo, [key]: value });
@@ -2442,7 +2516,7 @@ function AddPlayerForm({ onAdd, turma, onCancel }) {
       anoConclusao: c.anoConclusao || n.anoConclusao,
     }));
     setAviso(`Dados de ${c.apelido || c.nome} (turma ${c.turma}) preenchidos — buscando o CPF...`);
-    const cpf = await buscarCpfDoJogadorConhecido(c);
+    const cpf = c.cpf || (await buscarCpfDoJogadorConhecido(c));
     if (cpf) setNovo((n) => ({ ...n, cpf }));
     setAviso(
       `Dados de ${c.apelido || c.nome} (turma ${c.turma}) preenchidos` +
@@ -2451,13 +2525,25 @@ function AddPlayerForm({ onAdd, turma, onCancel }) {
     );
   };
 
-  const adicionar = () => {
+  const adicionar = async () => {
     const faltando = Object.entries(novo).some(([, v]) => !String(v).trim());
     if (faltando) {
       setErro("Preenche todos os campos pra poder adicionar o jogador — nenhum é opcional.");
       return;
     }
     setErro("");
+    let jaNoTime = existentes || [];
+    if (teamId) {
+      try {
+        const cpfsTime = await buscarCpfsDoTime(teamId);
+        jaNoTime = jaNoTime.map((j) => ({ ...j, cpf: j.cpf || cpfsTime[j.id] }));
+      } catch (e) { /* segue sem os CPFs do time */ }
+    }
+    const dup = await verificarDuplicidade({ jogadores: [...jaNoTime, novo], teamId, teamNome: turma, teams: teamsConhecidos });
+    if (dup.length) {
+      setErro("Não dá pra adicionar: " + dup.join(" "));
+      return;
+    }
     onAdd({ id: `j_${Date.now()}`, ...novo });
     setNovo(vazio);
     if (onCancel) onCancel();
@@ -2592,6 +2678,7 @@ function MeuTimeRepresentante({ team, saveTeams, avaliacoes, saveAvaliacoes }) {
   const escudo = ESCUDOS_TIMES[team.nome] || team.escudoUrl;
 
   const salvar = async () => {
+    if (detalhesTravados(team)) { setMsg("O prazo de alteração terminou — peça à comissão."); return; }
     setSalvando(true);
     setMsg("");
     const final = (team.jogadores || [])
@@ -2656,6 +2743,7 @@ function MeuTimeRepresentante({ team, saveTeams, avaliacoes, saveAvaliacoes }) {
     try {
       await saveAvaliacoes((atuais) => [...(atuais || avaliacoes || []), caso]);
       if (cpf) await salvarCpfsEmLote([{ team_id: team.id, jogador_id: novo.id, cpf }]).catch((e) => console.error("CPF", e));
+      if (cpf) salvarAtletas([novo], team.nome).catch((e) => console.error("banco de atletas", e));
       registrarAlteracaoRep({ tipo: "elenco", timeId: team.id, timeNome: team.nome, linhas: [`🙋 Pediu para incluir: ${novo.apelido || novo.nome}`] });
       avisarOrg("avaliacao", `🙋 Pedido de inclusão: ${team.nome}`, `${novo.apelido || novo.nome} — aguardando a comissão`);
       setMsg("✓ Pedido enviado à comissão. Quando aprovado, o jogador entra no time.");
@@ -2691,7 +2779,7 @@ function MeuTimeRepresentante({ team, saveTeams, avaliacoes, saveAvaliacoes }) {
           <div className="mt-5 pt-5 border-t" style={{ borderColor: COLORS.border }}>
             {travado && (
               <div className="rounded-lg px-3 py-2 mb-4 text-xs" style={{ backgroundColor: COLORS.accentSoft, color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
-                🔒 O prazo para alterar apelido, número e posição terminou em 02/11. Para mudar, peça liberação à organização.
+                🔒 O prazo para alterar o time terminou em {prazoEdicaoTexto()}. Para mudar (ou trocar jogador), peça à comissão.
               </div>
             )}
 
@@ -2699,7 +2787,7 @@ function MeuTimeRepresentante({ team, saveTeams, avaliacoes, saveAvaliacoes }) {
               <div className="text-[11px] font-bold uppercase tracking-widest mb-2" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
                 Contato do representante
               </div>
-              <input value={contato} onChange={(e) => setContatoEd(e.target.value)} placeholder="WhatsApp com DDD" className="w-full sm:w-72 px-3 py-2.5 rounded-lg text-sm" style={inp} />
+              <input value={contato} disabled={travado} onChange={(e) => setContatoEd(e.target.value)} placeholder="WhatsApp com DDD" className="w-full sm:w-72 px-3 py-2.5 rounded-lg text-sm" style={inp} />
             </div>
 
             <div className="flex items-baseline justify-between mb-2">
@@ -2722,6 +2810,7 @@ function MeuTimeRepresentante({ team, saveTeams, avaliacoes, saveAvaliacoes }) {
                         type="button"
                         className="text-[11px] font-semibold underline"
                         style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+                        disabled={travado}
                         onClick={() => { if (window.confirm(`Remover ${j.apelido || j.nome} do time?`)) setRemovidos((r) => [...r, j.id]); }}
                       >
                         Remover
@@ -2771,13 +2860,13 @@ function MeuTimeRepresentante({ team, saveTeams, avaliacoes, saveAvaliacoes }) {
             </button>
             {mostrarSolicitar && (
               <div className="mt-3">
-                <AddPlayerForm onAdd={solicitarInclusao} turma={team.nome} onCancel={() => setMostrarSolicitar(false)} />
+                <AddPlayerForm onAdd={solicitarInclusao} turma={team.nome} teamId={team.id} existentes={team.jogadores || []} onCancel={() => setMostrarSolicitar(false)} />
               </div>
             )}
 
             <div className="sticky bottom-0 -mx-5 -mb-5 mt-5 px-5 py-3 rounded-b-2xl flex items-center gap-3" style={{ backgroundColor: COLORS.card, borderTop: `1px solid ${COLORS.border}` }}>
-              <button type="button" onClick={salvar} disabled={salvando}
-                className="px-6 py-2.5 rounded-xl font-semibold text-sm" style={{ backgroundColor: COLORS.accent, color: "#0B1220", fontFamily: "'Inter', sans-serif" }}>
+              <button type="button" onClick={salvar} disabled={salvando || travado}
+                className="px-6 py-2.5 rounded-xl font-semibold text-sm disabled:opacity-50" style={{ backgroundColor: COLORS.accent, color: "#0B1220", fontFamily: "'Inter', sans-serif" }}>
                 {salvando ? "Salvando..." : "Salvar alterações"}
               </button>
               <span className="text-xs font-semibold" style={{ color: msg ? (msg.startsWith("✓") ? "#4ADE80" : "#DC2626") : COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
@@ -2996,6 +3085,12 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes, confi
       return;
     }
     setSaving(true);
+    const dupForm = await verificarDuplicidade({ jogadores: form.jogadores, teamId: timeExistente ? timeExistente.id : "", teamNome: nomeTime, teams });
+    if (dupForm.length) {
+      setSaving(false);
+      setError("NÃO foi salvo: " + dupForm.join(" "));
+      return;
+    }
     let codigo = null;
     let idParaCpfs = null;
     let timeNovoCriado = null;
@@ -3078,6 +3173,7 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes, confi
         await salvarCpfsEmLote(
           form.jogadores.filter((j) => j.cpf).map((j) => ({ team_id: idParaCpfs, jogador_id: j.id, cpf: j.cpf }))
         );
+        salvarAtletas(form.jogadores, nomeTime).catch((e) => console.error("banco de atletas", e));
       } catch (err) {
         console.error("Falha ao salvar CPFs", err);
       }
@@ -3355,7 +3451,7 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes, confi
                 >
                   Adicionar jogador — todos os campos são obrigatórios
                 </div>
-                <AddPlayerForm onAdd={addJogador} turma={nomeTime} />
+                <AddPlayerForm onAdd={addJogador} turma={nomeTime} teamId={timeExistente ? timeExistente.id : ""} existentes={form.jogadores} />
               </div>
             </>
           )}
@@ -8532,6 +8628,7 @@ function EncerrarTemporada({ teams, matches, sorteio, posts, avaliacoes, config,
   const [horaSabado, setHoraSabado] = useState(paraDatetimeLocal(horariosAtuais.inicioSabado));
   const [horaDomingo, setHoraDomingo] = useState(paraDatetimeLocal(horariosAtuais.inicioDomingo));
 
+  const [prazoEdicao, setPrazoEdicao] = useState(paraDatetimeLocal(parseDataConfig(config && config.prazoEdicaoTimes, PRAZO_EDICAO_DETALHES)));
   const [salvandoDatas, setSalvandoDatas] = useState(false);
   const [datasSalvas, setDatasSalvas] = useState(false);
   const [erroDatas, setErroDatas] = useState(null);
@@ -8544,6 +8641,7 @@ function EncerrarTemporada({ teams, matches, sorteio, posts, avaliacoes, config,
         ...(atual || {}),
         dataEvento: dataEvento.trim(),
         prazoInscricao: prazoInscricao.trim(),
+        prazoEdicaoTimes: deDatetimeLocal(prazoEdicao),
         inscricao: {
           inicio: deDatetimeLocal(inscricaoInicio),
           fim: deDatetimeLocal(inscricaoFim),
@@ -8797,6 +8895,22 @@ function EncerrarTemporada({ teams, matches, sorteio, posts, avaliacoes, config,
               style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
             />
           </div>
+        </div>
+
+        <div className="mb-3">
+          <label className="block text-xs font-semibold mb-1" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+            Prazo final para representantes alterarem o time
+          </label>
+          <input
+            type="datetime-local"
+            value={prazoEdicao}
+            onChange={(e) => setPrazoEdicao(e.target.value)}
+            className="w-full sm:w-72 px-3 py-2 rounded-xl text-sm"
+            style={{ backgroundColor: COLORS.zebra, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+          />
+          <p className="text-[11px] mt-1" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Depois dessa data o representante não altera mais nada no time — só pedindo à comissão (você libera em Gerenciar jogadores).
+          </p>
         </div>
 
         <div className="grid sm:grid-cols-3 gap-2 mb-3">
@@ -9944,6 +10058,7 @@ function ConfirmacaoAlunosColegio({ teams, saveTeams }) {
 
 function GerenciarElencos({ teams, saveTeams }) {
   const [timeId, setTimeId] = useState("");
+  const [sincAtl, setSincAtl] = useState("");
   const time = teams.find((t) => t.id === timeId);
 
   const salvarTime = async (atualizado) => {
@@ -9974,6 +10089,22 @@ function GerenciarElencos({ teams, saveTeams }) {
       <h3 className="font-semibold mb-4" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
         Gerenciar jogadores de um time
       </h3>
+      <div className="mb-4">
+        <button
+          type="button"
+          disabled={sincAtl === "..."}
+          onClick={async () => {
+            setSincAtl("...");
+            try { const n = await sincronizarBancoAtletas(teams); setSincAtl(`✓ ${n} atletas no banco`); }
+            catch (e) { setSincAtl("Falhou: " + (e.message || e) + " (rodou o supabase-atletas.sql?)"); }
+          }}
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+          style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}
+        >
+          Atualizar banco de atletas
+        </button>
+        {sincAtl && <span className="ml-2 text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>{sincAtl}</span>}
+      </div>
       <select
         value={timeId}
         onChange={(e) => setTimeId(e.target.value)}
@@ -9987,6 +10118,18 @@ function GerenciarElencos({ teams, saveTeams }) {
           </option>
         ))}
       </select>
+      {time && (
+        <div className="mb-4 flex items-center gap-3 flex-wrap">
+          <button
+            type="button"
+            onClick={() => saveTeams((atuais) => (atuais || []).map((t) => (t.id === time.id ? { ...t, edicaoLiberada: !t.edicaoLiberada } : t)))}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+            style={{ backgroundColor: time.edicaoLiberada ? COLORS.accent : COLORS.navy, color: time.edicaoLiberada ? "#FFFFFF" : COLORS.gold, fontFamily: "'Inter', sans-serif" }}
+          >
+            {time.edicaoLiberada ? "Edição liberada — toque para travar de novo" : "Liberar edição deste time (após o prazo)"}
+          </button>
+        </div>
+      )}
       {time && <RosterEditor key={time.id} team={time} onSave={salvarTime} />}
     </div>
   );
@@ -14510,6 +14653,7 @@ export default function App() {
   const [adminRequests, saveAdminRequests, loadingAdminRequests] = useSharedStorage("copasu:admin_requests", [], 8000);
   const [sorteio, saveSorteio, loadingSorteio] = useSharedStorage("copasu:sorteio", {}, 6000);
   const [config, saveConfig, loadingConfig] = useSharedStorage("copasu:config", {}, 10000);
+  prazoEdicaoAtual = parseDataConfig(config && config.prazoEdicaoTimes, PRAZO_EDICAO_DETALHES);
   const [avaliacoes, saveAvaliacoes, loadingAvaliacoes] = useSharedStorage("copasu:avaliacoes", [], 8000);
   const [escudosCustom, saveEscudosCustom] = useSharedStorage("copasu:escudos_custom", {}, 15000);
 

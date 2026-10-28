@@ -244,3 +244,66 @@ export async function buscarMetricasDetalhadas() {
   if (error) throw error;
   return data;
 }
+
+// ---------------------------------------------------------------------------
+// Banco de atletas (tabela `atletas`, protegida) — todo atleta já cadastrado,
+// pra preencher rápido nas próximas inscrições. E checagem de CPF repetido.
+// ---------------------------------------------------------------------------
+const soDigitos = (v) => String(v || "").replace(/\D/g, "");
+
+export async function buscarAtletas() {
+  const { data, error } = await supabase.from("atletas").select("cpf, nome, apelido, nascimento, periodo, ano_conclusao, turma").limit(5000);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function salvarAtletas(lista, turma) {
+  // lista: jogadores com cpf (nome, apelido, nascimento, periodo, anoConclusao)
+  const mapa = new Map();
+  (lista || []).forEach((j) => {
+    const cpf = soDigitos(j.cpf);
+    if (cpf.length !== 11 || !j.nome) return;
+    mapa.set(cpf, {
+      cpf,
+      nome: j.nome,
+      apelido: j.apelido || null,
+      nascimento: j.nascimento || null,
+      periodo: j.periodo || null,
+      ano_conclusao: j.anoConclusao != null ? String(j.anoConclusao) : null,
+      turma: j.turma || turma || null,
+      atualizado_em: new Date().toISOString(),
+    });
+  });
+  if (mapa.size === 0) return;
+  const { error } = await supabase.from("atletas").upsert(Array.from(mapa.values()));
+  if (error) throw error;
+}
+
+// CPFs que já estão em OUTRO time: devolve [{cpf, team_id}].
+export async function cpfsEmOutrosTimes(teamId, cpfs) {
+  const lista = (cpfs || []).map(soDigitos).filter((c) => c.length === 11);
+  if (lista.length === 0) return [];
+  const { data, error } = await supabase.rpc("cpfs_em_outros_times", { p_team_id: teamId || "", p_cpfs: lista });
+  if (error) throw error;
+  return data || [];
+}
+
+// Admin: junta no banco de atletas todo mundo que já tem CPF guardado (times
+// desta edição + elenco histórico).
+export async function sincronizarBancoAtletas(teams) {
+  const { data: cpfs, error: e1 } = await supabase.from("cpfs_jogadores").select("team_id, jogador_id, cpf");
+  if (e1) throw e1;
+  const lista = [];
+  const { data: hist } = await supabase.from("elenco_historico").select("turma, apelido, nome, cpf");
+  (hist || []).forEach((r) => {
+    if (r.nome && r.cpf) lista.push({ nome: r.nome, apelido: r.apelido, cpf: r.cpf, turma: r.turma });
+  });
+  (cpfs || []).forEach((r) => {
+    const t = (teams || []).find((x) => x.id === r.team_id);
+    const j = t && (t.jogadores || []).find((x) => x.id === r.jogador_id);
+    if (j) lista.push({ ...j, cpf: r.cpf, turma: t.nome });
+  });
+  // lotes de 500
+  for (let i = 0; i < lista.length; i += 500) await salvarAtletas(lista.slice(i, i + 500));
+  return lista.length;
+}
