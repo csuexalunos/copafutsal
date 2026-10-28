@@ -79,6 +79,25 @@ export async function avisarOrganizacao(tipo, titulo, corpo) {
   if (error) throw error;
 }
 
+// Diagnóstico: manda um aviso de teste pra organização e devolve o que a função respondeu
+// (quantos aparelhos receberam) ou o motivo exato da falha.
+export async function testarAvisoOrganizacao() {
+  const { data, error } = await supabase.functions.invoke("avisar-admin", {
+    body: { tipo: "outro", titulo: "Teste de aviso", corpo: "Se você viu isso, os avisos da organização estão funcionando." },
+  });
+  if (error) {
+    let detalhe = error.message || "erro desconhecido";
+    try {
+      if (error.context && typeof error.context.text === "function") {
+        const t = await error.context.text();
+        if (t) detalhe = t;
+      }
+    } catch (e) { /* ignora */ }
+    return { ok: false, detalhe };
+  }
+  return { ok: true, enviados: (data && data.enviados) || 0, removidos: (data && data.removidos) || 0 };
+}
+
 export async function ativarPush(times = []) {
   if (!pushSuportado()) throw new Error("Este navegador não suporta notificações.");
   const perm = await Notification.requestPermission();

@@ -48,7 +48,7 @@ import {
   registrarAcesso, contarAcessos, registrarEvento as registrarEventoBruto, buscarMetricasDetalhadas, esqueciSenha, definirNovaSenha, supabase,
   buscarCpfsDoTime, salvarCpfJogador, salvarCpfsEmLote, excluirCpfsDoJogador,
 } from "./lib/supabase.js";
-import { pushSuportado, ehIosNaoInstalado, inscricaoAtual, timesSalvos, ativarPush, desativarPush, avisarInicioJogo, avisarOrganizacao, ativarPushAdmin, desativarPushAdmin, pushAdminAtivo } from "./lib/push.js";
+import { pushSuportado, ehIosNaoInstalado, inscricaoAtual, timesSalvos, ativarPush, desativarPush, avisarInicioJogo, avisarOrganizacao, testarAvisoOrganizacao, ativarPushAdmin, desativarPushAdmin, pushAdminAtivo } from "./lib/push.js";
 
 // Link oficial pra finalizar a inscrição (anexar ficha em PDF e pagar),
 // depois que o time é aprovado pela comissão.
@@ -3900,6 +3900,13 @@ function AvisosOrganizacaoCard() {
   const [ativo, setAtivo] = useState(false);
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState("");
+  const [teste, setTeste] = useState(null);
+  const [testando, setTestando] = useState(false);
+  const testar = async () => {
+    setTestando(true); setTeste(null);
+    try { setTeste(await testarAvisoOrganizacao()); } catch (e) { setTeste({ ok: false, detalhe: e.message || String(e) }); }
+    setTestando(false);
+  };
   useEffect(() => { inscricaoAtual().then((s) => setAtivo(!!s && pushAdminAtivo())); }, []);
   if (!pushSuportado() && !ehIosNaoInstalado()) return null;
   const ligar = async () => {
@@ -3939,6 +3946,28 @@ function AvisosOrganizacaoCard() {
         </button>
       )}
       {erro && <p className="text-xs mt-2" style={{ color: "#DC2626" }}>{erro}</p>}
+      {!ehIosNaoInstalado() && (
+        <div className="mt-3">
+          <button type="button" onClick={testar} disabled={testando} className="text-xs underline" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
+            {testando ? "Testando..." : "Enviar aviso de teste agora"}
+          </button>
+          {teste && teste.ok && teste.enviados > 0 && (
+            <p className="text-xs mt-1.5" style={{ color: "#4ADE80", fontFamily: "'Inter', sans-serif" }}>
+              Funcionou: aviso enviado para {teste.enviados} aparelho(s) da organização{teste.removidos ? ` (${teste.removidos} antigo(s) removido(s))` : ""}. Se não chegou no celular, o problema é a permissão de notificação do aparelho.
+            </p>
+          )}
+          {teste && teste.ok && teste.enviados === 0 && (
+            <p className="text-xs mt-1.5" style={{ color: "#F59E0B", fontFamily: "'Inter', sans-serif" }}>
+              A função respondeu, mas nenhum aparelho está registrado como da organização{teste.removidos ? ` (${teste.removidos} estavam vencidos e foram removidos)` : ""}. Clique em "Desligar", depois "Ativar avisos da organização" de novo neste aparelho.
+            </p>
+          )}
+          {teste && !teste.ok && (
+            <p className="text-xs mt-1.5 break-words" style={{ color: "#DC2626", fontFamily: "'Inter', sans-serif" }}>
+              Falhou no servidor: {String(teste.detalhe).slice(0, 300)}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
