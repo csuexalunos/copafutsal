@@ -12997,6 +12997,91 @@ function ModeracaoFotos({ posts, savePosts }) {
   );
 }
 
+// Histórico de alterações dos times — agrupado por dia, com filtros por time e origem.
+function HistoricoAlteracoes({ historico, loading }) {
+  const [filtroTime, setFiltroTime] = useState("");
+  const [filtroOrigem, setFiltroOrigem] = useState("todos");
+  const [abertos, setAbertos] = useState({});
+  const lista = useMemo(() => [...(historico || [])].reverse(), [historico]);
+  const times = useMemo(() => Array.from(new Set(lista.map((h) => h.timeNome).filter(Boolean))).sort(), [lista]);
+  const origemDe = (h) => (h.por === "Organização" || h.por === "Reconstituído" ? "org" : "rep");
+  const filtrada = lista.filter((h) => (!filtroTime || h.timeNome === filtroTime) && (filtroOrigem === "todos" || origemDe(h) === filtroOrigem));
+  const dia = (iso) => {
+    const d = new Date(iso);
+    const hoje = new Date();
+    const ontem = new Date(); ontem.setDate(hoje.getDate() - 1);
+    const mesmo = (x, y) => x.toDateString() === y.toDateString();
+    if (mesmo(d, hoje)) return "Hoje";
+    if (mesmo(d, ontem)) return "Ontem";
+    return d.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" });
+  };
+  const grupos = [];
+  filtrada.forEach((h) => {
+    const rot = dia(h.em);
+    const g = grupos[grupos.length - 1];
+    if (g && g.rot === rot) g.itens.push(h); else grupos.push({ rot, itens: [h] });
+  });
+  const chip = (ativo) => ({ backgroundColor: ativo ? COLORS.navy : COLORS.card, color: ativo ? COLORS.gold : COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" });
+  const iconeLinha = (l) => (l.startsWith("➕") ? "#16A34A" : l.startsWith("➖") ? "#DC2626" : COLORS.ink);
+  return (
+    <div className="mt-4 max-w-xl">
+      <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+        Tudo que mudou nos times — feito pelos representantes ou pela organização. Não precisa aprovar, é só acompanhar.
+      </p>
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        {[["todos", "Todos"], ["rep", "Representantes"], ["org", "Organização"]].map(([k, r]) => (
+          <button key={k} type="button" onClick={() => setFiltroOrigem(k)} className="px-3 py-1.5 rounded-full text-xs font-semibold" style={chip(filtroOrigem === k)}>{r}</button>
+        ))}
+        <select value={filtroTime} onChange={(e) => setFiltroTime(e.target.value)} className="px-2 py-1.5 rounded-lg text-xs" style={{ backgroundColor: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}>
+          <option value="">Todos os times</option>
+          {times.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
+        <span className="text-[11px]" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>{filtrada.length} registro{filtrada.length === 1 ? "" : "s"}</span>
+      </div>
+      {loading ? (
+        <Loader2 size={16} className="animate-spin" />
+      ) : filtrada.length === 0 ? (
+        <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>Nenhuma alteração registrada{lista.length ? " com esse filtro" : " ainda"}.</p>
+      ) : (
+        grupos.map((g) => (
+          <div key={g.rot} className="mb-5">
+            <div className="text-[11px] font-bold uppercase tracking-widest mb-2" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>{g.rot}</div>
+            <ul className="space-y-2">
+              {g.itens.map((h) => {
+                const linhas = h.linhas || [];
+                const aberto = !!abertos[h.id];
+                const vis = aberto ? linhas : linhas.slice(0, 3);
+                const org = origemDe(h) === "org";
+                return (
+                  <li key={h.id} className="rounded-xl p-3" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}`, borderLeft: `4px solid ${org ? COLORS.gold : COLORS.accent}` }}>
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <span className="text-sm font-semibold min-w-0 truncate" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>{h.timeNome}</span>
+                      <span className="flex items-center gap-2 shrink-0">
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ backgroundColor: org ? COLORS.navy : COLORS.zebra, color: org ? COLORS.gold : COLORS.slate, fontFamily: "'Inter', sans-serif" }}>{h.por || "Representante"}</span>
+                        <span className="text-[11px]" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>{new Date(h.em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
+                      </span>
+                    </div>
+                    <ul className="space-y-0.5">
+                      {vis.map((l, i) => (
+                        <li key={i} className="text-xs" style={{ color: iconeLinha(l), fontFamily: "'Inter', sans-serif" }}>{l}</li>
+                      ))}
+                    </ul>
+                    {linhas.length > 3 && (
+                      <button type="button" onClick={() => setAbertos((a) => ({ ...a, [h.id]: !aberto }))} className="mt-1 text-[11px] font-semibold underline" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
+                        {aberto ? "Mostrar menos" : `Ver mais ${linhas.length - 3}`}
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
 function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, saveAdminRequests, sessao, config, saveConfig, avaliacoes, saveAvaliacoes, sorteio, saveSorteio, posts, savePosts, perfis, setPerfis, escudosCustom, saveEscudosCustom }) {
   const souAdminLogado = sessao && sessao.tipo === "admin";
   const souSuperAdmin = souAdminLogado && sessao.superAdmin;
@@ -14147,38 +14232,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
 
       {secaoAtiva === "avisos" && <PainelAvisosJogos matches={matches} teams={teams} saveMatches={saveMatches} />}
 
-      {secaoAtiva === "historico" && (
-        <div className="mt-4 max-w-xl">
-          <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-            Tudo que os representantes (e a própria organização, pelo painel) alteraram nos times (jogadores que entraram/saíram, mudanças de nome,
-            apelido, número e posição). Não precisa aprovar — é só acompanhar. Cada alteração também gera um aviso
-            no celular de quem ativou os avisos da organização.
-          </p>
-          {loadingHistorico ? (
-            <Loader2 size={16} className="animate-spin" />
-          ) : (historico || []).length === 0 ? (
-            <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>Nenhuma alteração registrada ainda.</p>
-          ) : (
-            <ul className="space-y-2.5">
-              {[...historico].reverse().map((h) => (
-                <li key={h.id} className="rounded-xl p-3" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <span className="text-sm font-semibold" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>{h.timeNome}{h.por ? <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ backgroundColor: COLORS.navy, color: COLORS.gold }}>{h.por}</span> : null}</span>
-                    <span className="text-[11px]" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-                      {new Date(h.em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
-                    </span>
-                  </div>
-                  <ul className="space-y-0.5">
-                    {(h.linhas || []).map((l, i) => (
-                      <li key={i} className="text-xs" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>{l}</li>
-                    ))}
-                  </ul>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
+      {secaoAtiva === "historico" && <HistoricoAlteracoes historico={historico} loading={loadingHistorico} />}
 
       {secaoAtiva === "jogos" && (
       <>
