@@ -13000,6 +13000,13 @@ function ModeracaoFotos({ posts, savePosts }) {
 }
 
 // Histórico de alterações dos times — agrupado por dia, com filtros por time e origem.
+// Só o primeiro nome (e "(reconstituído)" quando for o caso).
+function nomeCurto(txt) {
+  const m = String(txt || "").match(/^(.*?)(\s*\(reconstituído\))?$/);
+  const primeiro = (m[1] || "").trim().split(/\s+/)[0] || "";
+  const cap = primeiro ? primeiro.charAt(0).toUpperCase() + primeiro.slice(1).toLowerCase() : "";
+  return cap + (m[2] ? " (reconstituído)" : "");
+}
 function HistoricoAlteracoes({ historico, loading, teams }) {
   const [filtroTime, setFiltroTime] = useState("");
   const [filtroOrigem, setFiltroOrigem] = useState("todos");
@@ -13058,7 +13065,7 @@ function HistoricoAlteracoes({ historico, loading, teams }) {
                     <div className="flex items-center justify-between gap-2 mb-1.5">
                       <span className="text-sm font-semibold min-w-0 truncate" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>{h.timeNome}</span>
                       <span className="flex items-center gap-2 shrink-0">
-                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ backgroundColor: org ? COLORS.navy : COLORS.zebra, color: org ? COLORS.gold : COLORS.slate, fontFamily: "'Inter', sans-serif" }}>{h.por || ((teams || []).find((t) => t.nome === h.timeNome) || {}).capitao || "Representante"}</span>
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ backgroundColor: org ? COLORS.navy : COLORS.zebra, color: org ? COLORS.gold : COLORS.slate, fontFamily: "'Inter', sans-serif" }}>{nomeCurto(h.por || ((teams || []).find((t) => t.nome === h.timeNome) || {}).capitao || "Representante")}</span>
                         <span className="text-[11px]" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>{new Date(h.em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
                       </span>
                     </div>
@@ -13124,16 +13131,16 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   const [historico, , loadingHistorico] = useSharedStorage("copasu:historico", [], 10000);
   // Reconstituição única (27/10): alterações do Leite no time 2007/06 que não ficaram registradas.
   useEffect(() => {
-    if (loadingHistorico || !historico || historico.some((h) => h.id === "seed_leite_2007_06" && h.v === 3)) return;
+    if (loadingHistorico || !historico || historico.some((h) => h.id === "seed_leite_2007_06" && h.v === 4)) return;
     (async () => {
       try {
         const atual = ((await storageGet("copasu:historico")) || []).filter((h) => h.id !== "seed_leite_2007_06");
         const tm = (teams || []).find((t) => t.nome === "Seleção de 2007/06");
         const nova = {
-          id: "seed_leite_2007_06", v: 3, tipo: "elenco", em: "2026-10-27T22:00:00-03:00", por: "Bruno Leite (reconstituído)",
+          id: "seed_leite_2007_06", v: 4, tipo: "elenco", em: "2026-10-27T22:00:00-03:00", por: "Bruno Leite (reconstituído)",
           timeId: tm ? tm.id : undefined, timeNome: "Seleção de 2007/06",
           linhas: [
-            '✏️ ABILIO JORGE TENORIO ANTUNES DE MELLO (nº 21): nome → "ELISSON ALBUQUERQUE DE OLIVEIRA" (CPF e período ficaram os do Abilio; corrigidos depois pela organização)',
+            '✏️ Abilio (nº 21): nome trocado para Elisson (CPF e período ficaram os do Abilio; corrigidos depois pela organização)',
             "🔢 Hildebrando: nº 4 → 13",
             "🔢 Rodolfo: nº 6 → 7",
             "🔢 Engels: nº 7 → 12",
