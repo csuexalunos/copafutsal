@@ -13049,8 +13049,7 @@ function HistoricoAlteracoes({ historico, loading }) {
             <ul className="space-y-2">
               {g.itens.map((h) => {
                 const linhas = h.linhas || [];
-                const aberto = !!abertos[h.id];
-                const vis = aberto ? linhas : linhas.slice(0, 3);
+                const vis = linhas;
                 const org = origemDe(h) === "org";
                 return (
                   <li key={h.id} className="rounded-xl p-3" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}`, borderLeft: `4px solid ${org ? COLORS.gold : COLORS.accent}` }}>
@@ -13066,11 +13065,6 @@ function HistoricoAlteracoes({ historico, loading }) {
                         <li key={i} className="text-xs" style={{ color: iconeLinha(l), fontFamily: "'Inter', sans-serif" }}>{l}</li>
                       ))}
                     </ul>
-                    {linhas.length > 3 && (
-                      <button type="button" onClick={() => setAbertos((a) => ({ ...a, [h.id]: !aberto }))} className="mt-1 text-[11px] font-semibold underline" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
-                        {aberto ? "Mostrar menos" : `Ver mais ${linhas.length - 3}`}
-                      </button>
-                    )}
                   </li>
                 );
               })}
