@@ -12890,6 +12890,27 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   const [buscaInscritos, setBuscaInscritos] = useState("");
   const [secaoAtiva, setSecaoAtiva] = useState(() => (restritoAJogos ? "jogos" : null));
   const [historico, , loadingHistorico] = useSharedStorage("copasu:historico", [], 10000);
+  // Reconstituição única (27/10): alterações do Leite no time 2007/06 que não ficaram registradas.
+  useEffect(() => {
+    if (loadingHistorico || !historico || historico.some((h) => h.id === "seed_leite_2007_06")) return;
+    (async () => {
+      try {
+        const atual = (await storageGet("copasu:historico")) || [];
+        if (atual.some((h) => h.id === "seed_leite_2007_06")) return;
+        const tm = (teams || []).find((t) => t.nome === "Seleção de 2007/06");
+        const nova = {
+          id: "seed_leite_2007_06", tipo: "elenco", em: "2026-10-27T22:00:00-03:00", por: "Reconstituído",
+          timeId: tm ? tm.id : undefined, timeNome: "Seleção de 2007/06",
+          linhas: [
+            '✏️ ABILIO JORGE TENORIO ANTUNES DE MELLO (nº 21): nome → "ELISSON ALBUQUERQUE DE OLIVEIRA" (CPF e período ficaram os do Abilio; corrigidos depois pela organização)',
+            "🔢 Renumerados: Hildebrando 4→13 · Rodolfo 6→7 · Engels 7→12 · Gabriel 8→89 · Eduardo 69→5 · Felipe 89→11 · Carlos 12→99 · Lucas 55→6 · Helio 7→8 · Elisson 21→22",
+            "ℹ️ Reconstituído por comparação de duas listas (antes/depois). Registro automático não existia na época.",
+          ],
+        };
+        await storageSet("copasu:historico", [...atual, nova].slice(-400));
+      } catch (e) { console.error("seed histórico", e); }
+    })();
+  }, [loadingHistorico, historico, teams]);
   // Ao abrir "Pessoas e acesso", busca a lista de cadastros de novo no banco
   // (antes só carregava uma vez, ao abrir o app, e podia ficar desatualizada).
   useEffect(() => {
