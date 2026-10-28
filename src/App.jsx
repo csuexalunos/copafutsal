@@ -13133,7 +13133,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
   const [carregandoPainel, setCarregandoPainel] = useState(true);
   const [buscaInscritos, setBuscaInscritos] = useState("");
   const [secaoAtiva, setSecaoAtiva] = useState(() => (restritoAJogos ? "jogos" : null));
-  const [historico, , loadingHistorico] = useSharedStorage("copasu:historico", [], 10000);
+  const [historico, , loadingHistorico] = useSharedStorage("copasu:historico", [], 30000);
   // Reconstituição única (27/10): alterações do Leite no time 2007/06 que não ficaram registradas.
   useEffect(() => {
     if (loadingHistorico || !historico || historico.some((h) => h.id === "seed_leite_2007_06" && h.v === 4)) return;
@@ -14724,13 +14724,13 @@ export default function App() {
   }, [sessao]);
   const [checandoSessao, setCheckandoSessao] = useState(true);
   const [emRecuperacaoSenha, setEmRecuperacaoSenha] = useState(false);
-  const [teamsBanco, saveTeams, loadingTeams] = useSharedStorage("copasu:teams", [], 7000);
+  const [teamsBanco, saveTeams, loadingTeams] = useSharedStorage("copasu:teams", [], 30000);
   // Em todo o app os times aparecem em ordem de turma (2001/02 ... 2025).
   const teams = useMemo(() => [...(teamsBanco || [])].sort(compararTurmas), [teamsBanco]);
   const [matches, saveMatches, loadingMatches] = useSharedStorage("copasu:matches", [], 5000);
-  const [posts, savePosts, loadingPosts] = useSharedStorage("copasu:community", [], 6000);
-  const [adminRequests, saveAdminRequests, loadingAdminRequests] = useSharedStorage("copasu:admin_requests", [], 8000);
-  const [sorteioBruto, saveSorteioBruto, loadingSorteio] = useSharedStorage("copasu:sorteio", {}, 6000);
+  const [posts, savePosts, loadingPosts] = useSharedStorage("copasu:community", [], 30000);
+  const [adminRequests, saveAdminRequests, loadingAdminRequests] = useSharedStorage("copasu:admin_requests", [], 30000);
+  const [sorteioBruto, saveSorteioBruto, loadingSorteio] = useSharedStorage("copasu:sorteio", {}, 30000);
   // O sorteio guardava uma CÓPIA inteira de cada time dentro dos grupos (430 kB, baixados
   // a cada visita). Agora grava só {id, nome} e reidrata com os times atuais na leitura.
   const enxugarSorteio = useCallback((v) => {
@@ -14777,10 +14777,10 @@ export default function App() {
       }
     })();
   }, [loadingTeams, sessao, teamsBanco, saveTeams]);
-  const [config, saveConfig, loadingConfig] = useSharedStorage("copasu:config", {}, 10000);
+  const [config, saveConfig, loadingConfig] = useSharedStorage("copasu:config", {}, 30000);
   prazoEdicaoAtual = parseDataConfig(config && config.prazoEdicaoTimes, PRAZO_EDICAO_DETALHES);
-  const [avaliacoes, saveAvaliacoes, loadingAvaliacoes] = useSharedStorage("copasu:avaliacoes", [], 8000);
-  const [escudosCustom, saveEscudosCustom] = useSharedStorage("copasu:escudos_custom", {}, 15000);
+  const [avaliacoes, saveAvaliacoes, loadingAvaliacoes] = useSharedStorage("copasu:avaliacoes", [], 30000);
+  const [escudosCustom, saveEscudosCustom] = useSharedStorage("copasu:escudos_custom", {}, 60000);
 
   // ESCUDOS_TIMES é lido em vários componentes espalhados pelo app — em
   // vez de passar esse estado por prop em cada um, atualizamos o próprio
