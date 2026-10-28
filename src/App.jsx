@@ -2599,7 +2599,7 @@ function MeuTimeRepresentante({ team, saveTeams, avaliacoes, saveAvaliacoes }) {
       .map((j) => {
         const e = edits[j.id] || {};
         const aplicado = { ...j };
-        ["nome", "apelido", "numero", "posicao"].forEach((k) => {
+        ["apelido", "numero", "posicao"].forEach((k) => { // nome completo não muda: trocar jogador = remover + solicitar inclusão com CPF
           if (e[k] === undefined) return;
           if (travado && (k === "apelido" || k === "numero" || k === "posicao")) return; // prazo encerrado
           aplicado[k] = e[k];
@@ -2616,7 +2616,7 @@ function MeuTimeRepresentante({ team, saveTeams, avaliacoes, saveAvaliacoes }) {
             .filter((j) => !removidos.includes(j.id))
             .map((j) => {
               const f = porId.get(j.id);
-              return f ? { ...j, nome: f.nome, apelido: f.apelido, numero: f.numero, posicao: f.posicao } : j;
+              return f ? { ...j, nome: j.nome, apelido: f.apelido, numero: f.numero, posicao: f.posicao } : j;
             });
           return { ...t, jogadores: jogs, contato: contato.trim() || t.contato };
         })
@@ -2751,8 +2751,9 @@ function MeuTimeRepresentante({ team, saveTeams, avaliacoes, saveAvaliacoes }) {
                       </label>
                       <label className="col-span-6">
                         <span className="block text-[10px] font-semibold uppercase tracking-wide mb-1" style={rot}>Nome completo</span>
-                        <input value={valor(j, "nome")} onChange={(e) => mudar(j, "nome", e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg text-sm" style={inp} />
+                        <input value={valor(j, "nome")} readOnly disabled
+                          className="w-full px-3 py-2 rounded-lg text-sm opacity-60" style={inp} />
+                        <span className="block text-[10px] mt-1" style={rot}>Para trocar de jogador: remova este e solicite a inclusão do novo (com CPF e demais dados).</span>
                       </label>
                     </div>
                   </div>
