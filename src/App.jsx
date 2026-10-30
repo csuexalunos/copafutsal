@@ -1537,11 +1537,11 @@ function ModalTimeConteudo({ team, onClose, matches, teams }) {
 // ---------------------------------------------------------------------------
 // Parceiros da edição (logos em public/parceiros) e canal da transmissão (GV Produções).
 const PARCEIROS_APP = [
-  { nome: "Seu Buteco MCZ", img: "seu-buteco.svg", bg: "#FFD400", w: "66%", ig: "seubutecomcz", texto: "#111111" },
-  { nome: "Pajú", img: "paju.png", bg: "#EF363A", w: "88%", ig: "pajupasteis", texto: "#FFFFFF" },
-  { nome: "Papa Fritas", img: "papa-fritas.svg", bg: "#F26A1B", w: "62%", ig: "papafritas", texto: "#FFFFFF" },
-  { nome: "Hype Pizza", img: "hype-pizza.svg", bg: "#000000", w: "76%", ig: "hypepizzabr", texto: "#FFFFFF" },
-  { nome: "Casa de Mãinha", img: "casa-de-mainha.png", bg: "#FFFFFF", w: "52%", multiply: true, ig: "restaurantecasademainha", texto: "#5A2D12" },
+  { nome: "Seu Buteco MCZ", img: "seu-buteco.svg", bg: "#FFD400", w: "66%", ig: "seubutecomcz", url: "https://www.instagram.com/seubutecomcz?mdxt=MnBpNWhjcGZqdHBn", texto: "#111111" },
+  { nome: "Pajú", img: "paju.png", bg: "#EF363A", w: "88%", ig: "pajupasteis", url: "https://www.instagram.com/pajupasteis?xtok=MWY2MGRmZG4zenlkdQ==", texto: "#FFFFFF" },
+  { nome: "Papa Fritas", img: "papa-fritas.svg", bg: "#F26A1B", w: "62%", ig: "papafritas", url: "https://www.instagram.com/papafritas?cplk=MW9ubzlpNWx6MWRhMQ==", texto: "#FFFFFF" },
+  { nome: "Hype Pizza", img: "hype-pizza.svg", bg: "#000000", w: "76%", ig: "hypepizzabr", url: "https://www.instagram.com/hypepizzabr?vrfl=MTg4bm1rZDM3YzlwYw==", texto: "#FFFFFF" },
+  { nome: "Casa de Mãinha", img: "casa-de-mainha.png", bg: "#FFFFFF", w: "52%", multiply: true, ig: "restaurantecasademainha", url: "https://www.instagram.com/restaurantecasademainha?dlrf=MXJlZ29keDdnMnRvYg==", texto: "#5A2D12" },
 ];
 const LINK_CANAL_TRANSMISSAO = "https://www.youtube.com/channel/UCwAst32aZjhZdXTDXqP60Nw";
 
@@ -4647,7 +4647,7 @@ function BarraParceiro({ parceiro }) {
   const logoH = 44;
   return (
     <a
-      href={`https://www.instagram.com/${parceiro.ig}`}
+      href={parceiro.url}
       target="_blank"
       rel="noreferrer"
       onClick={() => registrarEvento("clique", `parceiro_${parceiro.ig}`).catch((e) => console.error("Falha ao registrar clique", e))}
