@@ -1535,6 +1535,16 @@ function ModalTimeConteudo({ team, onClose, matches, teams }) {
 // ---------------------------------------------------------------------------
 // TAB: Início
 // ---------------------------------------------------------------------------
+// Parceiros da edição (logos em public/parceiros) e canal da transmissão (GV Produções).
+const PARCEIROS_APP = [
+  { nome: "Seu Buteco MCZ", img: "seu-buteco.svg", bg: "#FFD400", w: "66%" },
+  { nome: "Pajú", img: "paju.png", bg: "#EF363A", w: "88%" },
+  { nome: "Papa Fritas", img: "papa-fritas.svg", bg: "#F26A1B", w: "62%" },
+  { nome: "Hype Pizza", img: "hype-pizza.svg", bg: "#000000", w: "76%" },
+  { nome: "Casa de Mãinha", img: "casa-de-mainha.png", bg: "#FFFFFF", w: "52%", multiply: true },
+];
+const LINK_CANAL_TRANSMISSAO = "https://www.youtube.com/channel/UCwAst32aZjhZdXTDXqP60Nw";
+
 function Home({ teams, matches, setTab, config, totalPessoas }) {
   const dataEventoTexto = (config && config.dataEvento) || DATA_EVENTO;
   const prazoInscricaoTexto = (config && config.prazoInscricao) || PRAZO_INSCRICAO;
@@ -1738,6 +1748,60 @@ function Home({ teams, matches, setTab, config, totalPessoas }) {
             </button>
           );
         })}
+      </div>
+
+      <div className="mt-10">
+        <div
+          className="text-xs font-semibold uppercase mb-3"
+          style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif", letterSpacing: "0.22em" }}
+        >
+          Parceiros oficiais
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {PARCEIROS_APP.map((p) => (
+            <div
+              key={p.nome}
+              className="rounded-2xl flex items-center justify-center overflow-hidden"
+              style={{ backgroundColor: p.bg, aspectRatio: "1 / 1", border: "1px solid rgba(255,255,255,0.12)" }}
+            >
+              <img
+                src={`${import.meta.env.BASE_URL}parceiros/${p.img}`}
+                alt={p.nome}
+                loading="lazy"
+                className="object-contain"
+                style={{ width: p.w, maxHeight: "78%", mixBlendMode: p.multiply ? "multiply" : "normal" }}
+              />
+            </div>
+          ))}
+        </div>
+
+        <a
+          href={LINK_CANAL_TRANSMISSAO}
+          target="_blank"
+          rel="noreferrer"
+          onClick={() => registrarEvento("clique", "canal_transmissao").catch((e) => console.error("Falha ao registrar clique", e))}
+          className="mt-4 flex items-center gap-3 rounded-xl pr-3 overflow-hidden"
+          style={{ backgroundColor: "#05060F", border: `1px solid ${COLORS.border}` }}
+        >
+          <img
+            src={`${import.meta.env.BASE_URL}parceiros/gv-producoes.png`}
+            alt="GV Produções"
+            loading="lazy"
+            className="h-12 w-auto shrink-0"
+          />
+          <span className="flex-1 min-w-0">
+            <span
+              className="block text-[10px] font-semibold uppercase"
+              style={{ color: COLORS.gold, fontFamily: "'Inter', sans-serif", letterSpacing: "0.2em" }}
+            >
+              Transmissão
+            </span>
+            <span className="block text-xs truncate" style={{ color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}>
+              GV Produções · ver o canal no YouTube
+            </span>
+          </span>
+          <ArrowRight size={14} color={COLORS.gold} className="shrink-0" />
+        </a>
       </div>
     </div>
   );
@@ -12305,6 +12369,7 @@ function SubAbasOrganizacao({ abas, ativa, onMudar }) {
 
 const ROTULOS_CLIQUES = {
   transmissao_ao_vivo: "Transmissão ao vivo",
+  canal_transmissao: "Canal da transmissão (GV)",
   local_mapa: "Local no mapa",
 };
 const ROTULOS_COMPARTILHAMENTOS = {
