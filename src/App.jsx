@@ -1537,11 +1537,11 @@ function ModalTimeConteudo({ team, onClose, matches, teams }) {
 // ---------------------------------------------------------------------------
 // Parceiros da edição (logos em public/parceiros) e canal da transmissão (GV Produções).
 const PARCEIROS_APP = [
-  { nome: "Seu Buteco MCZ", img: "seu-buteco.svg", bg: "#FFD400", w: "66%" },
-  { nome: "Pajú", img: "paju.png", bg: "#EF363A", w: "88%" },
-  { nome: "Papa Fritas", img: "papa-fritas.svg", bg: "#F26A1B", w: "62%" },
-  { nome: "Hype Pizza", img: "hype-pizza.svg", bg: "#000000", w: "76%" },
-  { nome: "Casa de Mãinha", img: "casa-de-mainha.png", bg: "#FFFFFF", w: "52%", multiply: true },
+  { nome: "Seu Buteco MCZ", img: "seu-buteco.svg", bg: "#FFD400", w: "66%", ig: "seubutecomcz", texto: "#111111" },
+  { nome: "Pajú", img: "paju.png", bg: "#EF363A", w: "88%", ig: "pajupasteis", texto: "#FFFFFF" },
+  { nome: "Papa Fritas", img: "papa-fritas.svg", bg: "#F26A1B", w: "62%", ig: "papafritas", texto: "#FFFFFF" },
+  { nome: "Hype Pizza", img: "hype-pizza.svg", bg: "#000000", w: "76%", ig: "hypepizzabr", texto: "#FFFFFF" },
+  { nome: "Casa de Mãinha", img: "casa-de-mainha.png", bg: "#FFFFFF", w: "52%", multiply: true, ig: "restaurantecasademainha", texto: "#5A2D12" },
 ];
 const LINK_CANAL_TRANSMISSAO = "https://www.youtube.com/channel/UCwAst32aZjhZdXTDXqP60Nw";
 
@@ -4642,6 +4642,39 @@ function PainelCardsTransmissao({ teams, matches }) {
   );
 }
 
+// Barra horizontal de parceiro (entre os jogos): clique abre o Instagram dele.
+function BarraParceiro({ parceiro }) {
+  const logoH = 44;
+  return (
+    <a
+      href={`https://www.instagram.com/${parceiro.ig}`}
+      target="_blank"
+      rel="noreferrer"
+      onClick={() => registrarEvento("clique", `parceiro_${parceiro.ig}`).catch((e) => console.error("Falha ao registrar clique", e))}
+      className="flex items-center gap-3 my-3 rounded-xl px-4 py-2.5"
+      style={{ backgroundColor: parceiro.bg, border: "1px solid rgba(255,255,255,0.14)", fontFamily: "'Inter', sans-serif" }}
+    >
+      <span className="flex items-center justify-center shrink-0" style={{ width: 96, height: 44 }}>
+        <img
+          src={`${import.meta.env.BASE_URL}parceiros/${parceiro.img}`}
+          alt={parceiro.nome}
+          loading="lazy"
+          style={{ maxWidth: "100%", maxHeight: logoH, objectFit: "contain", mixBlendMode: parceiro.multiply ? "multiply" : "normal" }}
+        />
+      </span>
+      <span className="flex-1 min-w-0">
+        <span className="block text-[10px] font-semibold uppercase" style={{ color: parceiro.texto, opacity: 0.75, letterSpacing: "0.2em" }}>
+          Parceiro oficial
+        </span>
+        <span className="block text-xs font-semibold truncate" style={{ color: parceiro.texto }}>
+          Siga @{parceiro.ig} no Instagram
+        </span>
+      </span>
+      <ArrowRight size={14} color={parceiro.texto} className="shrink-0" />
+    </a>
+  );
+}
+
 function Chaveamento({ matches, teams, sessao, saveMatches, config }) {
   const faseRank = (f) => {
     if (f.startsWith("Grupo")) return 0;
@@ -4785,6 +4818,9 @@ function Chaveamento({ matches, teams, sessao, saveMatches, config }) {
                     </div>
                   )}
                   <MatchCardExpansivel match={m} teams={teams} sessao={sessao} saveMatches={saveMatches} matches={matches} config={config} />
+                  {(idx + 1) % 3 === 0 && idx < jogosVisiveis.length - 1 && (
+                    <BarraParceiro parceiro={PARCEIROS_APP[((idx + 1) / 3 - 1) % PARCEIROS_APP.length]} />
+                  )}
                 </div>
               );
             })}
@@ -12370,6 +12406,11 @@ function SubAbasOrganizacao({ abas, ativa, onMudar }) {
 const ROTULOS_CLIQUES = {
   transmissao_ao_vivo: "Transmissão ao vivo",
   canal_transmissao: "Canal da transmissão (GV)",
+  parceiro_seubutecomcz: "Instagram Seu Buteco",
+  parceiro_pajupasteis: "Instagram Pajú",
+  parceiro_papafritas: "Instagram Papa Fritas",
+  parceiro_hypepizzabr: "Instagram Hype",
+  parceiro_restaurantecasademainha: "Instagram Casa de Mãinha",
   local_mapa: "Local no mapa",
 };
 const ROTULOS_COMPARTILHAMENTOS = {
