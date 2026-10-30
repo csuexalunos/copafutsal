@@ -692,6 +692,14 @@ function loteDoJogador(jogador, team) {
   const ini = team && team.pago ? loteInicialPlanilha(jogador, team, pag) : null;
   if (ini) return ini;
   if (pag) return loteDoPagamentoEntrada(pag, team);
+  // Quem ainda não pagou (time sem pagamento ou jogador adicionado depois e
+  // pendente) paga o lote VIGENTE hoje — o lote vale pela data do pagamento,
+  // então o carimbo de quando entrou no time não vale para pendentes.
+  if (jogador && team) {
+    const confirmados = Array.isArray(team.jogadoresConfirmadosPagos) ? team.jogadoresConfirmadosPagos : null;
+    const pendente = !team.pago || (confirmados !== null && !confirmados.includes(jogador.id));
+    if (pendente) return loteNaData(new Date());
+  }
   if (jogador && jogador.loteContratado) return jogador.loteContratado;
   if (entrouDepoisDoPagamento(jogador, team)) return loteNaData(new Date());
   return loteNaData(dataParaCalculoDeLote(team));
