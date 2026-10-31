@@ -1597,10 +1597,10 @@ function FaixaPrestadorMoveX() {
           className="block text-[10px] font-semibold uppercase"
           style={{ color: COLORS.gold, fontFamily: "'Inter', sans-serif", letterSpacing: "0.2em" }}
         >
-          Prestador de serviço
+          Fisioterapia
         </span>
         <span className="block text-xs truncate" style={{ color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}>
-          MoveX Recovery · recuperação esportiva
+          MoveX Recovery · fisioterapia esportiva
         </span>
       </span>
       {MOVEX_URL && <ArrowRight size={14} color={COLORS.gold} className="shrink-0" />}
