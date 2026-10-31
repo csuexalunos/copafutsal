@@ -5160,9 +5160,9 @@ function ClassificacaoTabela({ matches, teams }) {
           {modo === "geral" ? (
             <TabelaClassificacao titulo="Classificação geral" linhas={geral} destaqueTop={8} teams={teams} matches={matches} />
           ) : (
-            gruposNomes.map((fase) => (
+            gruposNomes.map((fase, gi) => (
+              <React.Fragment key={fase}>
               <TabelaClassificacao
-                key={fase}
                 titulo={fase}
                 destaqueTop={2}
                 teams={teams}
@@ -5171,6 +5171,8 @@ function ClassificacaoTabela({ matches, teams }) {
                   matches.some((m) => m.fase === fase && (m.timeA === t.id || m.timeB === t.id))
                 )}
               />
+              {gi < gruposNomes.length - 1 && <BarraParceiro parceiro={PARCEIROS_APP[gi % PARCEIROS_APP.length]} />}
+              </React.Fragment>
             ))
           )}
         </>
