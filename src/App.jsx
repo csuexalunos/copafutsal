@@ -43,7 +43,7 @@ import {
 import { jsPDF } from "jspdf";
 import {
   readKey, writeKey, cadastrarConta, entrarConta, sairConta, sessaoAtual, aoMudarSessao,
-  criarPerfil, buscarPerfil, listarPerfis, atualizarPerfil, atualizarPerfilConfirmado, souAdmin, listarAdmins,
+  criarPerfil, enviarBoasVindas, buscarPerfil, listarPerfis, atualizarPerfil, atualizarPerfilConfirmado, souAdmin, listarAdmins,
   promoverParaAdmin, removerAdmin, subirArquivo, urlAssinada, contarPessoasInscritas, buscarCpfsDaTurma,
   registrarAcesso, contarAcessos, registrarEvento as registrarEventoBruto, buscarMetricasDetalhadas, esqueciSenha, definirNovaSenha, supabase,
   buscarCpfsDoTime, salvarCpfJogador, salvarCpfsEmLote, excluirCpfsDoJogador, buscarAtletas, salvarAtletas, readStamp, subirEscudo, cpfsEmOutrosTimes, sincronizarBancoAtletas,
@@ -10403,8 +10403,9 @@ function CompletarPerfil({ sessao, onCompleted }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-    if (!form.nome.trim() || !form.whatsapp.trim() || !form.nascimento || (form.tipo === "jogador" && !form.turma)) {
-      setError("Preencha todos os campos" + (form.tipo === "jogador" ? " (inclusive a turma)." : "."));
+    const ehJogador = form.tipo === "jogador";
+    if (!form.nome.trim() || (ehJogador && (!form.whatsapp.trim() || !form.nascimento || !form.turma))) {
+      setError("Preencha todos os campos" + (ehJogador ? " (inclusive a turma)." : "."));
       return;
     }
     setSaving(true);
@@ -10414,10 +10415,11 @@ function CompletarPerfil({ sessao, onCompleted }) {
         nome: form.nome.trim(),
         tipo: form.tipo,
         turma: form.tipo === "jogador" ? form.turma : "",
-        whatsapp: form.whatsapp.trim(),
-        nascimento: form.nascimento,
+        whatsapp: ehJogador ? form.whatsapp.trim() : null,
+        nascimento: ehJogador ? form.nascimento : null,
         status: "pendente",
       });
+      enviarBoasVindas();
       onCompleted();
     } catch (err) {
       setSaving(false);
@@ -10525,7 +10527,7 @@ function CompletarPerfil({ sessao, onCompleted }) {
           {[
             { key: "whatsapp", label: "WhatsApp", type: "text", placeholder: "(00) 00000-0000" },
             { key: "nascimento", label: "Data de nascimento", type: "date", placeholder: "" },
-          ].map((f) => (
+          ].filter(() => form.tipo === "jogador").map((f) => (
             <div key={f.key}>
               <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
                 {f.label}
@@ -10580,13 +10582,12 @@ function Cadastro({ onVoltar }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    const ehJogador = form.tipo === "jogador";
     if (
       !form.nome.trim() ||
-      !form.whatsapp.trim() ||
       !form.email.trim() ||
-      !form.nascimento ||
       !form.senha.trim() ||
-      (form.tipo === "jogador" && !form.turma)
+      (ehJogador && (!form.whatsapp.trim() || !form.nascimento || !form.turma))
     ) {
       setError("Preencha todos os campos" + (form.tipo === "jogador" ? " (inclusive a turma)." : "."));
       return;
@@ -10604,10 +10605,11 @@ function Cadastro({ onVoltar }) {
           nome: form.nome.trim(),
           tipo: form.tipo,
           turma: form.tipo === "jogador" ? form.turma : "",
-          whatsapp: form.whatsapp.trim(),
-          nascimento: form.nascimento,
+          whatsapp: ehJogador ? form.whatsapp.trim() : null,
+          nascimento: ehJogador ? form.nascimento : null,
           status: "pendente",
         });
+        enviarBoasVindas();
         avisarOrg("perfil", "👤 Novo cadastro no app", `${form.nome.trim()} (${form.tipo}${form.tipo === "jogador" && form.turma ? ` · ${form.turma}` : ""})`);
       }
       setSaving(false);
@@ -10723,7 +10725,7 @@ function Cadastro({ onVoltar }) {
           { key: "whatsapp", label: "WhatsApp", type: "text", placeholder: "(00) 00000-0000" },
           { key: "email", label: "E-mail", type: "email", placeholder: "voce@email.com" },
           { key: "nascimento", label: "Data de nascimento", type: "date", placeholder: "" },
-        ].map((f) => (
+        ].filter((f) => form.tipo === "jogador" || f.key === "email").map((f) => (
           <div key={f.key}>
             <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
               {f.label}

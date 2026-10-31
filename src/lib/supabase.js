@@ -84,9 +84,21 @@ export async function criarPerfil(userId, perfil) {
   if (error) throw error;
 }
 
+// E-mail de boas-vindas (função "boas-vindas" no Supabase). Segura pra chamar
+// várias vezes: o servidor só envia uma vez por pessoa e só pra cadastros novos.
+export function enviarBoasVindas() {
+  return supabase.functions.invoke("boas-vindas", { body: {} }).catch((e) => console.error("Boas-vindas", e));
+}
+
+const CORTE_BOAS_VINDAS = new Date("2026-10-30T00:00:00Z");
+
 export async function buscarPerfil(userId) {
   const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
   if (error) throw error;
+  // Quem confirmou o e-mail depois do cadastro (sem sessão na hora) recebe no primeiro login.
+  if (data && !data.boas_vindas_em && data.criado_em && new Date(data.criado_em) >= CORTE_BOAS_VINDAS) {
+    enviarBoasVindas();
+  }
   return data;
 }
 
