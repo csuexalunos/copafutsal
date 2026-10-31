@@ -1582,7 +1582,7 @@ function BlocoParceiros() {
 }
 
 // Prestador de serviço (recuperação esportiva). Se tiver Instagram, preencher MOVEX_URL.
-const MOVEX_URL = "";
+const MOVEX_URL = "https://www.instagram.com/movexrecovery?cplk=MWI0azV6ZW53cXplaQ==";
 function FaixaPrestadorMoveX() {
   const conteudo = (
     <>
