@@ -4777,6 +4777,17 @@ function Chaveamento({ matches, teams, sessao, saveMatches, config }) {
   const mLink = jogoLink ? jogosOrdenados.find((m) => String(m.id) === jogoLink) : null;
   const diaAtual = dias.some((d) => d.k === diaSel) ? diaSel : mLink ? chaveDia(mLink) : alvo ? chaveDia(alvo) : dias[0]?.k;
   const jogosVisiveis = jogosOrdenados.filter((m) => chaveDia(m) === diaAtual);
+  // A sequência de parceiros continua de um dia para o outro: o dia seguinte começa
+  // no parceiro que viria depois da última barra do dia anterior.
+  const barrasAntes = (() => {
+    let total = 0;
+    for (const d of dias) {
+      if (d.k === diaAtual) break;
+      const n = jogosOrdenados.filter((m) => chaveDia(m) === d.k).length;
+      total += Math.floor((n - 1) / 3);
+    }
+    return total;
+  })();
 
   return (
     <div>
@@ -4840,7 +4851,7 @@ function Chaveamento({ matches, teams, sessao, saveMatches, config }) {
                   )}
                   <MatchCardExpansivel match={m} teams={teams} sessao={sessao} saveMatches={saveMatches} matches={matches} config={config} />
                   {(idx + 1) % 3 === 0 && idx < jogosVisiveis.length - 1 && (
-                    <BarraParceiro parceiro={PARCEIROS_APP[((idx + 1) / 3 - 1) % PARCEIROS_APP.length]} />
+                    <BarraParceiro parceiro={PARCEIROS_APP[(barrasAntes + (idx + 1) / 3 - 1) % PARCEIROS_APP.length]} />
                   )}
                 </div>
               );
