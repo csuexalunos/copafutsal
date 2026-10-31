@@ -1657,6 +1657,45 @@ function FaixaTransmissaoGV() {
   );
 }
 
+// Programação da Copa: o que acontece em cada dia (Home). Horários vêm do config.
+function ProgramacaoCopa({ config }) {
+  const h = horariosDoConfig(config);
+  const hm = (d) => `${d.getHours()}h${d.getMinutes() ? String(d.getMinutes()).padStart(2, "0") : ""}`;
+  const ab = new Date(h.inicioSexta.getTime() - 30 * 60000);
+  const dm = (d) => `${d.getDate()}/${d.getMonth() + 1}`;
+  const dias = [
+    { dia: "Sexta", data: dm(h.inicioSexta), titulo: "Abertura e fase de grupos", itens: [`Abertura às ${hm(ab)}`, `Primeiro jogo às ${hm(h.inicioSexta)}`, "Jogos da fase de grupos"] },
+    { dia: "Sábado", data: dm(h.inicioSabado), titulo: "Fase de grupos", itens: [`Jogos a partir das ${hm(h.inicioSabado)}`, "Definição dos classificados"] },
+    { dia: "Domingo", data: dm(h.inicioDomingo), titulo: "Eliminatórias e final", itens: [`Jogos a partir das ${hm(h.inicioDomingo)}`, "Semifinais, 3º lugar e grande final", "Premiação: melhor jogador, melhor goleiro e artilheiro"] },
+  ];
+  return (
+    <div className="mb-8">
+      <div
+        className="text-xs font-semibold uppercase mb-3"
+        style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif", letterSpacing: "0.22em" }}
+      >
+        Programação
+      </div>
+      <div className="space-y-2">
+        {dias.map((d) => (
+          <div key={d.dia} className="rounded-xl p-3 flex gap-3" style={{ border: `1px solid ${COLORS.border}` }}>
+            <div className="shrink-0 w-14 text-center">
+              <div className="text-[10px] font-semibold uppercase" style={{ color: COLORS.gold, letterSpacing: "0.14em", fontFamily: "'Inter', sans-serif" }}>{d.dia}</div>
+              <div className="text-lg font-bold" style={{ fontFamily: "'JetBrains Mono', monospace", color: COLORS.ink }}>{d.data}</div>
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>{d.titulo}</div>
+              <ul className="mt-1 text-xs space-y-0.5" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                {d.itens.map((i) => <li key={i}>• {i}</li>)}
+              </ul>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Home({ teams, matches, setTab, config, totalPessoas }) {
   const dataEventoTexto = (config && config.dataEvento) || DATA_EVENTO;
   const prazoInscricaoTexto = (config && config.prazoInscricao) || PRAZO_INSCRICAO;
@@ -1811,6 +1850,8 @@ function Home({ teams, matches, setTab, config, totalPessoas }) {
       </a>
 
       <FaixaTransmissaoGV />
+
+      <ProgramacaoCopa config={config} />
 
       <div className="flex flex-wrap gap-x-6 gap-y-1 mb-8">
         {stats.map((s) => (
