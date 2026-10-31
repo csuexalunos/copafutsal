@@ -4856,6 +4856,11 @@ function Chaveamento({ matches, teams, sessao, saveMatches, config }) {
                 </div>
               );
             })}
+            {(jogosVisiveis.some((m) => m.fase === "Final") || diaAtual === dias[dias.length - 1]?.k) && (
+              <div className="mt-8">
+                <BlocoParceiros />
+              </div>
+            )}
           </div>
         </>
       )}
