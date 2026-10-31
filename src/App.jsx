@@ -1537,13 +1537,82 @@ function ModalTimeConteudo({ team, onClose, matches, teams }) {
 // ---------------------------------------------------------------------------
 // Parceiros da edição (logos em public/parceiros) e canal da transmissão (GV Produções).
 const PARCEIROS_APP = [
-  { nome: "Seu Buteco MCZ", img: "seu-buteco.svg", bg: "#FFD400", w: "66%", ig: "seubutecomcz", url: "https://www.instagram.com/seubutecomcz?mdxt=MnBpNWhjcGZqdHBn", texto: "#111111" },
   { nome: "Pajú", img: "paju.png", bg: "#EF363A", w: "88%", ig: "pajupasteis", url: "https://www.instagram.com/pajupasteis?xtok=MWY2MGRmZG4zenlkdQ==", texto: "#FFFFFF" },
-  { nome: "Papa Fritas", img: "papa-fritas.svg", bg: "#F26A1B", w: "62%", ig: "papafritas", url: "https://www.instagram.com/papafritas?cplk=MW9ubzlpNWx6MWRhMQ==", texto: "#FFFFFF" },
+  { nome: "Seu Buteco MCZ", img: "seu-buteco.svg", bg: "#FFD400", w: "66%", ig: "seubutecomcz", url: "https://www.instagram.com/seubutecomcz?mdxt=MnBpNWhjcGZqdHBn", texto: "#111111" },
   { nome: "Hype Pizza", img: "hype-pizza.svg", bg: "#000000", w: "76%", ig: "hypepizzabr", url: "https://www.instagram.com/hypepizzabr?vrfl=MTg4bm1rZDM3YzlwYw==", texto: "#FFFFFF" },
   { nome: "Casa de Mãinha", img: "casa-de-mainha.png", bg: "#FFFFFF", w: "52%", multiply: true, ig: "restaurantecasademainha", url: "https://www.instagram.com/restaurantecasademainha?dlrf=MXJlZ29keDdnMnRvYg==", texto: "#5A2D12" },
+  { nome: "Papa Fritas", img: "papa-fritas.svg", bg: "#F26A1B", w: "62%", ig: "papafritas", url: "https://www.instagram.com/papafritas?cplk=MW9ubzlpNWx6MWRhMQ==", texto: "#FFFFFF" },
 ];
 const LINK_CANAL_TRANSMISSAO = "https://www.youtube.com/channel/UCwAst32aZjhZdXTDXqP60Nw";
+
+// Quadradinhos dos parceiros (clicáveis, abrem o Instagram) — usado na Home e na Classificação.
+function BlocoParceiros() {
+  return (
+    <div>
+      <div
+        className="text-xs font-semibold uppercase mb-3"
+        style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif", letterSpacing: "0.22em" }}
+      >
+        Parceiros oficiais
+      </div>
+      <div className="grid grid-cols-5 gap-2">
+        {PARCEIROS_APP.map((p) => (
+          <a
+            key={p.nome}
+            href={p.url}
+            target="_blank"
+            rel="noreferrer"
+            title={`${p.nome} no Instagram`}
+            onClick={() => registrarEvento("clique", `parceiro_${p.ig}`).catch((e) => console.error("Falha ao registrar clique", e))}
+            className="rounded-xl flex items-center justify-center overflow-hidden"
+            style={{ backgroundColor: p.bg, aspectRatio: "1 / 1", border: "1px solid rgba(255,255,255,0.12)" }}
+          >
+            <img
+              src={`${import.meta.env.BASE_URL}parceiros/${p.img}`}
+              alt={p.nome}
+              loading="lazy"
+              className="object-contain"
+              style={{ width: p.w, maxHeight: "78%", mixBlendMode: p.multiply ? "multiply" : "normal" }}
+            />
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Faixa pequena da transmissão (GV Produções) com link do canal.
+function FaixaTransmissaoGV() {
+  return (
+    <a
+      href={LINK_CANAL_TRANSMISSAO}
+      target="_blank"
+      rel="noreferrer"
+      onClick={() => registrarEvento("clique", "canal_transmissao").catch((e) => console.error("Falha ao registrar clique", e))}
+      className="mb-6 flex items-center gap-3 rounded-xl pr-3 overflow-hidden"
+      style={{ backgroundColor: "#05060F", border: `1px solid ${COLORS.border}` }}
+    >
+      <img
+        src={`${import.meta.env.BASE_URL}parceiros/gv-producoes.png`}
+        alt="GV Produções"
+        loading="lazy"
+        className="h-12 w-auto shrink-0"
+      />
+      <span className="flex-1 min-w-0">
+        <span
+          className="block text-[10px] font-semibold uppercase"
+          style={{ color: COLORS.gold, fontFamily: "'Inter', sans-serif", letterSpacing: "0.2em" }}
+        >
+          Transmissão
+        </span>
+        <span className="block text-xs truncate" style={{ color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}>
+          GV Produções · ver o canal no YouTube
+        </span>
+      </span>
+      <ArrowRight size={14} color={COLORS.gold} className="shrink-0" />
+    </a>
+  );
+}
 
 function Home({ teams, matches, setTab, config, totalPessoas }) {
   const dataEventoTexto = (config && config.dataEvento) || DATA_EVENTO;
@@ -1678,7 +1747,7 @@ function Home({ teams, matches, setTab, config, totalPessoas }) {
         target="_blank"
         rel="noreferrer"
         onClick={() => registrarEvento("clique", "local_mapa").catch((e) => console.error("Falha ao registrar clique", e))}
-        className="flex items-center gap-3 mb-6 rounded-xl px-4 py-3.5"
+        className="flex items-center gap-3 mb-3 rounded-xl px-4 py-3.5"
         style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
       >
         <span
@@ -1697,6 +1766,8 @@ function Home({ teams, matches, setTab, config, totalPessoas }) {
         </span>
         <ArrowRight size={16} color={COLORS.accent} className="shrink-0" />
       </a>
+
+      <FaixaTransmissaoGV />
 
       <div className="flex flex-wrap gap-x-6 gap-y-1 mb-8">
         {stats.map((s) => (
@@ -1751,57 +1822,7 @@ function Home({ teams, matches, setTab, config, totalPessoas }) {
       </div>
 
       <div className="mt-10">
-        <div
-          className="text-xs font-semibold uppercase mb-3"
-          style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif", letterSpacing: "0.22em" }}
-        >
-          Parceiros oficiais
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {PARCEIROS_APP.map((p) => (
-            <div
-              key={p.nome}
-              className="rounded-2xl flex items-center justify-center overflow-hidden"
-              style={{ backgroundColor: p.bg, aspectRatio: "1 / 1", border: "1px solid rgba(255,255,255,0.12)" }}
-            >
-              <img
-                src={`${import.meta.env.BASE_URL}parceiros/${p.img}`}
-                alt={p.nome}
-                loading="lazy"
-                className="object-contain"
-                style={{ width: p.w, maxHeight: "78%", mixBlendMode: p.multiply ? "multiply" : "normal" }}
-              />
-            </div>
-          ))}
-        </div>
-
-        <a
-          href={LINK_CANAL_TRANSMISSAO}
-          target="_blank"
-          rel="noreferrer"
-          onClick={() => registrarEvento("clique", "canal_transmissao").catch((e) => console.error("Falha ao registrar clique", e))}
-          className="mt-4 flex items-center gap-3 rounded-xl pr-3 overflow-hidden"
-          style={{ backgroundColor: "#05060F", border: `1px solid ${COLORS.border}` }}
-        >
-          <img
-            src={`${import.meta.env.BASE_URL}parceiros/gv-producoes.png`}
-            alt="GV Produções"
-            loading="lazy"
-            className="h-12 w-auto shrink-0"
-          />
-          <span className="flex-1 min-w-0">
-            <span
-              className="block text-[10px] font-semibold uppercase"
-              style={{ color: COLORS.gold, fontFamily: "'Inter', sans-serif", letterSpacing: "0.2em" }}
-            >
-              Transmissão
-            </span>
-            <span className="block text-xs truncate" style={{ color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}>
-              GV Produções · ver o canal no YouTube
-            </span>
-          </span>
-          <ArrowRight size={14} color={COLORS.gold} className="shrink-0" />
-        </a>
+        <BlocoParceiros />
       </div>
     </div>
   );
@@ -5064,6 +5085,9 @@ function Classificacao({ matches, teams }) {
       ) : (
         <EstatisticasJogadores matches={matches} teams={teams} tipo={aba} />
       )}
+      <div className="mt-8">
+        <BlocoParceiros />
+      </div>
     </div>
   );
 }
