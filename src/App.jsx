@@ -15022,14 +15022,16 @@ function agruparDuplicadosSorteio(perfis) {
 function SorteiosCopa({ premios, savePremios, sessao, perfis, setPerfis, totalPessoas }) {
   const ehAdmin = sessao && sessao.tipo === "admin";
   const lista = (premios && premios.sorteios) || [];
+  const [aba, setAba] = useState("sortear"); // só admin: sortear | resultados | duplicados
   const [tipo, setTipo] = useState("premio");
+  const [escolha, setEscolha] = useState("");
   const [titulo, setTitulo] = useState("");
   const [qtd, setQtd] = useState(1);
   const [incluirOrg, setIncluirOrg] = useState(false);
   const [admins, setAdmins] = useState([]);
-  const [rolando, setRolando] = useState(null); // nome que "passa" na tela durante o sorteio
   const [erro, setErro] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [palco, setPalco] = useState(null);
+  const [menu, setMenu] = useState(null);
 
   useEffect(() => {
     if (!ehAdmin) return;
@@ -15039,88 +15041,79 @@ function SorteiosCopa({ premios, savePremios, sessao, perfis, setPerfis, totalPe
   const grupos = useMemo(() => agruparDuplicadosSorteio(perfis), [perfis]);
   const duplicadosAChecar = grupos.filter((g) => g.extras.length > 0);
   const emailsOrg = useMemo(() => new Set((admins || []).map((a) => (a.email || "").trim().toLowerCase())), [admins]);
-
-  // Pessoas (já sem duplicatas) que já ganharam algum prêmio: nunca mais entram.
   const ganhadoresPremio = useMemo(() => {
     const ids = new Set();
     lista.forEach((s) => s.tipo === "premio" && (s.ganhadores || []).forEach((g) => g.status !== "ausente" && ids.add(g.id)));
     return ids;
   }, [lista]);
 
-  const elegiveis = (sorteioAtual, extraExcluir = []) => {
+  const elegiveis = (sorteioAtual, extraExcluir = [], tipoRef = tipo, tituloRef = titulo) => {
     const jaNesta = new Set((sorteioAtual ? sorteioAtual.ganhadores || [] : []).map((g) => g.id));
     const jaDinamica = new Set();
-    if (tipo === "dinamica" || (sorteioAtual && sorteioAtual.tipo === "dinamica")) {
-      const alvo = normalizarNomeSorteio(sorteioAtual ? sorteioAtual.titulo : titulo);
+    if (tipoRef === "dinamica") {
+      const alvo = normalizarNomeSorteio(tituloRef);
       lista.forEach((s) => s.tipo === "dinamica" && normalizarNomeSorteio(s.titulo) === alvo && (s.ganhadores || []).forEach((g) => jaDinamica.add(g.id)));
     }
     return grupos
       .filter((g) => {
-        const ids = [g.manter, ...g.extras].map((p) => p.id);
-        if (ids.some((id) => ganhadoresPremio.has(id) || jaNesta.has(id) || jaDinamica.has(id) || extraExcluir.includes(id))) return false;
-        if (!incluirOrg && [g.manter, ...g.extras].some((p) => emailsOrg.has((p.email || "").trim().toLowerCase()))) return false;
+        const todos = [g.manter, ...g.extras];
+        if (todos.some((p) => ganhadoresPremio.has(p.id) || jaNesta.has(p.id) || jaDinamica.has(p.id) || extraExcluir.includes(p.id))) return false;
+        if (!incluirOrg && todos.some((p) => emailsOrg.has((p.email || "").trim().toLowerCase()))) return false;
         return true;
       })
       .map((g) => g.manter);
   };
 
-  const girar = (pool, ms = 3000) =>
-    new Promise((resolve) => {
-      const t0 = Date.now();
-      const id = setInterval(() => {
-        setRolando(nomeSorteio(pool[aleatorioSorteio(pool.length)].nome));
-        if (Date.now() - t0 > ms) { clearInterval(id); setRolando(null); resolve(); }
-      }, 80);
-    });
+  const registroGanhador = (p) => ({
+    id: p.id,
+    nome: p.nome,
+    tipo: p.tipo === "jogador" ? "jogador" : "torcedor",
+    turma: (p.tipo === "jogador" ? p.turma : p.torce_turma || p.turma) || "",
+    status: "ativo",
+  });
 
-  const sortear = async () => {
+  const iniciar = () => {
     setErro("");
-    const t = titulo.trim();
-    if (!t) { setErro("Dê um nome ao sorteio (ex.: Voucher Pajú · R$ 40)."); return; }
-    const pool = elegiveis(null);
+    const t = (escolha === "__outro" ? titulo : escolha).trim();
+    if (!t) { setErro("Escolha o que será sorteado."); return; }
+    const pool = elegiveis(null, [], tipo, t);
+    if (pool.length === 0) { setErro("Não há ninguém elegível."); return; }
     const n = Math.max(1, Math.min(Number(qtd) || 1, pool.length));
-    if (pool.length === 0) { setErro("Não há ninguém elegível para este sorteio."); return; }
-    setBusy(true);
-    await girar(pool);
     const restante = [...pool];
     const sorteados = [];
-    for (let i = 0; i < n; i++) {
-      const k = aleatorioSorteio(restante.length);
-      const p = restante.splice(k, 1)[0];
-      sorteados.push({ id: p.id, nome: p.nome, tipo: p.tipo, turma: p.turma || p.torce_turma || "", email: p.email || "", status: "ativo" });
-    }
-    const novo = { id: Date.now().toString(36), tipo, titulo: t, criadoEm: new Date().toISOString(), ganhadores: sorteados };
-    try {
-      await savePremios((atual) => ({ ...(atual || {}), sorteios: [novo, ...(((atual || {}).sorteios) || [])] }));
-      setTitulo("");
-    } catch (e) { setErro("Erro ao salvar o sorteio: " + e.message); }
-    setBusy(false);
+    for (let i = 0; i < n; i++) sorteados.push(restante.splice(aleatorioSorteio(restante.length), 1)[0]);
+    setPalco({
+      titulo: t, tipo, nomes: pool.map((p) => p.nome), fila: sorteados.map(registroGanhador), idx: 0, fase: "pronto", salvo: false,
+      salvar: async (finais) => {
+        const novo = { id: Date.now().toString(36), tipo, titulo: t, criadoEm: new Date().toISOString(), ganhadores: finais };
+        await savePremios((atual) => ({ ...(atual || {}), sorteios: [novo, ...(((atual || {}).sorteios) || [])] }));
+      },
+    });
   };
 
-  const marcarAusente = async (s, g) => {
-    setErro("");
-    const pool = elegiveis(s, (s.ganhadores || []).map((x) => x.id));
-    if (pool.length === 0) { setErro("Não há mais ninguém elegível para substituir."); return; }
-    setBusy(true);
-    await girar(pool, 2000);
+  const substituir = (s, g) => {
+    setMenu(null);
+    const pool = elegiveis(s, (s.ganhadores || []).map((x) => x.id), s.tipo, s.titulo);
+    if (pool.length === 0) { setErro("Não há mais ninguém elegível para substituir."); setAba("resultados"); return; }
     const p = pool[aleatorioSorteio(pool.length)];
-    const sub = { id: p.id, nome: p.nome, tipo: p.tipo, turma: p.turma || p.torce_turma || "", email: p.email || "", status: "ativo" };
-    try {
-      await savePremios((atual) => ({
-        ...(atual || {}),
-        sorteios: ((atual || {}).sorteios || []).map((x) =>
-          x.id !== s.id ? x : { ...x, ganhadores: [...(x.ganhadores || []).map((y) => (y.id === g.id ? { ...y, status: "ausente" } : y)), sub] }
-        ),
-      }));
-    } catch (e) { setErro("Erro ao salvar: " + e.message); }
-    setBusy(false);
+    setPalco({
+      titulo: s.titulo, tipo: s.tipo, nomes: pool.map((x) => x.nome), fila: [registroGanhador(p)], idx: 0, fase: "pronto", salvo: false, substituicao: true,
+      salvar: async (finais) => {
+        await savePremios((atual) => ({
+          ...(atual || {}),
+          sorteios: ((atual || {}).sorteios || []).map((x) =>
+            x.id !== s.id ? x : { ...x, ganhadores: [...(x.ganhadores || []).map((y) => (y.id === g.id ? { ...y, status: "ausente" } : y)), ...finais] }
+          ),
+        }));
+      },
+    });
   };
 
   const desfazer = async (s) => {
+    setMenu(null);
     if (!window.confirm(`Desfazer o sorteio "${s.titulo}"? Os sorteados voltam a poder participar.`)) return;
-    try {
-      await savePremios((atual) => ({ ...(atual || {}), sorteios: ((atual || {}).sorteios || []).filter((x) => x.id !== s.id) }));
-    } catch (e) { setErro("Erro ao desfazer: " + e.message); }
+    try { await savePremios((atual) => ({ ...(atual || {}), sorteios: ((atual || {}).sorteios || []).filter((x) => x.id !== s.id) })); }
+    catch (e) { setErro("Erro ao desfazer: " + e.message); }
   };
 
   const cancelarDuplicado = async (p) => {
@@ -15131,112 +15124,235 @@ function SorteiosCopa({ premios, savePremios, sessao, perfis, setPerfis, totalPe
     } catch (e) { setErro("Erro ao cancelar: " + e.message); }
   };
 
-  const cardStyle = { backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` };
   const fonte = { fontFamily: "'Inter', sans-serif" };
-  const poolAtual = ehAdmin ? elegiveis(null) : [];
+  const card = { backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` };
+  const poolAtual = ehAdmin ? elegiveis(null, [], tipo, escolha === "__outro" ? titulo : escolha) : [];
+  const abas = [
+    { id: "sortear", l: "Sortear" },
+    { id: "resultados", l: `Resultados${lista.length ? ` (${lista.length})` : ""}` },
+    { id: "duplicados", l: `Duplicados${duplicadosAChecar.length ? ` (${duplicadosAChecar.length})` : ""}` },
+  ];
+
+  const detalhe = (g) => (g.tipo === "jogador" ? `Jogador${g.turma ? ` · turma ${g.turma}` : ""}` : `Torcedor${g.turma ? ` · torce pela turma ${g.turma}` : ""}`);
+  const contato = (g) => (perfis || []).find((p) => p.id === g.id);
+
+  const Resultados = (
+    <div>
+      {erro && <div className="text-sm mb-3" style={{ color: COLORS.accent, ...fonte }}>{erro}</div>}
+      {lista.length === 0 ? (
+        <div className="text-sm py-6" style={{ color: COLORS.slate, ...fonte }}>Os sorteios da Copa vão aparecer aqui.</div>
+      ) : (
+        <div className="space-y-4">
+          {lista.map((s) => (
+            <div key={s.id} className="rounded-2xl overflow-hidden" style={card}>
+              <div className="flex items-center justify-between gap-2 px-4 py-3" style={{ backgroundColor: COLORS.surfaceAlt }}>
+                <div className="min-w-0">
+                  <div className="text-[10px] font-semibold uppercase" style={{ color: s.tipo === "premio" ? COLORS.gold : COLORS.accent, letterSpacing: "0.16em", ...fonte }}>
+                    {s.tipo === "premio" ? "Prêmio" : "Dinâmica"} · {new Date(s.criadoEm).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                  </div>
+                  <div className="text-base font-bold break-words" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>{s.titulo}</div>
+                </div>
+                {ehAdmin && <button type="button" onClick={() => desfazer(s)} className="text-[11px] underline shrink-0" style={{ color: COLORS.slate, ...fonte }}>Desfazer</button>}
+              </div>
+              <ul>
+                {(s.ganhadores || []).filter((g) => ehAdmin || g.status !== "ausente").map((g) => {
+                  const ausente = g.status === "ausente";
+                  const c = ehAdmin ? contato(g) : null;
+                  return (
+                    <li key={g.id} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: `1px solid ${COLORS.border}`, opacity: ausente ? 0.5 : 1 }}>
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-base font-bold shrink-0" style={{ backgroundColor: COLORS.accentSoft, color: COLORS.accent }}>
+                        {(g.nome || "?").trim()[0].toUpperCase()}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-semibold break-words" style={{ color: COLORS.ink, textDecoration: ausente ? "line-through" : "none", ...fonte }}>{g.nome}{ausente ? " · ausente" : ""}</div>
+                        <div className="text-xs" style={{ color: COLORS.slate, ...fonte }}>{detalhe(g)}</div>
+                        {ehAdmin && c && (c.whatsapp || c.email) && <div className="text-[11px] mt-0.5 break-all" style={{ color: COLORS.slate, ...fonte }}>{[c.whatsapp, c.email].filter(Boolean).join(" · ")}</div>}
+                      </div>
+                      {ehAdmin && !ausente && (
+                        <button type="button" onClick={() => substituir(s, g)} className="shrink-0 text-[11px] px-2.5 py-1.5 rounded-lg" style={{ backgroundColor: COLORS.chipSoft, color: COLORS.ink, ...fonte }}>
+                          Ausente
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  const Sortear = (
+    <div className="rounded-2xl p-5 space-y-5" style={card}>
+      <div>
+        <div className="text-xs font-semibold uppercase mb-2" style={{ color: COLORS.slate, letterSpacing: "0.16em", ...fonte }}>1 · Tipo</div>
+        <div className="flex gap-2">
+          {[{ v: "premio", l: "🎁 Prêmio" }, { v: "dinamica", l: "🎯 Dinâmica" }].map((o) => (
+            <button key={o.v} type="button" onClick={() => { setTipo(o.v); setEscolha(""); }} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium"
+              style={{ backgroundColor: tipo === o.v ? COLORS.accent : COLORS.surfaceAlt, color: tipo === o.v ? "#fff" : COLORS.ink, border: `1.5px solid ${tipo === o.v ? COLORS.accent : COLORS.border}`, ...fonte }}>{o.l}</button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <div className="text-xs font-semibold uppercase mb-2" style={{ color: COLORS.slate, letterSpacing: "0.16em", ...fonte }}>2 · O que será sorteado</div>
+        <select value={escolha} onChange={(e) => setEscolha(e.target.value)} className="w-full px-4 py-2.5 rounded-xl outline-none text-sm"
+          style={{ backgroundColor: COLORS.surfaceAlt, border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, ...fonte }}>
+          <option value="">Selecione</option>
+          {SUGESTOES_SORTEIO.filter((s) => s.tipo === tipo).map((s) => <option key={s.titulo} value={s.titulo}>{s.titulo}</option>)}
+          <option value="__outro">Outro (digitar)…</option>
+        </select>
+        {escolha === "__outro" && (
+          <input type="text" value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Nome do sorteio" autoFocus className="w-full px-4 py-2.5 rounded-xl outline-none text-sm mt-2"
+            style={{ backgroundColor: COLORS.surfaceAlt, border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, ...fonte }} />
+        )}
+      </div>
+      <div>
+        <div className="text-xs font-semibold uppercase mb-2" style={{ color: COLORS.slate, letterSpacing: "0.16em", ...fonte }}>3 · Quantos sorteados</div>
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={() => setQtd(Math.max(1, Number(qtd) - 1))} className="w-10 h-10 rounded-xl text-lg font-bold" style={{ backgroundColor: COLORS.surfaceAlt, color: COLORS.ink }}>−</button>
+          <div className="w-10 text-center text-xl font-bold" style={{ color: COLORS.ink, fontFamily: "'JetBrains Mono', monospace" }}>{qtd}</div>
+          <button type="button" onClick={() => setQtd(Math.min(20, Number(qtd) + 1))} className="w-10 h-10 rounded-xl text-lg font-bold" style={{ backgroundColor: COLORS.surfaceAlt, color: COLORS.ink }}>+</button>
+        </div>
+      </div>
+      <div className="text-xs" style={{ color: COLORS.slate, ...fonte }}>
+        <strong style={{ color: COLORS.ink }}>{poolAtual.length}</strong> pessoas participam deste sorteio.
+        {ganhadoresPremio.size > 0 && ` ${ganhadoresPremio.size} já ganharam prêmio e ficam de fora.`}
+      </div>
+      <label className="flex items-center gap-2 text-xs" style={{ color: COLORS.slate, ...fonte }}>
+        <input type="checkbox" checked={incluirOrg} onChange={(e) => setIncluirOrg(e.target.checked)} /> Incluir a organização no sorteio
+      </label>
+      {erro && <div className="text-sm" style={{ color: COLORS.accent, ...fonte }}>{erro}</div>}
+      <button type="button" onClick={iniciar} className="w-full px-5 py-3.5 rounded-xl font-bold text-base inline-flex items-center justify-center gap-2" style={{ backgroundColor: COLORS.accent, color: "#fff", ...fonte }}>
+        <Dices size={18} /> Iniciar sorteio
+      </button>
+    </div>
+  );
+
+  const Duplicados = (
+    <div>
+      <p className="text-xs mb-3" style={{ color: COLORS.slate, ...fonte }}>
+        Cadastros com o mesmo nome, e-mail ou WhatsApp. Eles já contam uma vez só nos sorteios; cancele o login extra para limpar a lista.
+      </p>
+      {duplicadosAChecar.length === 0 ? (
+        <div className="text-sm py-4" style={{ color: COLORS.slate, ...fonte }}>Nenhum cadastro duplicado encontrado. ✅</div>
+      ) : (
+        <div className="space-y-3">
+          {duplicadosAChecar.map((g) => (
+            <div key={g.manter.id} className="rounded-xl p-3" style={card}>
+              <div className="text-sm font-semibold" style={{ color: COLORS.ink, ...fonte }}>{g.manter.nome}</div>
+              <div className="text-xs mb-2 break-all" style={{ color: "#4ADE80", ...fonte }}>Fica: {g.manter.email}</div>
+              {g.extras.map((p) => (
+                <div key={p.id} className="flex items-center justify-between gap-2 py-1.5" style={{ borderTop: `1px solid ${COLORS.border}` }}>
+                  <span className="text-xs break-all min-w-0" style={{ color: COLORS.slate, ...fonte }}>{p.email}</span>
+                  <button type="button" onClick={() => cancelarDuplicado(p)} className="shrink-0 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold" style={{ backgroundColor: COLORS.accentSoft, color: COLORS.accent }}>Cancelar</button>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div>
       <SectionLabel eyebrow="Prêmios e dinâmicas" title="Sorteios" />
-      <p className="text-sm mb-6 max-w-xl" style={{ color: COLORS.slate, ...fonte }}>
-        Todo mundo que se cadastrou no app participa dos sorteios da Copa
-        {totalPessoas ? ` (${totalPessoas} pessoas)` : ""}. Quem ganha um prêmio não concorre mais aos próximos.
+      <p className="text-sm mb-5 max-w-xl" style={{ color: COLORS.slate, ...fonte }}>
+        Todo mundo que se cadastrou no app participa{totalPessoas ? ` (${totalPessoas} pessoas)` : ""}. Quem ganha um prêmio não concorre mais.
       </p>
-
-      {rolando && (
-        <div className="rounded-2xl px-5 py-8 mb-6 text-center" style={{ background: "linear-gradient(135deg, rgba(255,107,53,0.25), rgba(242,183,5,0.2))", border: `1px solid ${COLORS.accent}` }}>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.2em] mb-2" style={{ color: COLORS.gold, ...fonte }}>Sorteando...</div>
-          <div className="text-3xl font-extrabold" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>{rolando}</div>
-        </div>
-      )}
-
       {ehAdmin && (
-        <div className="rounded-2xl p-4 mb-6" style={cardStyle}>
-          <div className="text-xs font-semibold uppercase mb-3" style={{ color: COLORS.slate, letterSpacing: "0.18em", ...fonte }}>Novo sorteio (organização)</div>
-          <div className="flex gap-2 mb-3">
-            {[{ v: "premio", l: "Prêmio" }, { v: "dinamica", l: "Dinâmica" }].map((o) => (
-              <button key={o.v} type="button" onClick={() => setTipo(o.v)} className="flex-1 px-4 py-2 rounded-xl text-sm font-medium"
-                style={{ backgroundColor: tipo === o.v ? COLORS.accent : COLORS.surfaceAlt, color: tipo === o.v ? "#fff" : COLORS.ink, border: `1.5px solid ${tipo === o.v ? COLORS.accent : COLORS.border}`, ...fonte }}>
-                {o.l}
-              </button>
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-1.5 mb-3">
-            {SUGESTOES_SORTEIO.filter((s) => s.tipo === tipo).map((s) => (
-              <button key={s.titulo} type="button" onClick={() => setTitulo(s.titulo)} className="text-[11px] px-2.5 py-1 rounded-full"
-                style={{ backgroundColor: COLORS.chipSoft, color: COLORS.ink, border: `1px solid ${COLORS.border}`, ...fonte }}>{s.titulo}</button>
-            ))}
-          </div>
-          <input type="text" value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder={tipo === "premio" ? "Qual é o prêmio?" : "Qual é a dinâmica?"}
-            className="w-full px-4 py-2.5 rounded-xl outline-none text-sm mb-3" style={{ backgroundColor: COLORS.surfaceAlt, border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, ...fonte }} />
-          <div className="flex items-center gap-3 mb-3">
-            <label className="text-xs" style={{ color: COLORS.slate, ...fonte }}>Quantos sorteados?</label>
-            <input type="number" min={1} max={50} value={qtd} onChange={(e) => setQtd(e.target.value)} className="w-20 px-3 py-2 rounded-xl outline-none text-sm"
-              style={{ backgroundColor: COLORS.surfaceAlt, border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, ...fonte }} />
-          </div>
-          <label className="flex items-center gap-2 text-xs mb-3" style={{ color: COLORS.slate, ...fonte }}>
-            <input type="checkbox" checked={incluirOrg} onChange={(e) => setIncluirOrg(e.target.checked)} /> Incluir a organização (admins) no sorteio
-          </label>
-          <div className="text-xs mb-3" style={{ color: COLORS.slate, ...fonte }}>
-            Elegíveis agora: <strong style={{ color: COLORS.ink }}>{poolAtual.length}</strong> · já ganharam prêmio: {ganhadoresPremio.size} · duplicados ignorados: {grupos.reduce((n, g) => n + g.extras.length, 0)}
-          </div>
-          {erro && <div className="text-sm mb-3" style={{ color: COLORS.accent, ...fonte }}>{erro}</div>}
-          <button type="button" onClick={sortear} disabled={busy} className="w-full px-5 py-3 rounded-xl font-semibold text-sm inline-flex items-center justify-center gap-2 disabled:opacity-60"
-            style={{ backgroundColor: COLORS.accent, color: "#fff", ...fonte }}>
-            {busy && <Loader2 size={16} className="animate-spin" />} <Dices size={16} /> Sortear
-          </button>
-        </div>
-      )}
-
-      {ehAdmin && duplicadosAChecar.length > 0 && (
-        <div className="rounded-2xl p-4 mb-6" style={{ ...cardStyle, borderColor: COLORS.gold }}>
-          <div className="text-xs font-semibold uppercase mb-1" style={{ color: COLORS.gold, letterSpacing: "0.18em", ...fonte }}>Cadastros duplicados ({duplicadosAChecar.length})</div>
-          <p className="text-xs mb-3" style={{ color: COLORS.slate, ...fonte }}>Mesmo nome, e-mail ou WhatsApp. Já contam uma vez só nos sorteios. Confirme e cancele o login extra:</p>
-          <ul className="space-y-3">
-            {duplicadosAChecar.map((g) => (
-              <li key={g.manter.id} className="text-xs" style={{ color: COLORS.ink, ...fonte }}>
-                <div><strong>{g.manter.nome}</strong> · {g.manter.email} <span style={{ color: "#4ADE80" }}>(fica)</span></div>
-                {g.extras.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between gap-2 mt-1 pl-3">
-                    <span className="min-w-0 break-words">{p.nome} · {p.email}</span>
-                    <button type="button" onClick={() => cancelarDuplicado(p)} className="shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-semibold" style={{ backgroundColor: COLORS.accentSoft, color: COLORS.accent }}>Cancelar este</button>
-                  </div>
-                ))}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {lista.length === 0 ? (
-        <div className="text-sm" style={{ color: COLORS.slate, ...fonte }}>Os sorteios da Copa vão aparecer aqui.</div>
-      ) : (
-        <ul className="space-y-3">
-          {lista.map((s) => (
-            <li key={s.id} className="rounded-2xl p-4" style={cardStyle}>
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <div className="min-w-0">
-                  <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full mr-2" style={{ backgroundColor: s.tipo === "premio" ? COLORS.goldSoft : COLORS.accentSoft, color: s.tipo === "premio" ? COLORS.gold : COLORS.accent, letterSpacing: "0.12em", ...fonte }}>
-                    {s.tipo === "premio" ? "Prêmio" : "Dinâmica"}
-                  </span>
-                  <span className="text-sm font-bold" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>{s.titulo}</span>
-                </div>
-                {ehAdmin && <button type="button" onClick={() => desfazer(s)} className="text-[11px] underline shrink-0" style={{ color: COLORS.slate }}>Desfazer</button>}
-              </div>
-              <ul className="space-y-1">
-                {(s.ganhadores || []).filter((g) => ehAdmin || g.status !== "ausente").map((g) => (
-                  <li key={g.id} className="flex items-center justify-between gap-2 text-sm" style={{ color: g.status === "ausente" ? COLORS.slate : COLORS.ink, textDecoration: g.status === "ausente" ? "line-through" : "none", ...fonte }}>
-                    <span className="min-w-0 break-words">🎉 {ehAdmin ? g.nome : nomeSorteio(g.nome)}{ehAdmin && g.turma ? ` · ${g.turma}` : ""}{g.status === "ausente" ? " (ausente)" : ""}</span>
-                    {ehAdmin && g.status !== "ausente" && (
-                      <button type="button" disabled={busy} onClick={() => marcarAusente(s, g)} className="shrink-0 text-[11px] px-2 py-1 rounded-lg disabled:opacity-50" style={{ backgroundColor: COLORS.chipSoft, color: COLORS.ink }}>Ausente · sortear outro</button>
-                    )}
-                  </li>
-                ))}
-              </ul>
-              <div className="text-[11px] mt-2" style={{ color: COLORS.slate, ...fonte }}>{new Date(s.criadoEm).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</div>
-            </li>
+        <div className="flex gap-1 p-1 rounded-xl mb-5" style={{ backgroundColor: COLORS.surfaceAlt }}>
+          {abas.map((a) => (
+            <button key={a.id} type="button" onClick={() => { setAba(a.id); setErro(""); }} className="flex-1 px-2 py-2 rounded-lg text-xs font-semibold"
+              style={{ backgroundColor: aba === a.id ? COLORS.accent : "transparent", color: aba === a.id ? "#fff" : COLORS.slate, ...fonte }}>{a.l}</button>
           ))}
-        </ul>
+        </div>
+      )}
+      {!ehAdmin || aba === "resultados" ? Resultados : aba === "sortear" ? Sortear : Duplicados}
+      {palco && <PalcoPremios palco={palco} fechar={() => setPalco(null)} ir={(p) => { setPalco(p); if (p.fase === "resultados") { /* abre resultados ao fechar */ } }} voltarResultados={() => setAba("resultados")} detalhe={detalhe} />}
+    </div>
+  );
+}
+
+// Tela cheia do sorteio acontecendo: nomes rodando, suspense e revelação com detalhes.
+function PalcoPremios({ palco, fechar, ir, voltarResultados, detalhe }) {
+  const [nomeRodando, setNomeRodando] = useState("");
+  const [reveladas, setReveladas] = useState([]);
+  const [fase, setFase] = useState("pronto"); // pronto | rolando | revelado | fim
+  const [idx, setIdx] = useState(0);
+  const [erro, setErro] = useState("");
+  const timer = React.useRef(null);
+  const total = palco.fila.length;
+  const atual = palco.fila[idx];
+
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  const rolar = () => {
+    setFase("rolando");
+    const t0 = Date.now();
+    const duracao = 4200;
+    const passo = () => {
+      const dec = (Date.now() - t0) / duracao;
+      if (dec >= 1) { setFase("revelado"); setReveladas((r) => [...r, atual]); return; }
+      setNomeRodando(palco.nomes[aleatorioSorteio(palco.nomes.length)]);
+      timer.current = setTimeout(passo, 55 + dec * dec * 380);
+    };
+    passo();
+  };
+
+  const proximo = async () => {
+    if (idx + 1 < total) { setIdx(idx + 1); setFase("pronto"); return; }
+    try { await palco.salvar(palco.fila); setFase("fim"); } catch (e) { setErro("Erro ao salvar o resultado: " + e.message); }
+  };
+
+  const cancelar = () => {
+    if (fase === "fim" || window.confirm("Cancelar o sorteio? Nada será salvo.")) { clearTimeout(timer.current); fechar(); if (fase === "fim") voltarResultados(); }
+  };
+
+  const f = { fontFamily: "'Inter', sans-serif" };
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center px-5 text-center" style={{ background: "radial-gradient(ellipse at 50% 30%, #1B2A5A 0%, #0B0F1C 70%)" }}>
+      <style>{`@keyframes palcoPop{0%{transform:scale(.4);opacity:0}70%{transform:scale(1.08);opacity:1}100%{transform:scale(1)}} @keyframes palcoPulse{0%,100%{opacity:.6}50%{opacity:1}}`}</style>
+      <button type="button" onClick={cancelar} className="absolute top-4 right-4 w-10 h-10 rounded-full text-xl" style={{ backgroundColor: "rgba(255,255,255,0.1)", color: "#fff" }}>×</button>
+      <div className="text-[11px] font-semibold uppercase mb-2" style={{ color: COLORS.gold, letterSpacing: "0.22em", ...f }}>
+        {palco.tipo === "premio" ? "🎁 Sorteio de prêmio" : "🎯 Dinâmica"}{total > 1 ? ` · ${Math.min(idx + 1, total)} de ${total}` : ""}
+      </div>
+      <div className="text-2xl sm:text-3xl font-extrabold mb-8 max-w-md" style={{ color: "#fff", fontFamily: "'Sora', sans-serif" }}>{palco.titulo}</div>
+
+      {fase === "pronto" && (
+        <button type="button" onClick={rolar} className="px-8 py-5 rounded-2xl text-xl font-extrabold" style={{ backgroundColor: COLORS.accent, color: "#fff", ...f }}>
+          {idx === 0 ? "🎲 Sortear!" : "🎲 Sortear o próximo"}
+        </button>
+      )}
+
+      {fase === "rolando" && (
+        <div>
+          <div className="text-xs uppercase mb-3" style={{ color: COLORS.slate, letterSpacing: "0.3em", animation: "palcoPulse 0.8s infinite", ...f }}>sorteando</div>
+          <div className="text-3xl sm:text-5xl font-extrabold break-words max-w-lg" style={{ color: COLORS.gold, fontFamily: "'Sora', sans-serif" }}>{nomeRodando}</div>
+        </div>
+      )}
+
+      {(fase === "revelado" || fase === "fim") && (
+        <div style={{ animation: "palcoPop .7s ease-out both" }} className="max-w-lg w-full">
+          {(fase === "fim" ? palco.fila : [atual]).map((g) => (
+            <div key={g.id} className="rounded-3xl px-6 py-7 mb-3" style={{ background: "linear-gradient(135deg, rgba(255,107,53,0.28), rgba(242,183,5,0.22))", border: `2px solid ${COLORS.gold}` }}>
+              <div className="text-4xl mb-1">🎉</div>
+              <div className="text-3xl sm:text-4xl font-extrabold break-words" style={{ color: "#fff", fontFamily: "'Sora', sans-serif" }}>{g.nome}</div>
+              <div className="text-sm mt-2" style={{ color: COLORS.gold, ...f }}>{detalhe(g)}</div>
+            </div>
+          ))}
+          {fase === "revelado" && (
+            <button type="button" onClick={proximo} className="mt-4 px-7 py-3.5 rounded-xl text-base font-bold" style={{ backgroundColor: COLORS.accent, color: "#fff", ...f }}>
+              {idx + 1 < total ? "Sortear o próximo" : "Concluir e salvar"}
+            </button>
+          )}
+          {fase === "fim" && (
+            <button type="button" onClick={cancelar} className="mt-4 px-7 py-3.5 rounded-xl text-base font-bold" style={{ backgroundColor: COLORS.accent, color: "#fff", ...f }}>Fechar</button>
+          )}
+          {erro && <div className="text-sm mt-3" style={{ color: COLORS.accent, ...f }}>{erro}</div>}
+        </div>
       )}
     </div>
   );
