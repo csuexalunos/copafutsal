@@ -1581,6 +1581,49 @@ function BlocoParceiros() {
   );
 }
 
+// Prestador de serviço (recuperação esportiva). Se tiver Instagram, preencher MOVEX_URL.
+const MOVEX_URL = "";
+function FaixaPrestadorMoveX() {
+  const conteudo = (
+    <>
+      <img
+        src={`${import.meta.env.BASE_URL}parceiros/movex-recovery.png`}
+        alt="MoveX Recovery"
+        loading="lazy"
+        className="h-12 w-12 shrink-0 rounded-full my-1 ml-1"
+      />
+      <span className="flex-1 min-w-0">
+        <span
+          className="block text-[10px] font-semibold uppercase"
+          style={{ color: COLORS.gold, fontFamily: "'Inter', sans-serif", letterSpacing: "0.2em" }}
+        >
+          Prestador de serviço
+        </span>
+        <span className="block text-xs truncate" style={{ color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}>
+          MoveX Recovery · recuperação esportiva
+        </span>
+      </span>
+      {MOVEX_URL && <ArrowRight size={14} color={COLORS.gold} className="shrink-0" />}
+    </>
+  );
+  const estilo = { backgroundColor: "#05060F", border: `1px solid ${COLORS.border}` };
+  const cls = "mt-3 flex items-center gap-3 rounded-xl pr-3 overflow-hidden";
+  return MOVEX_URL ? (
+    <a
+      href={MOVEX_URL}
+      target="_blank"
+      rel="noreferrer"
+      onClick={() => registrarEvento("clique", "prestador_movex").catch((e) => console.error("Falha ao registrar clique", e))}
+      className={cls}
+      style={estilo}
+    >
+      {conteudo}
+    </a>
+  ) : (
+    <div className={cls} style={estilo}>{conteudo}</div>
+  );
+}
+
 // Faixa pequena da transmissão (GV Produções) com link do canal.
 function FaixaTransmissaoGV() {
   return (
@@ -1823,6 +1866,7 @@ function Home({ teams, matches, setTab, config, totalPessoas }) {
 
       <div className="mt-10">
         <BlocoParceiros />
+        <FaixaPrestadorMoveX />
       </div>
     </div>
   );
