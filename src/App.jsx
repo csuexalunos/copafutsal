@@ -39,6 +39,7 @@ import {
   Clock,
   Upload,
   Bell,
+  Instagram,
 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import {
@@ -1657,6 +1658,31 @@ function FaixaTransmissaoGV() {
   );
 }
 
+const INSTAGRAM_COPA_URL = "https://www.instagram.com/copaexalunoscsu?vrfl=MXVoc3NncW91ank1bQ==";
+function FaixaInstagramCopa() {
+  return (
+    <a
+      href={INSTAGRAM_COPA_URL}
+      target="_blank"
+      rel="noreferrer"
+      onClick={() => registrarEvento("clique", "instagram_copa").catch((e) => console.error("Falha ao registrar clique", e))}
+      className="mb-6 flex items-center gap-3 rounded-xl px-4 py-3"
+      style={{ background: "linear-gradient(90deg, rgba(255,107,53,0.18), rgba(242,183,5,0.12))", border: `1px solid ${COLORS.border}` }}
+    >
+      <Instagram size={22} color={COLORS.accent} className="shrink-0" />
+      <span className="flex-1 min-w-0">
+        <span className="block text-sm font-semibold" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+          Siga a Copa no Instagram
+        </span>
+        <span className="block text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+          @copaexalunoscsu · fotos, resultados e novidades
+        </span>
+      </span>
+      <ArrowRight size={14} color={COLORS.gold} className="shrink-0" />
+    </a>
+  );
+}
+
 // Programação da Copa: o que acontece em cada dia (Home). Horários vêm do config.
 function ProgramacaoCopa({ config }) {
   const h = horariosDoConfig(config);
@@ -1852,6 +1878,8 @@ function Home({ teams, matches, setTab, config, totalPessoas }) {
       <FaixaTransmissaoGV />
 
       <ProgramacaoCopa config={config} />
+
+      <FaixaInstagramCopa />
 
       <div className="flex flex-wrap gap-x-6 gap-y-1 mb-8">
         {stats.map((s) => (
@@ -10404,8 +10432,8 @@ function CompletarPerfil({ sessao, onCompleted }) {
     e.preventDefault();
     setError("");
     const ehJogador = form.tipo === "jogador";
-    if (!form.nome.trim() || (ehJogador && (!form.whatsapp.trim() || !form.nascimento || !form.turma))) {
-      setError("Preencha todos os campos" + (ehJogador ? " (inclusive a turma)." : "."));
+    if (!form.nome.trim() || !form.turma || (ehJogador && (!form.whatsapp.trim() || !form.nascimento))) {
+      setError("Preencha todos os campos (inclusive a turma).");
       return;
     }
     setSaving(true);
@@ -10414,7 +10442,8 @@ function CompletarPerfil({ sessao, onCompleted }) {
         email: sessao.email,
         nome: form.nome.trim(),
         tipo: form.tipo,
-        turma: form.tipo === "jogador" ? form.turma : "",
+        turma: ehJogador ? form.turma : "",
+        torce_turma: ehJogador ? null : form.turma,
         whatsapp: ehJogador ? form.whatsapp.trim() : null,
         nascimento: ehJogador ? form.nascimento : null,
         status: "pendente",
@@ -10483,10 +10512,10 @@ function CompletarPerfil({ sessao, onCompleted }) {
             </div>
           </div>
 
-          {form.tipo === "jogador" && (
+          {(
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-                Turma
+                {form.tipo === "torcedor" ? "Para qual turma você torce?" : "Turma"}
               </label>
               <select
                 value={turmaCustomizada ? "outra" : form.turma}
@@ -10587,9 +10616,10 @@ function Cadastro({ onVoltar }) {
       !form.nome.trim() ||
       !form.email.trim() ||
       !form.senha.trim() ||
-      (ehJogador && (!form.whatsapp.trim() || !form.nascimento || !form.turma))
+      !form.turma ||
+      (ehJogador && (!form.whatsapp.trim() || !form.nascimento))
     ) {
-      setError("Preencha todos os campos" + (form.tipo === "jogador" ? " (inclusive a turma)." : "."));
+      setError("Preencha todos os campos (inclusive a turma).");
       return;
     }
     if (form.senha.trim().length < 6) {
@@ -10604,13 +10634,14 @@ function Cadastro({ onVoltar }) {
           email: form.email.trim(),
           nome: form.nome.trim(),
           tipo: form.tipo,
-          turma: form.tipo === "jogador" ? form.turma : "",
+          turma: ehJogador ? form.turma : "",
+          torce_turma: ehJogador ? null : form.turma,
           whatsapp: ehJogador ? form.whatsapp.trim() : null,
           nascimento: ehJogador ? form.nascimento : null,
           status: "pendente",
         });
         enviarBoasVindas();
-        avisarOrg("perfil", "👤 Novo cadastro no app", `${form.nome.trim()} (${form.tipo}${form.tipo === "jogador" && form.turma ? ` · ${form.turma}` : ""})`);
+        avisarOrg("perfil", "👤 Novo cadastro no app", `${form.nome.trim()} (${form.tipo}${form.turma ? ` · ${form.tipo === "torcedor" ? "torce " : ""}${form.turma}` : ""})`);
       }
       setSaving(false);
       setSent(true);
@@ -10680,10 +10711,10 @@ function Cadastro({ onVoltar }) {
           </div>
         </div>
 
-        {form.tipo === "jogador" && (
+        {(
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-              Turma
+              {form.tipo === "torcedor" ? "Para qual turma você torce?" : "Turma"}
             </label>
             <select
               value={turmaCustomizada ? "outra" : form.turma}
@@ -14173,8 +14204,8 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
                       )}
                     </div>
                     <div className="text-xs break-words" style={{ color: COLORS.slate }}>
-                      {p.tipo === "jogador" ? "jogador" : "torcedor"} · turma{" "}
-                      <strong>{p.turma || turmaEdicao[p.id] || "não definida"}</strong> · {p.email} ·{" "}
+                      {p.tipo === "jogador" ? "jogador" : "torcedor"} · {p.tipo === "torcedor" && p.torce_turma ? "torce pela turma" : "turma"}{" "}
+                      <strong>{(p.tipo === "torcedor" && p.torce_turma) || p.turma || turmaEdicao[p.id] || "não definida"}</strong> · {p.email} ·{" "}
                       {p.status === "recusado" ? "recusado" : "pendente"}
                       {p.criado_em && ` · cadastrado em ${new Date(p.criado_em).toLocaleDateString("pt-BR")}`}
                     </div>

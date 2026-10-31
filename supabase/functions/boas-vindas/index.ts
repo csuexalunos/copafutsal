@@ -18,8 +18,8 @@ const REMETENTE_NOME = Deno.env.get("REMETENTE_NOME") || "Copa de Ex-Alunos de F
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 
 // ---- Ajuste aqui se precisar ---------------------------------------
-const INSTAGRAM_COPA_URL = Deno.env.get("INSTAGRAM_COPA_URL") || "https://www.instagram.com/csuexalunos";
-const INSTAGRAM_COPA_NOME = Deno.env.get("INSTAGRAM_COPA_NOME") || "@csuexalunos";
+const INSTAGRAM_COPA_URL = Deno.env.get("INSTAGRAM_COPA_URL") || "https://www.instagram.com/copaexalunoscsu?vrfl=MXVoc3NncW91ank1bQ==";
+const INSTAGRAM_COPA_NOME = Deno.env.get("INSTAGRAM_COPA_NOME") || "@copaexalunoscsu";
 const APP_URL = "https://csuexalunos.github.io/copafutsal/";
 const DATA_CORTE = "2026-10-30T00:00:00Z";
 // ---------------------------------------------------------------------

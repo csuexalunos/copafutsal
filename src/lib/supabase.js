@@ -80,7 +80,12 @@ export async function definirNovaSenha(novaSenha) {
 }
 
 export async function criarPerfil(userId, perfil) {
-  const { error } = await supabase.from("profiles").insert({ id: userId, ...perfil });
+  let { error } = await supabase.from("profiles").insert({ id: userId, ...perfil });
+  // Se a coluna "torce_turma" ainda não foi criada no Supabase, salva sem ela (o cadastro não pode falhar).
+  if (error && /torce_turma/i.test(error.message || "") && "torce_turma" in perfil) {
+    const { torce_turma, ...semTorce } = perfil;
+    ({ error } = await supabase.from("profiles").insert({ id: userId, ...semTorce }));
+  }
   if (error) throw error;
 }
 
