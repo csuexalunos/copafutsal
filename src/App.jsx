@@ -45,7 +45,7 @@ import {
 import { jsPDF } from "jspdf";
 import {
   readKey, writeKey, cadastrarConta, entrarConta, sairConta, sessaoAtual, aoMudarSessao,
-  criarPerfil, enviarBoasVindas, buscarPerfil, listarPerfis, atualizarPerfil, atualizarPerfilConfirmado, souAdmin, listarAdmins,
+  criarPerfil, cadastroDuplicado, enviarBoasVindas, buscarPerfil, listarPerfis, atualizarPerfil, atualizarPerfilConfirmado, souAdmin, listarAdmins,
   promoverParaAdmin, removerAdmin, subirArquivo, urlAssinada, contarPessoasInscritas, buscarCpfsDaTurma,
   registrarAcesso, contarAcessos, registrarEvento as registrarEventoBruto, buscarMetricasDetalhadas, esqueciSenha, definirNovaSenha, supabase,
   buscarCpfsDoTime, salvarCpfJogador, salvarCpfsEmLote, excluirCpfsDoJogador, buscarAtletas, salvarAtletas, readStamp, subirEscudo, cpfsEmOutrosTimes, sincronizarBancoAtletas,
@@ -10439,6 +10439,11 @@ function CompletarPerfil({ sessao, onCompleted }) {
     }
     setSaving(true);
     try {
+      if (await cadastroDuplicado(form.nome.trim(), ehJogador ? form.whatsapp.trim() : "")) {
+        setSaving(false);
+        setError("Já existe um cadastro com esse nome ou WhatsApp. Se é você, volte e entre com seu e-mail e senha (use \"Esqueci a senha\" se precisar).");
+        return;
+      }
       await criarPerfil(sessao.id, {
         email: sessao.email,
         nome: form.nome.trim(),
@@ -10629,6 +10634,11 @@ function Cadastro({ onVoltar }) {
     }
     setSaving(true);
     try {
+      if (await cadastroDuplicado(form.nome.trim(), ehJogador ? form.whatsapp.trim() : "")) {
+        setSaving(false);
+        setError("Já existe um cadastro com esse nome ou WhatsApp. Se é você, volte e entre com seu e-mail e senha (use \"Esqueci a senha\" se precisar).");
+        return;
+      }
       const user = await cadastrarConta(form.email.trim(), form.senha.trim());
       if (user) {
         await criarPerfil(user.id, {

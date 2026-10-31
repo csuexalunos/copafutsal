@@ -42,7 +42,24 @@ export async function writeKey(key, value) {
 export async function cadastrarConta(email, senha) {
   const { data, error } = await supabase.auth.signUp({ email, password: senha });
   if (error) throw error;
+  // Com confirmação de e-mail ligada, o Supabase não dá erro pra e-mail já usado:
+  // devolve um usuário "fantasma" sem identidades. Tratamos como cadastro repetido.
+  if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+    throw new Error("User already registered");
+  }
   return data.user;
+}
+
+// Pergunta ao banco se já existe cadastro com o mesmo nome completo ou WhatsApp.
+// Se a função ainda não foi criada no Supabase, não bloqueia o cadastro.
+export async function cadastroDuplicado(nome, whatsapp) {
+  try {
+    const { data, error } = await supabase.rpc("perfil_duplicado", { p_nome: nome || "", p_whatsapp: whatsapp || "" });
+    if (error) return false;
+    return data === true;
+  } catch (e) {
+    return false;
+  }
 }
 
 export async function entrarConta(email, senha) {
