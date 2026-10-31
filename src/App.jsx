@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   Radio,
   Dices,
+  Gift,
   Download,
   MapPin,
   ChevronUp,
@@ -14959,6 +14960,289 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
 }
 
 // ---------------------------------------------------------------------------
+// TAB: Sorteios — prêmios (vouchers dos parceiros) e dinâmicas (quem participa
+// de uma brincadeira). Todo mundo cadastrado no app participa; cadastro duplo
+// conta uma vez só; quem ganha um prêmio não entra mais em nenhum sorteio.
+// O sorteio é feito por um admin; o público só vê o resultado.
+// ---------------------------------------------------------------------------
+const SUGESTOES_SORTEIO = [
+  { tipo: "premio", titulo: "Voucher Pajú · R$ 40" },
+  { tipo: "premio", titulo: "Voucher Papa Fritas · R$ 50" },
+  { tipo: "premio", titulo: "Voucher Hype · Pizza Big" },
+  { tipo: "premio", titulo: "Voucher Seu Buteco · Feijoada + acompanhante" },
+  { tipo: "premio", titulo: "Voucher Casa de Mãinha · Você + acompanhante" },
+  { tipo: "dinamica", titulo: "Desafio do Travessão" },
+];
+
+function normalizarNomeSorteio(s) {
+  return (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+}
+function nomeSorteio(nome) {
+  const p = (nome || "").trim().split(/\s+/);
+  if (p.length === 0 || !p[0]) return "Participante";
+  return p.length === 1 ? p[0] : `${p[0]} ${p[p.length - 1][0].toUpperCase()}.`;
+}
+function aleatorioSorteio(n) {
+  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+    const a = new Uint32Array(1);
+    crypto.getRandomValues(a);
+    return a[0] % n;
+  }
+  return Math.floor(Math.random() * n);
+}
+
+// Agrupa cadastros da mesma pessoa (mesmo nome, e-mail ou WhatsApp). Em cada
+// grupo, mantém 1 (preferindo jogador com turma e, depois, o mais antigo).
+function agruparDuplicadosSorteio(perfis) {
+  const lista = (perfis || []).filter((p) => p.status !== "recusado");
+  const pai = new Map(lista.map((p) => [p.id, p.id]));
+  const achar = (x) => { while (pai.get(x) !== x) { pai.set(x, pai.get(pai.get(x))); x = pai.get(x); } return x; };
+  const unir = (a, b) => { const ra = achar(a), rb = achar(b); if (ra !== rb) pai.set(ra, rb); };
+  const vistos = {};
+  const registrar = (chave, id) => { if (!chave) return; if (vistos[chave]) unir(vistos[chave], id); else vistos[chave] = id; };
+  lista.forEach((p) => {
+    const nome = normalizarNomeSorteio(p.nome);
+    if (nome.split(" ").length >= 2) registrar("n:" + nome, p.id);
+    registrar("e:" + (p.email || "").trim().toLowerCase(), p.id);
+    const w = (p.whatsapp || "").replace(/\D/g, "");
+    if (w.length >= 8) registrar("w:" + w.slice(-8), p.id);
+  });
+  const grupos = {};
+  lista.forEach((p) => { const r = achar(p.id); (grupos[r] = grupos[r] || []).push(p); });
+  return Object.values(grupos).map((membros) => {
+    const ordenados = [...membros].sort((a, b) => {
+      const sa = a.tipo === "jogador" && a.turma ? 0 : 1, sb = b.tipo === "jogador" && b.turma ? 0 : 1;
+      if (sa !== sb) return sa - sb;
+      return new Date(a.criado_em || 0) - new Date(b.criado_em || 0);
+    });
+    return { manter: ordenados[0], extras: ordenados.slice(1) };
+  });
+}
+
+function SorteiosCopa({ premios, savePremios, sessao, perfis, setPerfis, totalPessoas }) {
+  const ehAdmin = sessao && sessao.tipo === "admin";
+  const lista = (premios && premios.sorteios) || [];
+  const [tipo, setTipo] = useState("premio");
+  const [titulo, setTitulo] = useState("");
+  const [qtd, setQtd] = useState(1);
+  const [incluirOrg, setIncluirOrg] = useState(false);
+  const [admins, setAdmins] = useState([]);
+  const [rolando, setRolando] = useState(null); // nome que "passa" na tela durante o sorteio
+  const [erro, setErro] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!ehAdmin) return;
+    listarAdmins().then((a) => setAdmins(a || [])).catch(() => {});
+  }, [ehAdmin]);
+
+  const grupos = useMemo(() => agruparDuplicadosSorteio(perfis), [perfis]);
+  const duplicadosAChecar = grupos.filter((g) => g.extras.length > 0);
+  const emailsOrg = useMemo(() => new Set((admins || []).map((a) => (a.email || "").trim().toLowerCase())), [admins]);
+
+  // Pessoas (já sem duplicatas) que já ganharam algum prêmio: nunca mais entram.
+  const ganhadoresPremio = useMemo(() => {
+    const ids = new Set();
+    lista.forEach((s) => s.tipo === "premio" && (s.ganhadores || []).forEach((g) => g.status !== "ausente" && ids.add(g.id)));
+    return ids;
+  }, [lista]);
+
+  const elegiveis = (sorteioAtual, extraExcluir = []) => {
+    const jaNesta = new Set((sorteioAtual ? sorteioAtual.ganhadores || [] : []).map((g) => g.id));
+    const jaDinamica = new Set();
+    if (tipo === "dinamica" || (sorteioAtual && sorteioAtual.tipo === "dinamica")) {
+      const alvo = normalizarNomeSorteio(sorteioAtual ? sorteioAtual.titulo : titulo);
+      lista.forEach((s) => s.tipo === "dinamica" && normalizarNomeSorteio(s.titulo) === alvo && (s.ganhadores || []).forEach((g) => jaDinamica.add(g.id)));
+    }
+    return grupos
+      .filter((g) => {
+        const ids = [g.manter, ...g.extras].map((p) => p.id);
+        if (ids.some((id) => ganhadoresPremio.has(id) || jaNesta.has(id) || jaDinamica.has(id) || extraExcluir.includes(id))) return false;
+        if (!incluirOrg && [g.manter, ...g.extras].some((p) => emailsOrg.has((p.email || "").trim().toLowerCase()))) return false;
+        return true;
+      })
+      .map((g) => g.manter);
+  };
+
+  const girar = (pool, ms = 3000) =>
+    new Promise((resolve) => {
+      const t0 = Date.now();
+      const id = setInterval(() => {
+        setRolando(nomeSorteio(pool[aleatorioSorteio(pool.length)].nome));
+        if (Date.now() - t0 > ms) { clearInterval(id); setRolando(null); resolve(); }
+      }, 80);
+    });
+
+  const sortear = async () => {
+    setErro("");
+    const t = titulo.trim();
+    if (!t) { setErro("Dê um nome ao sorteio (ex.: Voucher Pajú · R$ 40)."); return; }
+    const pool = elegiveis(null);
+    const n = Math.max(1, Math.min(Number(qtd) || 1, pool.length));
+    if (pool.length === 0) { setErro("Não há ninguém elegível para este sorteio."); return; }
+    setBusy(true);
+    await girar(pool);
+    const restante = [...pool];
+    const sorteados = [];
+    for (let i = 0; i < n; i++) {
+      const k = aleatorioSorteio(restante.length);
+      const p = restante.splice(k, 1)[0];
+      sorteados.push({ id: p.id, nome: p.nome, tipo: p.tipo, turma: p.turma || p.torce_turma || "", email: p.email || "", status: "ativo" });
+    }
+    const novo = { id: Date.now().toString(36), tipo, titulo: t, criadoEm: new Date().toISOString(), ganhadores: sorteados };
+    try {
+      await savePremios((atual) => ({ ...(atual || {}), sorteios: [novo, ...(((atual || {}).sorteios) || [])] }));
+      setTitulo("");
+    } catch (e) { setErro("Erro ao salvar o sorteio: " + e.message); }
+    setBusy(false);
+  };
+
+  const marcarAusente = async (s, g) => {
+    setErro("");
+    const pool = elegiveis(s, (s.ganhadores || []).map((x) => x.id));
+    if (pool.length === 0) { setErro("Não há mais ninguém elegível para substituir."); return; }
+    setBusy(true);
+    await girar(pool, 2000);
+    const p = pool[aleatorioSorteio(pool.length)];
+    const sub = { id: p.id, nome: p.nome, tipo: p.tipo, turma: p.turma || p.torce_turma || "", email: p.email || "", status: "ativo" };
+    try {
+      await savePremios((atual) => ({
+        ...(atual || {}),
+        sorteios: ((atual || {}).sorteios || []).map((x) =>
+          x.id !== s.id ? x : { ...x, ganhadores: [...(x.ganhadores || []).map((y) => (y.id === g.id ? { ...y, status: "ausente" } : y)), sub] }
+        ),
+      }));
+    } catch (e) { setErro("Erro ao salvar: " + e.message); }
+    setBusy(false);
+  };
+
+  const desfazer = async (s) => {
+    if (!window.confirm(`Desfazer o sorteio "${s.titulo}"? Os sorteados voltam a poder participar.`)) return;
+    try {
+      await savePremios((atual) => ({ ...(atual || {}), sorteios: ((atual || {}).sorteios || []).filter((x) => x.id !== s.id) }));
+    } catch (e) { setErro("Erro ao desfazer: " + e.message); }
+  };
+
+  const cancelarDuplicado = async (p) => {
+    if (!window.confirm(`Cancelar o cadastro duplicado de ${p.nome} (${p.email})? Ele sai dos sorteios.`)) return;
+    try {
+      await atualizarPerfil(p.id, { status: "recusado" });
+      setPerfis && setPerfis((atual) => (atual || []).map((x) => (x.id === p.id ? { ...x, status: "recusado" } : x)));
+    } catch (e) { setErro("Erro ao cancelar: " + e.message); }
+  };
+
+  const cardStyle = { backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` };
+  const fonte = { fontFamily: "'Inter', sans-serif" };
+  const poolAtual = ehAdmin ? elegiveis(null) : [];
+
+  return (
+    <div>
+      <SectionLabel eyebrow="Prêmios e dinâmicas" title="Sorteios" />
+      <p className="text-sm mb-6 max-w-xl" style={{ color: COLORS.slate, ...fonte }}>
+        Todo mundo que se cadastrou no app participa dos sorteios da Copa
+        {totalPessoas ? ` (${totalPessoas} pessoas)` : ""}. Quem ganha um prêmio não concorre mais aos próximos.
+      </p>
+
+      {rolando && (
+        <div className="rounded-2xl px-5 py-8 mb-6 text-center" style={{ background: "linear-gradient(135deg, rgba(255,107,53,0.25), rgba(242,183,5,0.2))", border: `1px solid ${COLORS.accent}` }}>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.2em] mb-2" style={{ color: COLORS.gold, ...fonte }}>Sorteando...</div>
+          <div className="text-3xl font-extrabold" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>{rolando}</div>
+        </div>
+      )}
+
+      {ehAdmin && (
+        <div className="rounded-2xl p-4 mb-6" style={cardStyle}>
+          <div className="text-xs font-semibold uppercase mb-3" style={{ color: COLORS.slate, letterSpacing: "0.18em", ...fonte }}>Novo sorteio (organização)</div>
+          <div className="flex gap-2 mb-3">
+            {[{ v: "premio", l: "Prêmio" }, { v: "dinamica", l: "Dinâmica" }].map((o) => (
+              <button key={o.v} type="button" onClick={() => setTipo(o.v)} className="flex-1 px-4 py-2 rounded-xl text-sm font-medium"
+                style={{ backgroundColor: tipo === o.v ? COLORS.accent : COLORS.surfaceAlt, color: tipo === o.v ? "#fff" : COLORS.ink, border: `1.5px solid ${tipo === o.v ? COLORS.accent : COLORS.border}`, ...fonte }}>
+                {o.l}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {SUGESTOES_SORTEIO.filter((s) => s.tipo === tipo).map((s) => (
+              <button key={s.titulo} type="button" onClick={() => setTitulo(s.titulo)} className="text-[11px] px-2.5 py-1 rounded-full"
+                style={{ backgroundColor: COLORS.chipSoft, color: COLORS.ink, border: `1px solid ${COLORS.border}`, ...fonte }}>{s.titulo}</button>
+            ))}
+          </div>
+          <input type="text" value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder={tipo === "premio" ? "Qual é o prêmio?" : "Qual é a dinâmica?"}
+            className="w-full px-4 py-2.5 rounded-xl outline-none text-sm mb-3" style={{ backgroundColor: COLORS.surfaceAlt, border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, ...fonte }} />
+          <div className="flex items-center gap-3 mb-3">
+            <label className="text-xs" style={{ color: COLORS.slate, ...fonte }}>Quantos sorteados?</label>
+            <input type="number" min={1} max={50} value={qtd} onChange={(e) => setQtd(e.target.value)} className="w-20 px-3 py-2 rounded-xl outline-none text-sm"
+              style={{ backgroundColor: COLORS.surfaceAlt, border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, ...fonte }} />
+          </div>
+          <label className="flex items-center gap-2 text-xs mb-3" style={{ color: COLORS.slate, ...fonte }}>
+            <input type="checkbox" checked={incluirOrg} onChange={(e) => setIncluirOrg(e.target.checked)} /> Incluir a organização (admins) no sorteio
+          </label>
+          <div className="text-xs mb-3" style={{ color: COLORS.slate, ...fonte }}>
+            Elegíveis agora: <strong style={{ color: COLORS.ink }}>{poolAtual.length}</strong> · já ganharam prêmio: {ganhadoresPremio.size} · duplicados ignorados: {grupos.reduce((n, g) => n + g.extras.length, 0)}
+          </div>
+          {erro && <div className="text-sm mb-3" style={{ color: COLORS.accent, ...fonte }}>{erro}</div>}
+          <button type="button" onClick={sortear} disabled={busy} className="w-full px-5 py-3 rounded-xl font-semibold text-sm inline-flex items-center justify-center gap-2 disabled:opacity-60"
+            style={{ backgroundColor: COLORS.accent, color: "#fff", ...fonte }}>
+            {busy && <Loader2 size={16} className="animate-spin" />} <Dices size={16} /> Sortear
+          </button>
+        </div>
+      )}
+
+      {ehAdmin && duplicadosAChecar.length > 0 && (
+        <div className="rounded-2xl p-4 mb-6" style={{ ...cardStyle, borderColor: COLORS.gold }}>
+          <div className="text-xs font-semibold uppercase mb-1" style={{ color: COLORS.gold, letterSpacing: "0.18em", ...fonte }}>Cadastros duplicados ({duplicadosAChecar.length})</div>
+          <p className="text-xs mb-3" style={{ color: COLORS.slate, ...fonte }}>Mesmo nome, e-mail ou WhatsApp. Já contam uma vez só nos sorteios. Confirme e cancele o login extra:</p>
+          <ul className="space-y-3">
+            {duplicadosAChecar.map((g) => (
+              <li key={g.manter.id} className="text-xs" style={{ color: COLORS.ink, ...fonte }}>
+                <div><strong>{g.manter.nome}</strong> · {g.manter.email} <span style={{ color: "#4ADE80" }}>(fica)</span></div>
+                {g.extras.map((p) => (
+                  <div key={p.id} className="flex items-center justify-between gap-2 mt-1 pl-3">
+                    <span className="min-w-0 break-words">{p.nome} · {p.email}</span>
+                    <button type="button" onClick={() => cancelarDuplicado(p)} className="shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-semibold" style={{ backgroundColor: COLORS.accentSoft, color: COLORS.accent }}>Cancelar este</button>
+                  </div>
+                ))}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {lista.length === 0 ? (
+        <div className="text-sm" style={{ color: COLORS.slate, ...fonte }}>Os sorteios da Copa vão aparecer aqui.</div>
+      ) : (
+        <ul className="space-y-3">
+          {lista.map((s) => (
+            <li key={s.id} className="rounded-2xl p-4" style={cardStyle}>
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div className="min-w-0">
+                  <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full mr-2" style={{ backgroundColor: s.tipo === "premio" ? COLORS.goldSoft : COLORS.accentSoft, color: s.tipo === "premio" ? COLORS.gold : COLORS.accent, letterSpacing: "0.12em", ...fonte }}>
+                    {s.tipo === "premio" ? "Prêmio" : "Dinâmica"}
+                  </span>
+                  <span className="text-sm font-bold" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>{s.titulo}</span>
+                </div>
+                {ehAdmin && <button type="button" onClick={() => desfazer(s)} className="text-[11px] underline shrink-0" style={{ color: COLORS.slate }}>Desfazer</button>}
+              </div>
+              <ul className="space-y-1">
+                {(s.ganhadores || []).filter((g) => ehAdmin || g.status !== "ausente").map((g) => (
+                  <li key={g.id} className="flex items-center justify-between gap-2 text-sm" style={{ color: g.status === "ausente" ? COLORS.slate : COLORS.ink, textDecoration: g.status === "ausente" ? "line-through" : "none", ...fonte }}>
+                    <span className="min-w-0 break-words">🎉 {ehAdmin ? g.nome : nomeSorteio(g.nome)}{ehAdmin && g.turma ? ` · ${g.turma}` : ""}{g.status === "ausente" ? " (ausente)" : ""}</span>
+                    {ehAdmin && g.status !== "ausente" && (
+                      <button type="button" disabled={busy} onClick={() => marcarAusente(s, g)} className="shrink-0 text-[11px] px-2 py-1 rounded-lg disabled:opacity-50" style={{ backgroundColor: COLORS.chipSoft, color: COLORS.ink }}>Ausente · sortear outro</button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <div className="text-[11px] mt-2" style={{ color: COLORS.slate, ...fonte }}>{new Date(s.criadoEm).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // APP
 // ---------------------------------------------------------------------------
 const TABS = [
@@ -14967,6 +15251,7 @@ const TABS = [
   { id: "sorteio", label: "Sorteio", icon: Dices },
   { id: "chaveamento", label: "Jogos ao Vivo", icon: Swords },
   { id: "classificacao", label: "Classificação", icon: ListOrdered },
+  { id: "sorteios", label: "Sorteios", icon: Gift },
   { id: "comunidade", label: "Fotos e Vídeos", icon: Camera },
   { id: "galeria", label: "Galeria", icon: Award },
   { id: "organizacao", label: "Organização", icon: ShieldCheck },
@@ -15054,6 +15339,7 @@ export default function App() {
   const [config, saveConfig, loadingConfig] = useSharedStorage("copasu:config", {}, 30000);
   prazoEdicaoAtual = parseDataConfig(config && config.prazoEdicaoTimes, PRAZO_EDICAO_DETALHES);
   const [avaliacoes, saveAvaliacoes, loadingAvaliacoes] = useSharedStorage("copasu:avaliacoes", [], 30000);
+  const [premios, savePremios] = useSharedStorage("copasu:premios", { sorteios: [] }, 20000);
   const [escudosCustom, saveEscudosCustom] = useSharedStorage("copasu:escudos_custom", {}, 60000);
 
   // ESCUDOS_TIMES é lido em vários componentes espalhados pelo app — em
@@ -15381,6 +15667,7 @@ export default function App() {
               <Chaveamento matches={matches} teams={teams} sessao={sessao} saveMatches={saveMatches} config={config} />
             )}
             {tab === "classificacao" && <Classificacao matches={matches} teams={teamsInscritos} />}
+            {tab === "sorteios" && <SorteiosCopa premios={premios} savePremios={savePremios} sessao={sessao} perfis={perfis} setPerfis={setPerfis} totalPessoas={totalPessoas} />}
             {tab === "comunidade" && <Comunidade posts={posts} savePosts={savePosts} sessao={sessao} />}
             {tab === "galeria" && <Galeria config={config} />}
             {tab === "organizacao" && (
