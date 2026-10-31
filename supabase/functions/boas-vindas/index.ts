@@ -93,11 +93,13 @@ function montarHtml(nome: string) {
 <tr><td style="padding:22px 28px 0"><div style="font:800 13px Arial,sans-serif;letter-spacing:3px;color:#8A93A6">PARCEIROS OFICIAIS</div>
 <div style="margin:10px -4px 0">${parcHtml}</div></td></tr>
 <tr><td style="padding:20px 28px 0"><div style="font:800 13px Arial,sans-serif;letter-spacing:3px;color:#8A93A6">FISIOTERAPIA</div>
-<a href="${MOVEX_URL}" style="text-decoration:none;display:inline-block;margin-top:10px"><img src="${IMG}p-movex.png" width="84" height="84" alt="MoveX Recovery" style="border-radius:14px;display:block;float:left"></a>
-<div style="font:14px/1.5 Arial,sans-serif;color:#3A4358;margin:10px 0 0 100px">MoveX Recovery cuida da recuperação dos atletas durante a Copa.</div><div style="clear:both"></div></td></tr>
+<table cellpadding="0" cellspacing="0" style="margin-top:10px"><tr>
+<td width="84" valign="middle"><a href="${MOVEX_URL}"><img src="${IMG}p-movex.png" width="84" height="84" alt="MoveX Recovery" style="border-radius:14px;display:block"></a></td>
+<td valign="middle" style="padding-left:16px;font:14px/1.5 Arial,sans-serif;color:#3A4358">MoveX Recovery cuida da recuperação dos atletas durante a Copa. <a href="${MOVEX_URL}" style="color:#E8630A">Ver no Instagram</a>.</td></tr></table></td></tr>
 <tr><td style="padding:20px 28px 0"><div style="font:800 13px Arial,sans-serif;letter-spacing:3px;color:#8A93A6">TRANSMISSÃO</div>
-<a href="${GV_URL}" style="text-decoration:none;display:inline-block;margin-top:10px"><img src="${IMG}p-gv.png" width="84" height="84" alt="GV Produções" style="border-radius:14px;display:block;float:left"></a>
-<div style="font:14px/1.5 Arial,sans-serif;color:#3A4358;margin:10px 0 0 100px">Todos os jogos ao vivo pela GV Produções. <a href="${GV_URL}" style="color:#E8630A">Ver o canal</a>.</div><div style="clear:both"></div></td></tr>
+<table cellpadding="0" cellspacing="0" style="margin-top:10px"><tr>
+<td width="84" valign="middle"><a href="${GV_URL}"><img src="${IMG}p-gv.png" width="84" height="84" alt="GV Produções" style="border-radius:14px;display:block"></a></td>
+<td valign="middle" style="padding-left:16px;font:14px/1.5 Arial,sans-serif;color:#3A4358">Todos os jogos ao vivo pela GV Produções. <a href="${GV_URL}" style="color:#E8630A">Ver o canal</a>.</td></tr></table></td></tr>
 <tr><td style="padding:28px;font:12px/1.5 Arial,sans-serif;color:#8A93A6;text-align:center">Copa de Ex-Alunos de Futsal · Colégio Santa Úrsula<br>Você recebeu este e-mail porque criou uma conta no app da Copa.</td></tr>
 </table></td></tr></table></body></html>`;
 }
