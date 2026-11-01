@@ -10497,8 +10497,8 @@ function CompletarPerfil({ sessao, onCompleted }) {
             </label>
             <div className="flex gap-2">
               {[
-                { value: "jogador", label: "Jogador" },
-                { value: "torcedor", label: "Torcedor" },
+                { value: "jogador", label: "Jogador(a)" },
+                { value: "torcedor", label: "Torcedor(a)" },
               ].map((op) => (
                 <button
                   key={op.value}
@@ -10701,8 +10701,8 @@ function Cadastro({ onVoltar }) {
           </label>
           <div className="flex gap-2">
             {[
-              { value: "jogador", label: "Jogador" },
-              { value: "torcedor", label: "Torcedor" },
+              { value: "jogador", label: "Jogador(a)" },
+              { value: "torcedor", label: "Torcedor(a)" },
             ].map((op) => (
               <button
                 key={op.value}
