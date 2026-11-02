@@ -647,17 +647,24 @@ function loteDoPagamentoEntrada(h, team) {
 // elenco enquanto a data de pagamento não for corrigida à mão no card; quem
 // entrou depois segue a data do próprio pagamento.
 const PAGAMENTO_INICIAL_03OUT = {
-  "2010": [[11, "Lote 1"]], "2021": [[9, "Lote 1"]], "2015": [[7, "Lote 1"]], "2016": [[10, "Lote 1"]],
-  "2009": [[7, "Lote 3"]], "2018": [[8, "Lote 1"]], "2007/06": [[14, "Lote 1"]], "2022.2": [[7, "Lote 1"]],
+  "2010": [[11, "Lote 1"]], "2021": [[7, "Lote 1"], [2, "Lote 2"]], "2015": [[7, "Lote 1"]], "2016": [[10, "Lote 1"]],
+  "2009": [[7, "Lote 3"]], "2018": [[8, "Lote 1"]], "2007/06": [[14, "Lote 1"]], "2022.2": [[7, "Lote 3"]],
   "2008": [[10, "Lote 1"]], "2022.1": [[11, "Lote 1"]], "2003/04": [[8, "Lote 1"]], "2001/02": [[11, "Lote 1"]],
-  "2020": [[11, "Lote 1"]], "2014": [[13, "Lote 1"]], "2012": [[12, "Lote 1"]], "2025": [[11, "Lote 1"]],
-  "2024": [[9, "Lote 1"]], "2019": [[7, "Lote 1"]], "2013": [[7, "Lote 1"]], "2022.3": [[9, "Lote 1"]],
+  "2020": [[11, "Lote 1"]], "2014": [[13, "Lote 1"]], "2012": [[12, "Lote 3"]], "2025": [[11, "Lote 3"]],
+  "2024": [[9, "Lote 3"]], "2019": [[7, "Lote 3"]], "2013": [[7, "Lote 3"]], "2022.3": [[9, "Lote 3"]],
 };
+// Jogador cadastrado depois da planilha de 03/10 (o id carrega a hora em que
+// foi criado: j_<timestamp>). Esses são "novos" e pagam o lote vigente (Lote 3).
+const DATA_PLANILHA_03OUT = new Date(2026, 9, 3, 23, 59, 59).getTime();
+function jogadorNovoDepoisDaPlanilha(j) {
+  const m = j && typeof j.id === "string" && j.id.match(/^j_(\d{12,})/);
+  return !!m && Number(m[1]) > DATA_PLANILHA_03OUT;
+}
 function loteInicialPlanilha(jogador, team, pag) {
   const seg = team && PAGAMENTO_INICIAL_03OUT[String(team.nome).trim()];
-  if (!seg || !jogador) return null;
+  if (!seg || !jogador || jogadorNovoDepoisDaPlanilha(jogador)) return null;
   if (pag && (pag.corrigida || Array.isArray(pag.ids))) return null;
-  const jogadores = Array.isArray(team.jogadores) ? team.jogadores : [];
+  const jogadores = (Array.isArray(team.jogadores) ? team.jogadores : []).filter((j) => !jogadorNovoDepoisDaPlanilha(j));
   const idx = jogadores.findIndex((j) => j.id === jogador.id);
   if (idx < 0) return null;
   let acc = 0;
@@ -691,6 +698,9 @@ function entrouDepoisDoPagamento(jogador, team) {
 }
 function loteDoJogador(jogador, team) {
   const pag = pagamentoDoJogador(jogador, team);
+  // Jogador novo (depois da planilha de 03/10) sem pagamento próprio confirmado:
+  // paga o lote vigente hoje (Lote 3), mesmo que caia na posição de alguém que saiu.
+  if (jogadorNovoDepoisDaPlanilha(jogador) && !(pag && Array.isArray(pag.ids) && pag.ids.includes(jogador.id))) return loteNaData(new Date());
   const ini = team && team.pago ? loteInicialPlanilha(jogador, team, pag) : null;
   if (ini) return ini;
   if (pag) return loteDoPagamentoEntrada(pag, team);
