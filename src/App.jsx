@@ -7300,7 +7300,7 @@ async function buscarTimeAtualizado(team) {
 // usada só pra anexar no e-mail de aprovação da comissão, gerada com jsPDF
 // direto no navegador, sem depender de nenhum serviço externo.
 // ---------------------------------------------------------------------------
-async function gerarFichaTimePdfBase64(teamOriginal) {
+async function gerarFichaTimePdfBase64(teamOriginal, opcoes = {}) {
   const team = await buscarTimeAtualizado(teamOriginal);
   const mapaCpf = await buscarCpfsDoTime(team.id);
   const jogadores = (Array.isArray(team.jogadores) ? team.jogadores : []).map((j) =>
@@ -7411,12 +7411,16 @@ async function gerarFichaTimePdfBase64(teamOriginal) {
   }
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
-  const linhaValor =
-    "Valor da inscrição: " +
-    resumo.detalhamento
-      .map((d) => `${d.qtd} atleta(s) no ${d.nome} × ${formatarReais(d.valorUnitario)} = ${formatarReais(d.subtotal)}`)
-      .join(" + ") +
-    (resumo.misto ? ` → Total: ${formatarReais(resumo.total)}` : ` = ${formatarReais(resumo.total)}`);
+  const avulsosPdf = Array.isArray(opcoes.avulsos) ? opcoes.avulsos : null;
+  const linhaValor = avulsosPdf
+    ? "Pagamento deste envio (somente atleta(s) novo(s)): " +
+      avulsosPdf.map((a) => `${a.nome} — ${a.lote} — ${formatarReais(a.valor)}`).join("; ") +
+      ` → Total: ${formatarReais(avulsosPdf.reduce((t, a) => t + a.valor, 0))}`
+    : "Valor da inscrição: " +
+      resumo.detalhamento
+        .map((d) => `${d.qtd} atleta(s) no ${d.nome} × ${formatarReais(d.valorUnitario)} = ${formatarReais(d.subtotal)}`)
+        .join(" + ") +
+      (resumo.misto ? ` → Total: ${formatarReais(resumo.total)}` : ` = ${formatarReais(resumo.total)}`);
   doc.text(linhaValor, marginX, y, { maxWidth: larguraUtil });
 
   // "datauristring" já devolve no formato "data:application/pdf;base64,XXXX"
@@ -7702,6 +7706,94 @@ async function enviarLembretePagamentoTime(team, emailDestino) {
     textContent,
     pdfBase64,
     pdfNomeArquivo: `ficha-${team.nome}.pdf`.replace(/[^a-zA-Z0-9._-]/g, "_"),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// E-mail de atleta avulso — pra time que JÁ PAGOU e teve atleta(s) novo(s)
+// aprovado(s) depois. Mostra o elenco atualizado (ficha em PDF), mas cobra
+// SÓ o(s) atleta(s) novo(s), no lote vigente — não o elenco todo de novo.
+// ---------------------------------------------------------------------------
+function atletasAvulsosDoTime(team) {
+  return jogadoresPendentesDePagamento(team).map((j) => ({
+    nome: j.apelido ? `${j.nome} (${j.apelido})` : j.nome || "Atleta",
+    lote: loteDoJogador(j, team),
+    valor: valorDoJogador(j, team),
+  }));
+}
+async function enviarEmailAtletaAvulso(team, emailDestino) {
+  const avulsos = atletasAvulsosDoTime(team);
+  if (!avulsos.length) throw new Error("Este time não tem atleta novo pendente de pagamento.");
+  const total = avulsos.reduce((t, a) => t + a.valor, 0);
+  const pdfBase64 = await gerarFichaTimePdfBase64(team, { avulsos });
+  const destinatarioNome = team.capitao || team.nome;
+  const um = avulsos.length === 1;
+  const listaTxt = avulsos.map((a) => `${a.nome} — ${a.lote} — ${formatarReais(a.valor)}`);
+  const assunto = `${um ? "Atleta aprovado" : "Atletas aprovados"} no time ${team.nome} — pagamento ${um ? "do atleta" : "dos atletas"} (${formatarReais(total)})`;
+  const mensagemWpp =
+    `Olá! Sou o representante do time ${team.nome} na Copa de Ex-Alunos de Futsal do Colégio Santa Úrsula.\n\n` +
+    `Estou enviando o comprovante do pagamento ${um ? "do atleta" : "dos atletas"} adicionado(s) ao elenco:\n` +
+    listaTxt.map((l) => `- ${l}`).join("\n") +
+    `\n\nTotal: ${formatarReais(total)}. Segue também a lista atualizada do time.`;
+  const linkWpp = linkWhatsapp(WHATSAPP_CONFIRMACAO_PAGAMENTO, mensagemWpp);
+  const passos = [
+    `Pague <strong>somente ${um ? "este atleta" : "estes atletas"}</strong>, ${formatarReais(total)}, via Pix — chave: ${PIX_CHAVE_TEXTO}. O elenco que já foi pago não precisa ser pago de novo;`,
+    "Clique no botão abaixo pra abrir o WhatsApp da organização;",
+    "Envie por lá o comprovante do pagamento e o PDF da ficha atualizada do time (em anexo neste e-mail).",
+  ];
+  const linhasHtml = avulsos
+    .map((a) => `<li><strong>${a.nome}</strong> — ${a.lote} — ${formatarReais(a.valor)}</li>`)
+    .join("");
+  const htmlContent = envelopeHtmlEmail(`
+    <div style="font-family: Arial, Helvetica, sans-serif; color: #12203D; max-width: 560px; margin: 0 auto; padding: 24px 16px;">
+      <h2 style="color: #12203D;">${um ? "Atleta aprovado" : "Atletas aprovados"} no seu time! ✅</h2>
+      <p>Olá${destinatarioNome ? ", " + destinatarioNome : ""}!</p>
+      <p>
+        A comissão aprovou a entrada ${um ? "do atleta abaixo" : "dos atletas abaixo"} no time
+        <strong>${team.nome}</strong> da Copa de Ex-Alunos de Futsal do Colégio Santa Úrsula:
+      </p>
+      <ul>${linhasHtml}</ul>
+      <p>
+        <strong>Atenção:</strong> o pagamento é apenas ${um ? "deste atleta" : "destes atletas"}
+        — total de <strong>${formatarReais(total)}</strong>. O restante do elenco já está pago.
+        Em anexo está a <strong>ficha do time atualizada</strong> em PDF, com a lista completa.
+      </p>
+      <p>Pra concluir:</p>
+      <ol>
+        ${passos.map((p) => `<li>${p}</li>`).join("\n        ")}
+      </ol>
+      <p style="text-align: center; margin: 28px 0;">
+        <a href="${linkWpp}"
+           style="background-color: #25D366; color: #052E16; text-decoration: none; font-weight: bold; padding: 12px 24px; border-radius: 8px; display: inline-block;">
+          Enviar comprovante no WhatsApp
+        </a>
+      </p>
+      <p style="font-size: 13px; color: #667085;">
+        Se o botão não funcionar, copie e cole este link no navegador:<br />
+        <a href="${linkWpp}">${linkWpp}</a>
+      </p>
+      <p>Qualquer dúvida, fale com a organização.</p>
+      <p>Copa de Ex-Alunos de Futsal — Colégio Santa Úrsula</p>
+    </div>
+  `);
+  const textContent =
+    `${um ? "Atleta aprovado" : "Atletas aprovados"} no seu time!\n\n` +
+    `Olá${destinatarioNome ? ", " + destinatarioNome : ""}!\n\n` +
+    `A comissão aprovou a entrada ${um ? "do atleta abaixo" : "dos atletas abaixo"} no time ${team.nome}:\n` +
+    listaTxt.map((l) => `- ${l}`).join("\n") +
+    `\n\nAtenção: o pagamento é apenas ${um ? "deste atleta" : "destes atletas"} — total de ${formatarReais(total)}. O restante do elenco já está pago. Em anexo está a ficha do time atualizada em PDF.\n\n` +
+    `Pra concluir:\n` +
+    passos.map((p, i) => `${i + 1}. ${p.replace(/<[^>]+>/g, "")}`).join("\n") +
+    `\n\nAbra o WhatsApp da organização por aqui:\n${linkWpp}\n\n` +
+    `Qualquer dúvida, fale com a organização.\n\nCopa de Ex-Alunos de Futsal — Colégio Santa Úrsula\n\n(Não achou este e-mail na caixa de entrada? Confira a pasta de spam/lixo eletrônico.)`;
+  return chamarEnvioDeEmail({
+    destinatarioEmail: emailDestino.trim(),
+    destinatarioNome,
+    assunto,
+    htmlContent,
+    textContent,
+    pdfBase64,
+    pdfNomeArquivo: `ficha-atualizada-${team.nome}.pdf`.replace(/[^a-zA-Z0-9._-]/g, "_"),
   });
 }
 
@@ -9856,6 +9948,8 @@ function AprovacaoComissao({ teams, saveTeams, perfis }) {
   const [erro, setErro] = useState({});
   const [enviandoPag, setEnviandoPag] = useState({});
   const [erroPag, setErroPag] = useState({});
+  const [enviandoAv, setEnviandoAv] = useState({});
+  const [erroAv, setErroAv] = useState({});
 
   const emailAtual = (team) => {
     if (emailPorTime[team.id] !== undefined) return emailPorTime[team.id];
@@ -9885,6 +9979,32 @@ function AprovacaoComissao({ teams, saveTeams, perfis }) {
       setErro((s) => ({ ...s, [team.id]: (teste ? "Erro no teste: " : "Erro ao enviar: ") + e.message }));
     } finally {
       setEnviando((s) => ({ ...s, [team.id]: false }));
+    }
+  };
+
+  const enviarAvulso = async (team, opcoes = {}) => {
+    const teste = !!opcoes.teste;
+    const email = teste ? EMAIL_TESTE_ORGANIZACAO : emailAtual(team).trim();
+    if (!teste && !email) {
+      setErroAv((s) => ({ ...s, [team.id]: "Informe o e-mail antes de enviar." }));
+      return;
+    }
+    setErroAv((s) => ({ ...s, [team.id]: "" }));
+    setEnviandoAv((s) => ({ ...s, [team.id]: true }));
+    try {
+      await enviarEmailAtletaAvulso(team, email);
+      if (!teste) {
+        await saveTeams((atuais) =>
+          (atuais || []).map((t) =>
+            t.id === team.id ? { ...t, emailComissao: email, avulsoEnviadoEm: new Date().toISOString() } : t
+          )
+        );
+      }
+    } catch (e) {
+      console.error("Falha ao enviar e-mail de atleta avulso", e);
+      setErroAv((s) => ({ ...s, [team.id]: (teste ? "Erro no teste: " : "Erro ao enviar: ") + e.message }));
+    } finally {
+      setEnviandoAv((s) => ({ ...s, [team.id]: false }));
     }
   };
 
@@ -9964,6 +10084,7 @@ function AprovacaoComissao({ teams, saveTeams, perfis }) {
                     fontFamily: "'Inter', sans-serif",
                   }}
                 />
+                {!t.pago && (<>
                 <button
                   type="button"
                   onClick={() => enviar(t)}
@@ -9984,6 +10105,7 @@ function AprovacaoComissao({ teams, saveTeams, perfis }) {
                 >
                   Testar
                 </button>
+                </>)}
               </div>
               {emailSugerido && (
                 <p className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
@@ -10001,6 +10123,57 @@ function AprovacaoComissao({ teams, saveTeams, perfis }) {
                 </p>
               )}
 
+              {t.pago && (() => {
+                const avulsos = atletasAvulsosDoTime(t);
+                const totalAv = avulsos.reduce((x, a) => x + a.valor, 0);
+                return (
+                  <div className="rounded-lg p-3 flex flex-col gap-2" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+                    <p className="text-xs font-semibold" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+                      Time já pago — {avulsos.length === 1 ? "atleta novo" : "atletas novos"} a cobrar (só {avulsos.length === 1 ? "ele" : "eles"}, não o elenco todo):
+                    </p>
+                    <ul className="text-xs" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+                      {avulsos.map((a, i) => (
+                        <li key={i}>• {a.nome} — {a.lote} — {formatarReais(a.valor)}</li>
+                      ))}
+                    </ul>
+                    <p className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                      O e-mail leva a ficha atualizada (elenco completo) e cobra apenas {formatarReais(totalAv)}.
+                    </p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => enviarAvulso(t)}
+                        disabled={!!enviandoAv[t.id]}
+                        className="px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-60 shrink-0"
+                        style={{ backgroundColor: "#F97316", color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+                      >
+                        {enviandoAv[t.id] ? <Loader2 size={13} className="animate-spin" /> : <Mail size={13} />}
+                        {t.avulsoEnviadoEm ? "Reenviar e-mail do atleta" : "Enviar e-mail do atleta"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => enviarAvulso(t, { teste: true })}
+                        disabled={!!enviandoAv[t.id]}
+                        title={`Manda esse e-mail pra ${EMAIL_TESTE_ORGANIZACAO} em vez do representante`}
+                        className="px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-60 shrink-0"
+                        style={{ border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+                      >
+                        Testar
+                      </button>
+                    </div>
+                    {erroAv[t.id] && (
+                      <p className="text-xs" style={{ color: "#EF4444", fontFamily: "'Inter', sans-serif" }}>{erroAv[t.id]}</p>
+                    )}
+                    {t.avulsoEnviadoEm && !erroAv[t.id] && (
+                      <p className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                        Último envio: {new Date(t.avulsoEnviadoEm).toLocaleString("pt-BR")} para {t.emailComissao}
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {!t.pago && (
               <div className="flex items-center gap-2 flex-wrap pt-1" style={{ borderTop: `1px dashed ${COLORS.border}` }}>
                 <button
                   type="button"
@@ -10023,6 +10196,7 @@ function AprovacaoComissao({ teams, saveTeams, perfis }) {
                   Testar
                 </button>
               </div>
+              )}
               {erroPag[t.id] && (
                 <p className="text-xs" style={{ color: "#EF4444", fontFamily: "'Inter', sans-serif" }}>
                   {erroPag[t.id]}
