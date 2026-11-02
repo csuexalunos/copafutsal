@@ -648,7 +648,7 @@ function loteDoPagamentoEntrada(h, team) {
 // entrou depois segue a data do próprio pagamento.
 const PAGAMENTO_INICIAL_03OUT = {
   "2010": [[11, "Lote 1"]], "2021": [[7, "Lote 1"], [2, "Lote 2"]], "2015": [[7, "Lote 1"]], "2016": [[10, "Lote 1"]],
-  "2009": [[7, "Lote 3"]], "2018": [[8, "Lote 1"]], "2007/06": [[14, "Lote 1"]], "2022.2": [[7, "Lote 3"]],
+  "2009": [[7, "Lote 1"]], "2018": [[8, "Lote 1"]], "2007/06": [[14, "Lote 1"]], "2022.2": [[7, "Lote 3"]],
   "2008": [[10, "Lote 1"]], "2022.1": [[11, "Lote 1"]], "2003/04": [[8, "Lote 1"]], "2001/02": [[11, "Lote 1"]],
   "2020": [[11, "Lote 1"]], "2014": [[13, "Lote 1"]], "2012": [[12, "Lote 3"]], "2025": [[11, "Lote 3"]],
   "2024": [[9, "Lote 3"]], "2019": [[7, "Lote 3"]], "2013": [[7, "Lote 3"]], "2022.3": [[9, "Lote 3"]],
@@ -696,7 +696,17 @@ function pagamentoDoJogador(jogador, team) {
 function entrouDepoisDoPagamento(jogador, team) {
   return !!(jogador && team && team.pago && !pagamentoDoJogador(jogador, team));
 }
+// Exceções confirmadas pela organização: jogador que paga Lote 3 mesmo estando
+// num time cujos demais jogadores são do Lote 1 (time dividido).
+const LOTE3_POR_NOME = { "2009": ["dylermando"] };
+function jogadorForcadoLote3(jogador, team) {
+  const nomes = team && LOTE3_POR_NOME[String(team.nome).trim()];
+  if (!nomes || !jogador) return false;
+  const alvo = `${jogador.nome || ""} ${jogador.apelido || ""}`.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return nomes.some((n) => alvo.includes(n));
+}
 function loteDoJogador(jogador, team) {
+  if (jogadorForcadoLote3(jogador, team)) return "Lote 3";
   const pag = pagamentoDoJogador(jogador, team);
   // Jogador novo (depois da planilha de 03/10) sem pagamento próprio confirmado:
   // paga o lote vigente hoje (Lote 3), mesmo que caia na posição de alguém que saiu.
