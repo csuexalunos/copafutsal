@@ -647,11 +647,11 @@ function loteDoPagamentoEntrada(h, team) {
 // elenco enquanto a data de pagamento não for corrigida à mão no card; quem
 // entrou depois segue a data do próprio pagamento.
 const PAGAMENTO_INICIAL_03OUT = {
-  "2010": [[11, "Lote 1"]], "2021": [[7, "Lote 1"], [2, "Lote 2"]], "2015": [[7, "Lote 1"]], "2016": [[10, "Lote 1"]],
-  "2009": [[7, "Lote 3"]], "2018": [[8, "Lote 1"]], "2007/06": [[14, "Lote 1"]], "2022.2": [[7, "Lote 3"]],
+  "2010": [[11, "Lote 1"]], "2021": [[9, "Lote 1"]], "2015": [[7, "Lote 1"]], "2016": [[10, "Lote 1"]],
+  "2009": [[7, "Lote 3"]], "2018": [[8, "Lote 1"]], "2007/06": [[14, "Lote 1"]], "2022.2": [[7, "Lote 1"]],
   "2008": [[10, "Lote 1"]], "2022.1": [[11, "Lote 1"]], "2003/04": [[8, "Lote 1"]], "2001/02": [[11, "Lote 1"]],
-  "2020": [[11, "Lote 1"]], "2014": [[13, "Lote 1"]], "2012": [[12, "Lote 3"]], "2025": [[11, "Lote 3"]],
-  "2024": [[9, "Lote 3"]], "2019": [[7, "Lote 3"]], "2013": [[7, "Lote 3"]], "2022.3": [[9, "Lote 3"]],
+  "2020": [[11, "Lote 1"]], "2014": [[13, "Lote 1"]], "2012": [[12, "Lote 1"]], "2025": [[11, "Lote 1"]],
+  "2024": [[9, "Lote 1"]], "2019": [[7, "Lote 1"]], "2013": [[7, "Lote 1"]], "2022.3": [[9, "Lote 1"]],
 };
 function loteInicialPlanilha(jogador, team, pag) {
   const seg = team && PAGAMENTO_INICIAL_03OUT[String(team.nome).trim()];
