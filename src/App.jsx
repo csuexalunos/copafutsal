@@ -1844,6 +1844,22 @@ function Home({ teams, matches, setTab, config, totalPessoas }) {
         <Download size={13} /> Baixar regulamento oficial (PDF)
       </a>
 
+      <div className="flex flex-wrap gap-x-6 gap-y-1 mb-6">
+        {stats.map((s) => (
+          <div key={s.label} className="flex items-baseline gap-1.5">
+            <span
+              className="text-base font-bold"
+              style={{ fontFamily: "'JetBrains Mono', monospace", color: COLORS.ink }}
+            >
+              {s.value}
+            </span>
+            <span className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+              {s.label}
+            </span>
+          </div>
+        ))}
+      </div>
+
       {config && config.linkTransmissao && (
         <a
           href={config.linkTransmissao}
@@ -1901,22 +1917,6 @@ function Home({ teams, matches, setTab, config, totalPessoas }) {
       <ProgramacaoCopa config={config} />
 
       <FaixaInstagramCopa />
-
-      <div className="flex flex-wrap gap-x-6 gap-y-1 mb-8">
-        {stats.map((s) => (
-          <div key={s.label} className="flex items-baseline gap-1.5">
-            <span
-              className="text-base font-bold"
-              style={{ fontFamily: "'JetBrains Mono', monospace", color: COLORS.ink }}
-            >
-              {s.value}
-            </span>
-            <span className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-              {s.label}
-            </span>
-          </div>
-        ))}
-      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
         {menuItems.map(({ id, label, desc, icon: Icon }) => {
