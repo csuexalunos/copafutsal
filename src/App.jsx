@@ -10217,6 +10217,60 @@ function AprovacaoComissao({ teams, saveTeams, perfis }) {
   );
 }
 
+// Ficha completa do jogador de um pedido de inclusão — a comissão precisa ver
+// quem é a pessoa (não só nome e apelido) antes de aprovar. O CPF fica numa
+// tabela à parte (só admin lê), então é buscado aqui.
+function FichaPedidoJogador({ pedido, team }) {
+  const d = pedido.jogadorDados || { nome: pedido.jogadorNome, apelido: pedido.jogadorApelido, anoConclusao: pedido.anoConclusao };
+  const [cpf, setCpf] = useState(d.cpf || "");
+  const [cpfEstado, setCpfEstado] = useState("");
+  useEffect(() => {
+    let vivo = true;
+    if (cpf || !team) return undefined;
+    setCpfEstado("buscando");
+    buscarCpfsDoTime(team.id)
+      .then((mapa) => { if (vivo) { setCpf(mapa[pedido.jogadorId] || ""); setCpfEstado(mapa[pedido.jogadorId] ? "" : "nao"); } })
+      .catch(() => { if (vivo) setCpfEstado("erro"); });
+    return () => { vivo = false; };
+  }, [team && team.id, pedido.jogadorId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const idade = (() => {
+    const m = String(d.nascimento || "").match(/^(\d{4})-(\d{2})-(\d{2})/) || String(d.nascimento || "").match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+    if (!m) return "";
+    const [ano, mes, dia] = m[1].length === 4 ? [+m[1], +m[2], +m[3]] : [+m[3], +m[2], +m[1]];
+    const hoje = new Date();
+    let i = hoje.getFullYear() - ano;
+    if (hoje.getMonth() + 1 < mes || (hoje.getMonth() + 1 === mes && hoje.getDate() < dia)) i -= 1;
+    return i > 0 && i < 100 ? ` (${i} anos)` : "";
+  })();
+  const nascFmt = (() => {
+    const v = String(d.nascimento || "");
+    const m = v.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return m ? `${m[3]}/${m[2]}/${m[1]}` : v;
+  })();
+  const cpfFmt = cpf ? String(cpf).replace(/\D/g, "").replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4") : cpfEstado === "buscando" ? "buscando..." : cpfEstado === "erro" ? "não consegui buscar" : "não informado";
+  const itens = [
+    ["Nome completo", d.nome],
+    ["Apelido", d.apelido],
+    ["Time / turma", pedido.timeNome],
+    ["Ano de conclusão", d.anoConclusao],
+    ["Período de estudo", d.periodo],
+    ["Nascimento", nascFmt ? nascFmt + idade : ""],
+    ["CPF", cpfFmt],
+    ["Camisa", d.numero],
+    ["Posição", d.posicao],
+  ];
+  return (
+    <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 rounded-lg p-2.5" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+      {itens.map(([k, v]) => (
+        <div key={k} className="text-[11px]" style={{ fontFamily: "'Inter', sans-serif" }}>
+          <span style={{ color: COLORS.slate }}>{k}: </span>
+          <strong style={{ color: COLORS.ink }}>{v || "—"}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // Motivo + artigo do regulamento para um jogador em situação irregular.
 const ARTIGO_ANO_CONCLUSAO = "Art. 9º, alínea a e §3º do Regulamento";
 function motivoIrregularidadeJogador(time, jogador, pedido) {
@@ -10310,6 +10364,7 @@ function DiagnosticoIrregularidades({ teams, avaliacoes, aprovarExcecao, manterI
                     const j = t && (t.jogadores || []).find((x) => x.id === a.jogadorId);
                     const { motivo, artigo } = a.tipo === "inclusao" ? { motivo: "Pedido de inclusão de jogador novo no time", artigo: "" } : motivoIrregularidadeJogador(t, j, a);
                     return (
+                      <>
                       <div className="text-[11px] mt-0.5" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
                         <strong>Motivo:</strong> {motivo}
                         {artigo && (
@@ -10319,6 +10374,8 @@ function DiagnosticoIrregularidades({ teams, avaliacoes, aprovarExcecao, manterI
                           </>
                         )}
                       </div>
+                      <FichaPedidoJogador pedido={a} team={t} />
+                      </>
                     );
                   })()}
                 </div>
