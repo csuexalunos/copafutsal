@@ -4614,6 +4614,62 @@ function PaginaCardConfronto({ matchId, teams, matches, fundo }) {
   );
 }
 
+// Entrega uma imagem PNG ao usuário. No computador baixa o arquivo; no celular
+// o download por link costuma falhar (iPhone), então mostra a imagem em tela
+// cheia pra segurar o dedo e "Salvar na Fototeca/Galeria", com botão de
+// compartilhar (a folha de compartilhamento tem "Salvar imagem").
+function ehCelular() {
+  const ua = navigator.userAgent || "";
+  return /iPhone|iPad|iPod|Android/i.test(ua) || (navigator.maxTouchPoints > 1 && /Mac/i.test(navigator.platform || ""));
+}
+function entregarPng(url, nomeArquivo) {
+  if (!ehCelular()) {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = nomeArquivo;
+    a.click();
+    return;
+  }
+  const fundo = document.createElement("div");
+  fundo.style.cssText = "position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:14px;gap:12px;overflow:auto;font-family:Inter,Arial,sans-serif";
+  const dica = document.createElement("div");
+  dica.style.cssText = "color:#fff;font-size:14px;text-align:center;max-width:420px;line-height:1.4";
+  dica.innerHTML = "<b>Segure o dedo na imagem</b> e escolha <b>Salvar na Fototeca</b> (iPhone) ou <b>Baixar imagem</b> (Android).";
+  const img = document.createElement("img");
+  img.src = url;
+  img.alt = nomeArquivo;
+  img.style.cssText = "max-width:100%;max-height:62vh;object-fit:contain;border-radius:10px;-webkit-touch-callout:default;-webkit-user-select:auto;user-select:auto";
+  const linha = document.createElement("div");
+  linha.style.cssText = "display:flex;gap:10px;flex-wrap:wrap;justify-content:center";
+  const mk = (txt, bg, cor) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = txt;
+    b.style.cssText = `padding:11px 18px;border-radius:12px;border:0;font-weight:700;font-size:14px;background:${bg};color:${cor}`;
+    return b;
+  };
+  const fechar = mk("Fechar", "#fff", "#111");
+  fechar.onclick = () => fundo.remove();
+  linha.appendChild(fechar);
+  if (navigator.share && navigator.canShare) {
+    const comp = mk("Compartilhar / Salvar", "#F97316", "#fff");
+    comp.onclick = async () => {
+      try {
+        const blob = await (await fetch(url)).blob();
+        const arq = new File([blob], nomeArquivo, { type: "image/png" });
+        if (navigator.canShare({ files: [arq] })) await navigator.share({ files: [arq] });
+      } catch (e) {
+        /* cancelado ou sem suporte: a pessoa ainda pode segurar a imagem */
+      }
+    };
+    linha.appendChild(comp);
+  }
+  fundo.appendChild(dica);
+  fundo.appendChild(img);
+  fundo.appendChild(linha);
+  document.body.appendChild(fundo);
+}
+
 function PainelCardsConfrontos({ teams, matches }) {
   const [sel, setSel] = useState(null);
   const [baixando, setBaixando] = useState(false);
@@ -4643,10 +4699,7 @@ function PainelCardsConfrontos({ teams, matches }) {
     try {
       const no = refCard.current && refCard.current.querySelector("[data-card]");
       const url = await toPng(no, { width: CARD_W, height: CARD_H, pixelRatio: 1, cacheBust: true });
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `confronto-${nome(atual.timeA)}-x-${nome(atual.timeB)}.png`.replace(/[^\w.-]+/g, "_");
-      a.click();
+      entregarPng(url, `confronto-${nome(atual.timeA)}-x-${nome(atual.timeB)}.png`.replace(/[^\w.-]+/g, "_"));
     } catch (e) {
       console.error(e);
       alert("Não consegui gerar o PNG. Use o link do OBS ou tire print da pré-visualização.");
@@ -4725,10 +4778,7 @@ function PainelCardsTransmissao({ teams, matches }) {
     try {
       const no = refCard.current && refCard.current.querySelector("[data-card]");
       const url = await toPng(no, { width: CARD_W, height: CARD_H, pixelRatio: 1, cacheBust: true, style: { transform: "none" } });
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `card-${team.nome.replace(/[^\w.-]+/g, "_")}.png`;
-      a.click();
+      entregarPng(url, `card-${team.nome.replace(/[^\w.-]+/g, "_")}.png`);
     } catch (e) {
       console.error("Falha ao gerar PNG do card", e);
       alert("Não consegui gerar o PNG. Use o link do OBS ou tire print da pré-visualização.");
@@ -13414,6 +13464,12 @@ function nomeArquivoEscudo(turma) {
 }
 
 function dispararDownload(blob, nome) {
+  if (blob && blob.type === "image/png" && ehCelular()) {
+    const r = new FileReader();
+    r.onload = () => entregarPng(r.result, nome);
+    r.readAsDataURL(blob);
+    return;
+  }
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
