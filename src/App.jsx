@@ -7925,7 +7925,7 @@ function sumulaBlocoTime(time, nomeTime, mapaCpf, suspensos, amarelosAntes) {
     }
     linhas.push(
       `<tr${susp ? ' style="background:#fde2e2"' : ""}><td class="c" style="width:18px">${n + 1}</td><td>${
-        j ? `<span style="${susp ? "text-decoration:line-through;color:#b00020" : ""}">${escapeHtml(j.apelido || j.nome || "")}</span>` : ""
+        j ? (() => { const nm = String(j.nome || j.apelido || ""); const fs = nm.length > 44 ? 7 : nm.length > 38 ? 8 : nm.length > 32 ? 9 : 10; return `<span style="white-space:nowrap;font-size:${fs}px;${susp ? "text-decoration:line-through;color:#b00020" : ""}">${escapeHtml(nm)}</span>`; })() : ""
       }${susp ? ` <b style="color:#b00020">SUSPENSO (${escapeHtml(susp.motivo)})</b>` : ""}${
         cpf ? `<span style="float:right">(${cpf})</span>` : ""
       }</td><td class="c" style="width:34px">${j ? escapeHtml(j.numero || "") : ""}</td><td class="c" style="width:50px">${"|".repeat(amarelos)}</td><td style="width:50px"></td></tr>`
