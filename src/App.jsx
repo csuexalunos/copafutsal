@@ -8274,7 +8274,92 @@ function PlanilhaInscricoes({ teams }) {
   );
 }
 
-function DocumentosOrganizacao({ teams, matches }) {
+// Tabela completa da copa pra imprimir/baixar em PDF: todos os jogos da fase de
+// grupos (com campo de placar) + eliminatórias com espaço em branco pra
+// escrever os times classificados.
+function tabelaCompletaHtml(matches, teams, config) {
+  const h = horariosDoConfig(config);
+  const nomeDe = (id) => {
+    const t = teams.find((x) => x.id === id);
+    return t ? t.nome : id || "";
+  };
+  let jogos = ordemCronologica((matches || []).filter((m) => String(m.fase || "").startsWith("Grupo")));
+  let previa = false;
+  if (jogos.length === 0) {
+    previa = true;
+    const grupos = {};
+    ["A", "B", "C", "D"].forEach((g) => { grupos[g] = [1, 2, 3, 4, 5].map((n) => ({ id: `${g}${n}` })); });
+    jogos = agendarHorarios(gerarJogosDosGrupos(grupos, []), h);
+  }
+  const hora = (iso) => {
+    const d = new Date(iso);
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  };
+  const diaTxt = (iso) => formatarHorarioJogo(iso).split(" · ")[0];
+  const porDia = {};
+  jogos.forEach((m, i) => {
+    const k = diaTxt(m.horario);
+    (porDia[k] = porDia[k] || []).push({ ...m, n: i + 1 });
+  });
+  const blocosGrupos = Object.entries(porDia)
+    .map(
+      ([dia, lista]) => `
+      <h2>${escapeHtml(dia)} — fase de grupos</h2>
+      <table>
+        <tr><th style="width:30px">Nº</th><th style="width:50px">Hora</th><th style="width:70px">Grupo</th><th>Time A</th><th style="width:90px;text-align:center">Placar</th><th>Time B</th></tr>
+        ${lista
+          .map(
+            (m) => `<tr><td>${m.n}</td><td>${m.horario ? hora(m.horario) : ""}</td><td>${escapeHtml(String(m.fase || "").replace("Grupo ", ""))}</td><td>${escapeHtml(nomeDe(m.timeA))}</td><td style="text-align:center">&nbsp;&nbsp;&nbsp;&nbsp; x &nbsp;&nbsp;&nbsp;&nbsp;</td><td>${escapeHtml(nomeDe(m.timeB))}</td></tr>`
+          )
+          .join("")}
+      </table>`
+    )
+    .join("");
+  const total = jogos.length;
+  const elim = [
+    ["Quartas de final", "1º × 8º"],
+    ["Quartas de final", "4º × 5º"],
+    ["Quartas de final", "2º × 7º"],
+    ["Quartas de final", "3º × 6º"],
+    ["Semifinal", "Venc. Q1 × Venc. Q2"],
+    ["Semifinal", "Venc. Q3 × Venc. Q4"],
+    ["3º e 4º lugar", "Perd. semi 1 × Perd. semi 2"],
+    ["Final", "Venc. semi 1 × Venc. semi 2"],
+  ];
+  const blank = '<span style="display:inline-block;width:100%;border-bottom:1px solid #444;height:14px"></span>';
+  const linhasElim = elim
+    .map(
+      ([fase, regra], i) => `<tr><td>${total + i + 1}</td><td>${hora(new Date(h.inicioDomingo.getTime() + i * DURACAO_SLOT_MIN * 60000).toISOString())}</td><td>${fase}<br/><span style="font-size:10px;color:#667085">${regra}</span></td><td style="height:30px;vertical-align:bottom">${blank}</td><td style="text-align:center">&nbsp;&nbsp;&nbsp;&nbsp; x &nbsp;&nbsp;&nbsp;&nbsp;</td><td style="vertical-align:bottom">${blank}</td></tr>`
+    )
+    .join("");
+  const classificados = Array.from({ length: 8 }, (_, i) => `<tr><td style="width:40px">${i + 1}º</td><td style="height:26px;vertical-align:bottom">${blank}</td></tr>`).join("");
+  const diaElim = diaTxt(new Date(h.inicioDomingo).toISOString());
+  return `
+    <h1>VIII Copa CSU de Ex-Alunos — Tabela completa</h1>
+    <div style="font-size:12px;color:#555">Colégio Santa Úrsula · ${escapeHtml(LOCAL_NOME)}${previa ? " · tabela prévia (A1 = cabeça de chave do Grupo A, etc.)" : ""}</div>
+    ${blocosGrupos}
+    <div style="page-break-before:always"></div>
+    <h2>Classificados para as eliminatórias (8 melhores)</h2>
+    <table style="width:60%">${classificados}</table>
+    <h2>${escapeHtml(diaElim)} — fase eliminatória</h2>
+    <table>
+      <tr><th style="width:30px">Nº</th><th style="width:50px">Hora</th><th style="width:150px">Fase</th><th>Time A</th><th style="width:90px;text-align:center">Placar</th><th>Time B</th></tr>
+      ${linhasElim}
+    </table>
+    <h2>Pódio</h2>
+    <table style="width:70%">
+      <tr><td style="width:110px"><b>Campeão</b></td><td style="height:28px;vertical-align:bottom">${blank}</td></tr>
+      <tr><td><b>Vice-campeão</b></td><td style="height:28px;vertical-align:bottom">${blank}</td></tr>
+      <tr><td><b>3º lugar</b></td><td style="height:28px;vertical-align:bottom">${blank}</td></tr>
+    </table>`;
+}
+
+function baixarTabelaCompleta(matches, teams, config) {
+  const win = abrirJanelaImpressao();
+  preencherJanelaImpressao(win, "Tabela completa — VIII Copa CSU", tabelaCompletaHtml(matches, teams, config));
+}
+
+function DocumentosOrganizacao({ teams, matches, config }) {
   const [secaoDoc, setSecaoDoc] = useState("fichas");
   const timesPagos = teams.filter(timeInscritoOficialmente).length;
 
@@ -8293,6 +8378,7 @@ function DocumentosOrganizacao({ teams, matches }) {
           { chave: "fichas", titulo: "Fichas dos times", contagem: 0 },
           { chave: "financeiro", titulo: "Planilha financeira", contagem: 0 },
           { chave: "sumulas", titulo: "Súmulas dos jogos", contagem: 0 },
+          { chave: "tabela", titulo: "Tabela completa", contagem: 0 },
           { chave: "regulamento", titulo: "Regulamento", contagem: 0 },
         ]}
         ativa={secaoDoc}
@@ -8368,6 +8454,23 @@ function DocumentosOrganizacao({ teams, matches }) {
             </button>
           </div>
           <PlanilhaInscricoes teams={teams} />
+        </div>
+      )}
+
+      {secaoDoc === "tabela" && (
+        <div>
+          <button
+            type="button"
+            onClick={() => baixarTabelaCompleta(matches, teams, config)}
+            className="px-4 py-2 rounded-xl text-sm font-semibold inline-flex items-center gap-1.5"
+            style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}
+          >
+            <Download size={14} /> Baixar tabela completa (PDF)
+          </button>
+          <p className="text-xs mt-2" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Todos os jogos da fase de grupos, com campo de placar, e as eliminatórias (quartas,
+            semifinais, 3º lugar e final) com espaço em branco pra escrever os times classificados.
+          </p>
         </div>
       )}
 
@@ -15050,7 +15153,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
             ativa={subAbaDownloads}
             onMudar={setSubAbaDownloads}
           />
-          {subAbaDownloads === "documentos" && <DocumentosOrganizacao teams={teams} matches={matches} />}
+          {subAbaDownloads === "documentos" && <DocumentosOrganizacao teams={teams} matches={matches} config={config} />}
           {subAbaDownloads === "escudos" && <BaixarEscudos escudosCustom={escudosCustom} />}
         </>
       )}
