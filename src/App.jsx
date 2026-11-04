@@ -4411,7 +4411,7 @@ function BotaoZipCards({ itens, nomeZip, rotulo, pequeno = false }) {
         setAtual(itens[i]);
         await new Promise((r) => setTimeout(r, 1100));
         const no = ref.current && ref.current.querySelector("[data-card]");
-        const url = await toPngSeguro(no, { width: CARD_W, height: CARD_H, pixelRatio: 1, cacheBust: true });
+        const url = await toPngSeguro(no, { width: CARD_W, height: CARD_H, pixelRatio: 1, cacheBust: true, style: { transform: "none" } });
         zip.file(`${String(i + 1).padStart(2, "0")}-${itens[i].arquivo}.png`.replace(/[^\w.-]+/g, "_"), url.split(",")[1], { base64: true });
       }
       const blob = await zip.generateAsync({ type: "blob" });
@@ -4623,9 +4623,44 @@ async function toPngSeguro(no, opcoes) {
     imgs.map((i) => (i.decode ? i.decode().catch(() => {}) : Promise.resolve()))
   );
   if (document.fonts && document.fonts.ready) await document.fonts.ready.catch(() => {});
-  try { await toPng(no, opcoes); } catch (e) { /* aquecimento */ }
-  await new Promise((r) => setTimeout(r, 150));
-  return toPng(no, opcoes);
+  // Safari/iPhone costuma sumir com escudos (webp ou imagem remota) dentro do
+  // PNG. Troca cada <img> por um PNG embutido (via canvas) só durante a captura.
+  const originais = [];
+  await Promise.all(
+    imgs.map(async (img) => {
+      try {
+        if (!img.src || img.src.startsWith("data:image/png")) return;
+        const alvo = new Image();
+        alvo.crossOrigin = "anonymous";
+        await new Promise((ok, erro) => {
+          alvo.onload = ok;
+          alvo.onerror = erro;
+          alvo.src = img.src;
+        });
+        const c = document.createElement("canvas");
+        c.width = alvo.naturalWidth || img.naturalWidth || 1;
+        c.height = alvo.naturalHeight || img.naturalHeight || 1;
+        c.getContext("2d").drawImage(alvo, 0, 0);
+        const png = c.toDataURL("image/png");
+        originais.push([img, img.src, img.srcset]);
+        img.removeAttribute("srcset");
+        img.src = png;
+        if (img.decode) await img.decode().catch(() => {});
+      } catch (e) {
+        /* imagem remota sem CORS: segue com a original */
+      }
+    })
+  );
+  try {
+    try { await toPng(no, opcoes); } catch (e) { /* aquecimento */ }
+    await new Promise((r) => setTimeout(r, 150));
+    return await toPng(no, opcoes);
+  } finally {
+    originais.forEach(([img, src, srcset]) => {
+      img.src = src;
+      if (srcset) img.srcset = srcset;
+    });
+  }
 }
 
 // Entrega uma imagem PNG ao usuário. No computador baixa o arquivo; no celular
@@ -4712,7 +4747,7 @@ function PainelCardsConfrontos({ teams, matches }) {
     setBaixando(true);
     try {
       const no = refCard.current && refCard.current.querySelector("[data-card]");
-      const url = await toPngSeguro(no, { width: CARD_W, height: CARD_H, pixelRatio: 1, cacheBust: true });
+      const url = await toPngSeguro(no, { width: CARD_W, height: CARD_H, pixelRatio: 1, cacheBust: true, style: { transform: "none" } });
       entregarPng(url, `confronto-${nome(atual.timeA)}-x-${nome(atual.timeB)}.png`.replace(/[^\w.-]+/g, "_"));
     } catch (e) {
       console.error(e);
