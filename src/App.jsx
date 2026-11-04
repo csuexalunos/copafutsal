@@ -4411,7 +4411,7 @@ function BotaoZipCards({ itens, nomeZip, rotulo, pequeno = false }) {
         setAtual(itens[i]);
         await new Promise((r) => setTimeout(r, 1100));
         const no = ref.current && ref.current.querySelector("[data-card]");
-        const url = await toPng(no, { width: CARD_W, height: CARD_H, pixelRatio: 1, cacheBust: true });
+        const url = await toPngSeguro(no, { width: CARD_W, height: CARD_H, pixelRatio: 1, cacheBust: true });
         zip.file(`${String(i + 1).padStart(2, "0")}-${itens[i].arquivo}.png`.replace(/[^\w.-]+/g, "_"), url.split(",")[1], { base64: true });
       }
       const blob = await zip.generateAsync({ type: "blob" });
@@ -4614,6 +4614,20 @@ function PaginaCardConfronto({ matchId, teams, matches, fundo }) {
   );
 }
 
+// html-to-image no Safari/iPhone costuma gerar a primeira imagem incompleta
+// (escudos e fontes ainda não carregados). Espera as imagens do card e roda
+// uma renderização de aquecimento antes da definitiva.
+async function toPngSeguro(no, opcoes) {
+  const imgs = Array.from(no.querySelectorAll("img"));
+  await Promise.all(
+    imgs.map((i) => (i.decode ? i.decode().catch(() => {}) : Promise.resolve()))
+  );
+  if (document.fonts && document.fonts.ready) await document.fonts.ready.catch(() => {});
+  try { await toPng(no, opcoes); } catch (e) { /* aquecimento */ }
+  await new Promise((r) => setTimeout(r, 150));
+  return toPng(no, opcoes);
+}
+
 // Entrega uma imagem PNG ao usuário. No computador baixa o arquivo; no celular
 // o download por link costuma falhar (iPhone), então mostra a imagem em tela
 // cheia pra segurar o dedo e "Salvar na Fototeca/Galeria", com botão de
@@ -4698,7 +4712,7 @@ function PainelCardsConfrontos({ teams, matches }) {
     setBaixando(true);
     try {
       const no = refCard.current && refCard.current.querySelector("[data-card]");
-      const url = await toPng(no, { width: CARD_W, height: CARD_H, pixelRatio: 1, cacheBust: true });
+      const url = await toPngSeguro(no, { width: CARD_W, height: CARD_H, pixelRatio: 1, cacheBust: true });
       entregarPng(url, `confronto-${nome(atual.timeA)}-x-${nome(atual.timeB)}.png`.replace(/[^\w.-]+/g, "_"));
     } catch (e) {
       console.error(e);
@@ -4777,7 +4791,7 @@ function PainelCardsTransmissao({ teams, matches }) {
     setBaixando(team.id);
     try {
       const no = refCard.current && refCard.current.querySelector("[data-card]");
-      const url = await toPng(no, { width: CARD_W, height: CARD_H, pixelRatio: 1, cacheBust: true, style: { transform: "none" } });
+      const url = await toPngSeguro(no, { width: CARD_W, height: CARD_H, pixelRatio: 1, cacheBust: true, style: { transform: "none" } });
       entregarPng(url, `card-${team.nome.replace(/[^\w.-]+/g, "_")}.png`);
     } catch (e) {
       console.error("Falha ao gerar PNG do card", e);
@@ -12924,7 +12938,6 @@ const GRUPOS_ORGANIZACAO = [
   { chave: "historico", titulo: "Alterações dos representantes", subtitulo: "Tudo que os times mudaram — sem precisar aprovar", icone: Clock },
   { chave: "times", titulo: "Times e elencos", subtitulo: "Elencos, irregularidades, CPFs, contatos", icone: ShieldCheck },
   { chave: "financeiro", titulo: "Financeiro", subtitulo: "Pagamentos e planilha de inscrições", icone: Wallet },
-  { chave: "cards", titulo: "Cards da transmissão", subtitulo: "Apresentação de cada time e atletas (OBS / PNG)", icone: Video },
   { chave: "jogos", titulo: "Jogos", subtitulo: "Transmissão, mata-mata, tabela", icone: Swords },
   { chave: "local_sorteio", titulo: "Local do sorteio", subtitulo: "Onde e quando é — só representantes veem", icone: MapPin },
   { chave: "documentos", titulo: "Documentos e downloads", subtitulo: "Fichas, súmulas e escudos em HD", icone: Download },
@@ -15205,12 +15218,14 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
             abas={[
               { chave: "documentos", titulo: "Documentos pra imprimir", contagem: 0 },
               { chave: "escudos", titulo: "Escudos dos times", contagem: 0 },
+              { chave: "cards", titulo: "Cards dos times e jogos", contagem: 0 },
             ]}
             ativa={subAbaDownloads}
             onMudar={setSubAbaDownloads}
           />
           {subAbaDownloads === "documentos" && <DocumentosOrganizacao teams={teams} matches={matches} config={config} />}
           {subAbaDownloads === "escudos" && <BaixarEscudos escudosCustom={escudosCustom} />}
+          {subAbaDownloads === "cards" && <PainelCardsTransmissao teams={teams} matches={matches} />}
         </>
       )}
 
