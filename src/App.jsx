@@ -4397,6 +4397,56 @@ function PaginaCardTime({ turma, teams, matches, fundo }) {
 
 // Gera vários cards em PNG e entrega tudo num .zip só.
 // itens: [{ chave, arquivo, node }] — node é o card (com [data-card]) a renderizar.
+// No celular, vários cards de uma vez: mostra todos empilhados (segurar o dedo
+// em cada um salva) e um botão que abre a folha de compartilhamento com
+// TODOS os arquivos, onde dá pra "Salvar N imagens" direto nas Fotos.
+function entregarVariosPng(lista) {
+  const fundo = document.createElement("div");
+  fundo.style.cssText = "position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.94);overflow:auto;padding:14px;font-family:Inter,Arial,sans-serif;display:flex;flex-direction:column;align-items:center;gap:14px";
+  const topo = document.createElement("div");
+  topo.style.cssText = "position:sticky;top:0;z-index:2;background:#000;padding:8px 0;display:flex;flex-direction:column;gap:8px;align-items:center;width:100%";
+  const dica = document.createElement("div");
+  dica.style.cssText = "color:#fff;font-size:14px;text-align:center;max-width:420px;line-height:1.4";
+  dica.innerHTML = `<b>${lista.length} cards prontos.</b> Toque em <b>Compartilhar todos</b> e escolha <b>Salvar imagens</b> — ou segure o dedo em cada imagem.`;
+  const linha = document.createElement("div");
+  linha.style.cssText = "display:flex;gap:10px;flex-wrap:wrap;justify-content:center";
+  const mk = (txt, bg, cor) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = txt;
+    b.style.cssText = `padding:11px 18px;border-radius:12px;border:0;font-weight:700;font-size:14px;background:${bg};color:${cor}`;
+    return b;
+  };
+  const fechar = mk("Fechar", "#fff", "#111");
+  fechar.onclick = () => fundo.remove();
+  linha.appendChild(fechar);
+  if (navigator.share && navigator.canShare) {
+    const comp = mk("Compartilhar todos", "#F97316", "#fff");
+    comp.onclick = async () => {
+      try {
+        const arqs = await Promise.all(
+          lista.map(async (it) => new File([await (await fetch(it.url)).blob()], it.nome, { type: "image/png" }))
+        );
+        if (navigator.canShare({ files: arqs })) await navigator.share({ files: arqs });
+      } catch (e) {
+        /* cancelado ou sem suporte: dá pra segurar cada imagem */
+      }
+    };
+    linha.appendChild(comp);
+  }
+  topo.appendChild(dica);
+  topo.appendChild(linha);
+  fundo.appendChild(topo);
+  lista.forEach((it) => {
+    const img = document.createElement("img");
+    img.src = it.url;
+    img.alt = it.nome;
+    img.style.cssText = "width:100%;max-width:640px;border-radius:10px;-webkit-touch-callout:default;-webkit-user-select:auto;user-select:auto";
+    fundo.appendChild(img);
+  });
+  document.body.appendChild(fundo);
+}
+
 function BotaoZipCards({ itens, nomeZip, rotulo, pequeno = false }) {
   const [prog, setProg] = useState(null);
   const [atual, setAtual] = useState(null);
@@ -4404,15 +4454,25 @@ function BotaoZipCards({ itens, nomeZip, rotulo, pequeno = false }) {
   const gerar = async () => {
     if (!itens.length || prog) return;
     try {
-      const { default: JSZip } = await import("jszip");
-      const zip = new JSZip();
+      const celular = ehCelular();
+      const { default: JSZip } = celular ? { default: null } : await import("jszip");
+      const zip = celular ? null : new JSZip();
+      const prontos = [];
       for (let i = 0; i < itens.length; i++) {
         setProg(`${i + 1}/${itens.length}`);
         setAtual(itens[i]);
         await new Promise((r) => setTimeout(r, 1100));
         const no = ref.current && ref.current.querySelector("[data-card]");
         const url = await toPngSeguro(no, { width: CARD_W, height: CARD_H, pixelRatio: 1, cacheBust: true, style: { transform: "none" } });
-        zip.file(`${String(i + 1).padStart(2, "0")}-${itens[i].arquivo}.png`.replace(/[^\w.-]+/g, "_"), url.split(",")[1], { base64: true });
+        const nomePng = `${String(i + 1).padStart(2, "0")}-${itens[i].arquivo}.png`.replace(/[^\w.-]+/g, "_");
+        if (celular) prontos.push({ url, nome: nomePng });
+        else zip.file(nomePng, url.split(",")[1], { base64: true });
+      }
+      if (celular) {
+        setAtual(null);
+        setProg(null);
+        entregarVariosPng(prontos);
+        return;
       }
       const blob = await zip.generateAsync({ type: "blob" });
       const a = document.createElement("a");
