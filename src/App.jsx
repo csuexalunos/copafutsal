@@ -4827,7 +4827,7 @@ function PainelCardsConfrontos({ teams, matches }) {
       {lista.length === 0 && <p className="text-sm" style={{ color: COLORS.slate }}>Nenhum jogo com os dois times definidos ainda.</p>}
       {lista.length > 0 && (
         <div className="mb-5">
-          <BotaoZipCards nomeZip="cards-confrontos-transmissao" rotulo={`Baixar todos os cards dos confrontos (${lista.length}) — .zip`} itens={itensZip(lista)} />
+          <BotaoZipCards nomeZip="cards-confrontos-transmissao" rotulo={`Baixar todos os cards dos confrontos (${lista.length})`} itens={itensZip(lista)} />
         </div>
       )}
       <div className="space-y-6 max-w-xl">
@@ -4835,7 +4835,7 @@ function PainelCardsConfrontos({ teams, matches }) {
           <section key={rot}>
             <div className="flex items-center gap-2 mb-2">
               <h3 className="font-bold text-sm mr-auto" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>{rot} <span className="font-normal text-xs" style={{ color: COLORS.slate }}>· {jogos.length} {jogos.length === 1 ? "jogo" : "jogos"}</span></h3>
-              <BotaoZipCards pequeno nomeZip={`cards-${rot}`} rotulo="Baixar esta rodada (.zip)" itens={itensZip(jogos)} />
+              <BotaoZipCards pequeno nomeZip={`cards-${rot}`} rotulo="Baixar esta rodada" itens={itensZip(jogos)} />
             </div>
             <ul className="space-y-2">
               {jogos.map((m) => {
@@ -4918,7 +4918,7 @@ function PainelCardsTransmissao({ teams, matches }) {
       </p>
       {lista.length > 0 && (
         <div className="mb-4">
-          <BotaoZipCards nomeZip="cards-elencos-times" rotulo={`Baixar todos os elencos (${lista.length}) — .zip`}
+          <BotaoZipCards nomeZip="cards-elencos-times" rotulo={`Baixar todos os elencos (${lista.length})`}
             itens={lista.map((t) => ({ chave: t.id, arquivo: nomeCardTime(t), node: <CardApresentacaoTime team={t} grupo={grupoDoTime(t, matches)} /> }))} />
         </div>
       )}
