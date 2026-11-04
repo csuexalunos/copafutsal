@@ -4447,6 +4447,11 @@ function entregarVariosPng(lista) {
   document.body.appendChild(fundo);
 }
 
+// Escala da pré-visualização dos cards: cabe na largura do celular.
+function kPreviaCard() {
+  return Math.min(0.4, (Math.min(window.innerWidth, 800) - 56) / CARD_W);
+}
+
 function BotaoZipCards({ itens, nomeZip, rotulo, pequeno = false }) {
   const [prog, setProg] = useState(null);
   const [atual, setAtual] = useState(null);
@@ -4461,12 +4466,18 @@ function BotaoZipCards({ itens, nomeZip, rotulo, pequeno = false }) {
       for (let i = 0; i < itens.length; i++) {
         setProg(`${i + 1}/${itens.length}`);
         setAtual(itens[i]);
-        await new Promise((r) => setTimeout(r, 1100));
+        await new Promise((r) => setTimeout(r, 350));
         const no = ref.current && ref.current.querySelector("[data-card]");
         const url = await toPngSeguro(no, { width: CARD_W, height: CARD_H, pixelRatio: 1, cacheBust: true, style: { transform: "none" } });
         const nomePng = `${String(i + 1).padStart(2, "0")}-${itens[i].arquivo}.png`.replace(/[^\w.-]+/g, "_");
-        if (celular) prontos.push({ url, nome: nomePng });
-        else zip.file(nomePng, url.split(",")[1], { base64: true });
+        prontos.push({ url, nome: nomePng });
+        if (!celular) zip.file(nomePng, url.split(",")[1], { base64: true });
+      }
+      if (prontos.length === 1) {
+        setAtual(null);
+        setProg(null);
+        entregarPng(prontos[0].url, prontos[0].nome.replace(/^01-/, ""));
+        return;
       }
       if (celular) {
         setAtual(null);
@@ -4846,6 +4857,7 @@ function PainelCardsConfrontos({ teams, matches }) {
                       <div className="font-semibold text-sm" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>{nome(m.timeA)} x {nome(m.timeB)}</div>
                       <div className="text-[11px]" style={{ color: COLORS.slate }}>{[(m.fase || "").startsWith("Grupo") ? m.fase : "", dia, hora.replace("H", ":")].filter(Boolean).join(" · ")}{m.status === "encerrado" ? " · encerrado" : ""}</div>
                     </div>
+                    <BotaoZipCards pequeno nomeZip={`card-${nome(m.timeA)}-x-${nome(m.timeB)}`} rotulo="Baixar" itens={itensZip([m])} />
                     <button type="button" onClick={() => setSel(sel === m.id ? null : m.id)} className="text-xs font-semibold underline" style={{ color: COLORS.accent }}>{sel === m.id ? "Fechar" : "Ver card"}</button>
                     <button type="button" onClick={() => copiar(m)} className="text-xs font-semibold px-2.5 py-1.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, color: COLORS.ink }}>{copiado === m.id ? "Link copiado!" : "Copiar link pro OBS"}</button>
                   </li>
@@ -4856,9 +4868,11 @@ function PainelCardsConfrontos({ teams, matches }) {
         ))}
       </div>
       {atual && (
-        <div className="mt-5 max-w-3xl">
-          <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${COLORS.border}`, width: CARD_W * 0.4, maxWidth: "100%", height: CARD_H * 0.4, position: "relative", backgroundColor: "#0B0F1C" }}>
-            <div ref={refCard} style={{ position: "absolute", top: 0, left: 0, width: CARD_W, height: CARD_H, transformOrigin: "top left", transform: "scale(0.4)" }}>
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-auto p-3" style={{ background: "rgba(0,0,0,0.82)" }} onClick={(e) => { if (e.target === e.currentTarget) setSel(null); }}>
+        <div className="rounded-2xl p-4 w-full max-w-3xl mt-6" style={{ backgroundColor: COLORS.card }}>
+          <button type="button" onClick={() => setSel(null)} className="mb-3 px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ border: `1px solid ${COLORS.border}`, color: COLORS.ink }}>Fechar</button>
+          <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${COLORS.border}`, width: CARD_W * kPreviaCard(), maxWidth: "100%", height: CARD_H * kPreviaCard(), position: "relative", backgroundColor: "#0B0F1C" }}>
+            <div ref={refCard} style={{ position: "absolute", top: 0, left: 0, width: CARD_W, height: CARD_H, transformOrigin: "top left", transform: `scale(${kPreviaCard()})` }}>
               <div data-card style={{ width: CARD_W, height: CARD_H }}>
                 <CardConfronto match={atual} timeA={teams.find((t) => t.id === atual.timeA)} timeB={teams.find((t) => t.id === atual.timeB)} />
               </div>
@@ -4868,6 +4882,7 @@ function PainelCardsConfrontos({ teams, matches }) {
           <button type="button" onClick={baixar} disabled={baixando} className="mt-3 block px-4 py-2 rounded-xl text-sm font-semibold" style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}>
             {baixando ? "Gerando..." : "Baixar PNG (1920×1080)"}
           </button>
+        </div>
         </div>
       )}
     </div>
@@ -4927,6 +4942,7 @@ function PainelCardsTransmissao({ teams, matches }) {
           <li key={t.id} className="flex flex-wrap items-center gap-2 px-3 py-2.5 rounded-xl" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
             {(ESCUDOS_TIMES[t.nome] || t.escudoUrl) && <img src={ESCUDOS_TIMES[t.nome] || t.escudoUrl} alt="" className="w-7 h-7 object-contain" />}
             <span className="font-semibold text-sm mr-auto" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>{t.nome}</span>
+            <BotaoZipCards pequeno nomeZip={`card-${nomeCardTime(t)}`} rotulo="Baixar" itens={[{ chave: t.id, arquivo: nomeCardTime(t), node: <CardApresentacaoTime team={t} grupo={grupoDoTime(t, matches)} /> }]} />
             <button type="button" onClick={() => setSel(sel === t.id ? null : t.id)} className="text-xs font-semibold underline" style={{ color: COLORS.accent }}>
               {sel === t.id ? "Fechar" : "Ver card"}
             </button>
@@ -4937,9 +4953,11 @@ function PainelCardsTransmissao({ teams, matches }) {
         ))}
       </ul>
       {atual && (
-        <div className="mt-5 max-w-3xl">
-          <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${COLORS.border}`, width: CARD_W * 0.4, maxWidth: "100%", height: CARD_H * 0.4, position: "relative", backgroundColor: "#0B0F1C" }}>
-            <div ref={refCard} style={{ position: "absolute", top: 0, left: 0, width: CARD_W, height: CARD_H, transformOrigin: "top left", transform: "scale(0.4)" }}>
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-auto p-3" style={{ background: "rgba(0,0,0,0.82)" }} onClick={(e) => { if (e.target === e.currentTarget) setSel(null); }}>
+        <div className="rounded-2xl p-4 w-full max-w-3xl mt-6" style={{ backgroundColor: COLORS.card }}>
+          <button type="button" onClick={() => setSel(null)} className="mb-3 px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ border: `1px solid ${COLORS.border}`, color: COLORS.ink }}>Fechar</button>
+          <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${COLORS.border}`, width: CARD_W * kPreviaCard(), maxWidth: "100%", height: CARD_H * kPreviaCard(), position: "relative", backgroundColor: "#0B0F1C" }}>
+            <div ref={refCard} style={{ position: "absolute", top: 0, left: 0, width: CARD_W, height: CARD_H, transformOrigin: "top left", transform: `scale(${kPreviaCard()})` }}>
               <div data-card style={{ width: CARD_W, height: CARD_H }}>
                 <CardApresentacaoTime team={atual} grupo={grupoDoTime(atual, matches)} />
               </div>
@@ -4950,6 +4968,7 @@ function PainelCardsTransmissao({ teams, matches }) {
             className="mt-3 block px-4 py-2 rounded-xl text-sm font-semibold" style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}>
             {baixando ? "Gerando..." : "Baixar PNG (1920×1080)"}
           </button>
+        </div>
         </div>
       )}
     </div>
