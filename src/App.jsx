@@ -1834,15 +1834,13 @@ function Home({ teams, matches, setTab, config, totalPessoas }) {
         </div>
       </div>
 
-      <a
-        href="regulamento.pdf"
-        target="_blank"
-        rel="noreferrer"
+      <LinkRegulamento
+        config={config}
         className="inline-flex items-center gap-1.5 text-xs mb-6"
         style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}
       >
         <Download size={13} /> Baixar regulamento oficial (PDF)
-      </a>
+      </LinkRegulamento>
 
       <div className="flex flex-wrap gap-x-6 gap-y-1 mb-6">
         {stats.map((s) => (
@@ -3515,15 +3513,13 @@ function Inscricao({ teams, saveTeams, sessao, avaliacoes, saveAvaliacoes, confi
         Valor da inscrição: <strong>{VALOR_INSCRICAO_ATLETA}</strong>
       </div>
       <div>
-        <a
-          href="regulamento.pdf"
-          target="_blank"
-          rel="noreferrer"
+        <LinkRegulamento
+          config={config}
           className="inline-flex items-center gap-1.5 text-xs mb-6"
           style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}
         >
           <Download size={13} /> Baixar regulamento oficial (PDF)
-        </a>
+        </LinkRegulamento>
       </div>
 
       <div className="grid sm:grid-cols-5 gap-8">
@@ -8537,7 +8533,111 @@ function baixarTabelaCompleta(matches, teams, config) {
   preencherJanelaImpressao(win, "Tabela completa — VIII Copa CSU", tabelaCompletaHtml(matches, teams, config));
 }
 
-function DocumentosOrganizacao({ teams, matches, config }) {
+// Link do regulamento: usa o PDF que a organização enviou (guardado no
+// bucket privado, link temporário na hora de abrir) e, se nunca enviaram um,
+// o regulamento que já vem junto com o site.
+function LinkRegulamento({ config, className, style, children }) {
+  const caminho = config && config.regulamento && config.regulamento.caminho;
+  const abrir = async (e) => {
+    if (!caminho) return;
+    e.preventDefault();
+    const janela = window.open("", "_blank");
+    try {
+      const url = await urlAssinada(caminho, 3600);
+      if (janela) janela.location.href = url;
+      else window.location.href = url;
+    } catch (err) {
+      console.error("Falha ao abrir o regulamento enviado:", err);
+      if (janela) janela.location.href = "regulamento.pdf";
+      else window.open("regulamento.pdf", "_blank");
+    }
+  };
+  return (
+    <a href="regulamento.pdf" target="_blank" rel="noreferrer" onClick={abrir} className={className} style={style}>
+      {children}
+    </a>
+  );
+}
+
+// Onde a organização troca o regulamento: escolhe o PDF novo e pronto —
+// todos os botões "Baixar regulamento" do app passam a abrir esse arquivo.
+function EnviarRegulamento({ config, saveConfig }) {
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState("");
+  const [ok, setOk] = useState("");
+  const atual = config && config.regulamento;
+
+  const escolher = async (e) => {
+    const arq = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!arq) return;
+    setErro("");
+    setOk("");
+    if (!/pdf$/i.test(arq.name) && arq.type !== "application/pdf") {
+      setErro("Escolha um arquivo PDF.");
+      return;
+    }
+    if (arq.size > 15 * 1024 * 1024) {
+      setErro("O PDF é grande demais (máximo 15 MB).");
+      return;
+    }
+    setEnviando(true);
+    try {
+      const caminho = await subirArquivo(arq, "regulamento.pdf", "application/pdf");
+      await saveConfig((atual) => ({ ...atual, regulamento: { caminho, nome: arq.name, enviadoEm: new Date().toISOString() } }));
+      setOk("Pronto! Os botões de regulamento do app já abrem o arquivo novo.");
+    } catch (err) {
+      console.error("Falha ao enviar o regulamento:", err);
+      setErro(`Não consegui enviar: ${err?.message || "erro desconhecido"}. Se aparecer algo sobre tipo de arquivo (mime type), o espaço de arquivos do Supabase só aceita imagens e vídeos — me avise que eu ajusto.`);
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  const voltarAoPadrao = async () => {
+    setErro("");
+    await saveConfig((atual) => { const { regulamento, ...resto } = atual || {}; return resto; });
+    setOk("Voltou ao regulamento que vem junto com o site.");
+  };
+
+  return (
+    <div className="rounded-xl p-4" style={{ border: `1px solid ${COLORS.border}`, backgroundColor: COLORS.card }}>
+      <div className="text-sm font-semibold mb-1" style={{ color: COLORS.navy, fontFamily: "'Inter', sans-serif" }}>
+        Trocar o regulamento
+      </div>
+      <p className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+        {atual
+          ? `Em uso: ${atual.nome || "PDF enviado"} (enviado em ${new Date(atual.enviadoEm).toLocaleString("pt-BR")}).`
+          : "Em uso: o regulamento padrão que vem junto com o site."}{" "}
+        Escolha um PDF novo e todos os botões “Baixar regulamento” passam a abrir esse arquivo.
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <label
+          className="px-4 py-2 rounded-xl text-sm font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+          style={{ backgroundColor: COLORS.accent, color: "#fff", fontFamily: "'Inter', sans-serif", opacity: enviando ? 0.6 : 1 }}
+        >
+          {enviando ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+          {enviando ? "Enviando…" : "Enviar novo regulamento (PDF)"}
+          <input type="file" accept="application/pdf,.pdf" className="hidden" onChange={escolher} disabled={enviando} />
+        </label>
+        {atual && (
+          <button
+            type="button"
+            onClick={voltarAoPadrao}
+            className="px-3 py-2 rounded-xl text-xs"
+            style={{ border: `1px solid ${COLORS.border}`, color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
+          >
+            Voltar ao padrão do site
+          </button>
+        )}
+      </div>
+      {ok && <p className="text-xs mt-2" style={{ color: "#15803d", fontFamily: "'Inter', sans-serif" }}>{ok}</p>}
+      {erro && <p className="text-xs mt-2" style={{ color: "#b91c1c", fontFamily: "'Inter', sans-serif" }}>{erro}</p>}
+    </div>
+  );
+}
+
+function DocumentosOrganizacao({ teams, matches, config, saveConfig }) {
   const [secaoDoc, setSecaoDoc] = useState("fichas");
   const timesPagos = teams.filter(timeInscritoOficialmente).length;
 
@@ -8722,15 +8822,16 @@ function DocumentosOrganizacao({ teams, matches, config }) {
       )}
 
       {secaoDoc === "regulamento" && (
-        <a
-          href="regulamento.pdf"
-          target="_blank"
-          rel="noreferrer"
-          className="px-4 py-2 rounded-xl text-sm font-semibold inline-flex items-center gap-1.5"
-          style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}
-        >
-          <Download size={14} /> Regulamento oficial (PDF)
-        </a>
+        <div className="space-y-4">
+          <LinkRegulamento
+            config={config}
+            className="px-4 py-2 rounded-xl text-sm font-semibold inline-flex items-center gap-1.5"
+            style={{ backgroundColor: COLORS.navy, color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}
+          >
+            <Download size={14} /> Regulamento oficial (PDF)
+          </LinkRegulamento>
+          <EnviarRegulamento config={config} saveConfig={saveConfig} />
+        </div>
       )}
     </div>
   );
@@ -15337,7 +15438,7 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
             ativa={subAbaDownloads}
             onMudar={setSubAbaDownloads}
           />
-          {subAbaDownloads === "documentos" && <DocumentosOrganizacao teams={teams} matches={matches} config={config} />}
+          {subAbaDownloads === "documentos" && <DocumentosOrganizacao teams={teams} matches={matches} config={config} saveConfig={saveConfig} />}
           {subAbaDownloads === "escudos" && <BaixarEscudos escudosCustom={escudosCustom} />}
           {subAbaDownloads === "cards" && <PainelCardsTransmissao teams={teams} matches={matches} />}
         </>
