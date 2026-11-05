@@ -358,3 +358,10 @@ export async function subirEscudo(blob) {
   if (error) throw error;
   return supabase.storage.from("fotos").getPublicUrl(caminho).data.publicUrl;
 }
+
+// Quantos aparelhos têm os avisos ativos (só admin consegue).
+export async function contarAparelhosPush() {
+  const { data, error } = await supabase.rpc("contar_push");
+  if (error) throw error;
+  return Number(data) || 0;
+}

@@ -41,12 +41,13 @@ import {
   Upload,
   Bell,
   Instagram,
+  ArrowLeft,
 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import {
   readKey, writeKey, cadastrarConta, entrarConta, sairConta, sessaoAtual, aoMudarSessao,
   criarPerfil, cadastroDuplicado, enviarBoasVindas, buscarPerfil, listarPerfis, atualizarPerfil, atualizarPerfilConfirmado, souAdmin, listarAdmins,
-  promoverParaAdmin, removerAdmin, subirArquivo, urlAssinada, contarPessoasInscritas, buscarCpfsDaTurma,
+  promoverParaAdmin, removerAdmin, contarAparelhosPush, subirArquivo, urlAssinada, contarPessoasInscritas, buscarCpfsDaTurma,
   registrarAcesso, contarAcessos, registrarEvento as registrarEventoBruto, buscarMetricasDetalhadas, esqueciSenha, definirNovaSenha, supabase,
   buscarCpfsDoTime, salvarCpfJogador, salvarCpfsEmLote, excluirCpfsDoJogador, buscarAtletas, salvarAtletas, readStamp, subirEscudo, cpfsEmOutrosTimes, sincronizarBancoAtletas,
 } from "./lib/supabase.js";
@@ -4215,7 +4216,9 @@ function AvisosOrganizacaoCard() {
     try { setTeste(await testarAvisoOrganizacao()); } catch (e) { setTeste({ ok: false, detalhe: e.message || String(e) }); }
     setTestando(false);
   };
+  const [totalAparelhos, setTotalAparelhos] = useState(null);
   useEffect(() => { inscricaoAtual().then((s) => setAtivo(!!s && pushAdminAtivo())); }, []);
+  useEffect(() => { contarAparelhosPush().then(setTotalAparelhos).catch(() => setTotalAparelhos(null)); }, [ativo]);
   if (!pushSuportado() && !ehIosNaoInstalado()) return null;
   const ligar = async () => {
     setOcupado(true); setErro("");
@@ -4254,6 +4257,11 @@ function AvisosOrganizacaoCard() {
         </button>
       )}
       {erro && <p className="text-xs mt-2" style={{ color: "#DC2626" }}>{erro}</p>}
+      {totalAparelhos !== null && (
+        <p className="text-xs mt-3" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+          📲 <b>{totalAparelhos}</b> {totalAparelhos === 1 ? "aparelho com avisos ativos" : "aparelhos com avisos ativos"} no total (torcedores + organização)
+        </p>
+      )}
       {!ehIosNaoInstalado() && (
         <div className="mt-3">
           <button type="button" onClick={testar} disabled={testando} className="text-xs underline" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
@@ -8538,24 +8546,121 @@ function baixarTabelaCompleta(matches, teams, config) {
 // o regulamento que já vem junto com o site.
 function LinkRegulamento({ config, className, style, children }) {
   const caminho = config && config.regulamento && config.regulamento.caminho;
+  const [url, setUrl] = useState(null);
   const abrir = async (e) => {
-    if (!caminho) return;
     e.preventDefault();
-    const janela = window.open("", "_blank");
-    try {
-      const url = await urlAssinada(caminho, 3600);
-      if (janela) janela.location.href = url;
-      else window.location.href = url;
-    } catch (err) {
-      console.error("Falha ao abrir o regulamento enviado:", err);
-      if (janela) janela.location.href = "regulamento.pdf";
-      else window.open("regulamento.pdf", "_blank");
+    let u = "regulamento.pdf";
+    if (caminho) {
+      try {
+        u = await urlAssinada(caminho, 3600);
+      } catch (err) {
+        console.error("Falha ao abrir o regulamento enviado:", err);
+      }
     }
+    setUrl(u);
   };
   return (
-    <a href="regulamento.pdf" target="_blank" rel="noreferrer" onClick={abrir} className={className} style={style}>
-      {children}
-    </a>
+    <>
+      <a href="regulamento.pdf" target="_blank" rel="noreferrer" onClick={abrir} className={className} style={style}>
+        {children}
+      </a>
+      {url && <LeitorPdf url={url} titulo="Regulamento" onClose={() => setUrl(null)} />}
+    </>
+  );
+}
+
+// Leitor de PDF dentro do app, com botão "Voltar" sempre visível (abrir o PDF
+// direto no navegador do celular não deixa nenhum jeito de voltar ao app).
+function LeitorPdf({ url, titulo, onClose }) {
+  const boxRef = useRef(null);
+  const [estado, setEstado] = useState("carregando");
+  useEffect(() => {
+    let cancelado = false;
+    const antes = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const esc = (ev) => ev.key === "Escape" && onClose();
+    window.addEventListener("keydown", esc);
+    (async () => {
+      try {
+        const pdfjs = await import("pdfjs-dist/build/pdf.min.mjs");
+        const worker = (await import("pdfjs-dist/build/pdf.worker.min.mjs?url")).default;
+        pdfjs.GlobalWorkerOptions.workerSrc = worker;
+        const doc = await pdfjs.getDocument(url).promise;
+        const box = boxRef.current;
+        if (!box || cancelado) return;
+        box.innerHTML = "";
+        const largura = Math.min(box.clientWidth - 16, 900);
+        const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+        for (let n = 1; n <= doc.numPages; n++) {
+          const page = await doc.getPage(n);
+          if (cancelado) return;
+          const base = page.getViewport({ scale: 1 });
+          const escala = largura / base.width;
+          const vp = page.getViewport({ scale: escala * dpr });
+          const c = document.createElement("canvas");
+          c.width = vp.width;
+          c.height = vp.height;
+          c.style.width = `${largura}px`;
+          c.style.height = `${vp.height / dpr}px`;
+          c.style.margin = "8px auto";
+          c.style.display = "block";
+          c.style.background = "#fff";
+          c.style.borderRadius = "4px";
+          box.appendChild(c);
+          await page.render({ canvasContext: c.getContext("2d"), viewport: vp }).promise;
+        }
+        if (!cancelado) setEstado("ok");
+      } catch (err) {
+        console.error("Falha ao mostrar o PDF:", err);
+        if (!cancelado) setEstado("erro");
+      }
+    })();
+    return () => {
+      cancelado = true;
+      window.removeEventListener("keydown", esc);
+      document.body.style.overflow = antes;
+    };
+  }, [url]);
+  return (
+    <div className="fixed inset-0 flex flex-col" style={{ zIndex: 9999, backgroundColor: "#0b1020" }}>
+      <div
+        className="flex items-center justify-between gap-2 px-3 py-2"
+        style={{ backgroundColor: COLORS.surface, paddingTop: "max(8px, env(safe-area-inset-top))", borderBottom: `1px solid ${COLORS.border}` }}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          className="px-3 py-2 rounded-xl text-sm font-semibold inline-flex items-center gap-1.5"
+          style={{ backgroundColor: COLORS.accent, color: "#fff", fontFamily: "'Inter', sans-serif" }}
+        >
+          <ArrowLeft size={15} /> Voltar ao app
+        </button>
+        <span className="text-sm font-semibold truncate" style={{ color: "#fff", fontFamily: "'Inter', sans-serif" }}>{titulo}</span>
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          className="px-3 py-2 rounded-xl text-xs inline-flex items-center gap-1.5"
+          style={{ border: `1px solid ${COLORS.border}`, color: "#fff", fontFamily: "'Inter', sans-serif" }}
+        >
+          <Download size={13} /> Baixar
+        </a>
+      </div>
+      <div className="flex-1 overflow-y-auto" style={{ WebkitOverflowScrolling: "touch" }}>
+        <div ref={boxRef} className="py-2 px-2" />
+        {estado === "carregando" && (
+          <div className="flex items-center justify-center gap-2 py-10 text-sm" style={{ color: COLORS.slate }}>
+            <Loader2 size={16} className="animate-spin" /> Abrindo…
+          </div>
+        )}
+        {estado === "erro" && (
+          <div className="text-center py-10 px-4 text-sm" style={{ color: "#fff", fontFamily: "'Inter', sans-serif" }}>
+            Não consegui mostrar aqui dentro.{" "}
+            <a href={url} target="_blank" rel="noreferrer" style={{ color: COLORS.gold, textDecoration: "underline" }}>Abrir o PDF</a>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
