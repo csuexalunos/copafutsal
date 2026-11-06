@@ -1566,7 +1566,7 @@ const PARCEIROS_APP = [
   { nome: "Casa de Mãinha", img: "casa-de-mainha.png", bg: "#FFFFFF", w: "52%", multiply: true, ig: "restaurantecasademainha", url: "https://www.instagram.com/restaurantecasademainha?dlrf=MXJlZ29keDdnMnRvYg==", texto: "#5A2D12" },
   { nome: "Papa Fritas", img: "papa-fritas.svg", bg: "#F26A1B", w: "62%", ig: "papafritas", url: "https://www.instagram.com/papafritas?cplk=MW9ubzlpNWx6MWRhMQ==", texto: "#FFFFFF" },
 ];
-const LINK_CANAL_TRANSMISSAO = "https://www.youtube.com/channel/UCwAst32aZjhZdXTDXqP60Nw";
+const LINK_CANAL_TRANSMISSAO = "https://www.youtube.com/live/EqAj1_bFM4I?si=aOrEkHNviFIeQ92p";
 
 // Quadradinhos dos parceiros (clicáveis, abrem o Instagram) — usado na Home e na Classificação.
 function BlocoParceiros() {
