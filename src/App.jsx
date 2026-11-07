@@ -5516,6 +5516,32 @@ function ClassificacaoTabela({ matches, teams }) {
         </>
       )}
 
+      {teams.length > 0 && (
+        <div className="rounded-2xl p-4 mb-4" style={{ backgroundColor: COLORS.surface, border: `1px solid ${COLORS.border}` }}>
+          <div className="font-semibold text-sm mb-1" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>
+            ⚖️ Critérios de desempate
+          </div>
+          <p className="text-xs mb-2" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            Em caso de empate em pontos entre duas ou mais equipes, vale esta ordem (Art. 21):
+          </p>
+          <ol className="text-sm space-y-1" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
+            {[
+              "Maior número de pontos (vitória 3, empate 1, derrota 0)",
+              "Maior número de vitórias",
+              "Melhor saldo de gols",
+              "Maior número de gols marcados",
+              "Equipe mais disciplinada (amarelo = 1 ponto, vermelho = 3 pontos)",
+              "Sorteio",
+            ].map((c, i) => (
+              <li key={i} className="flex gap-2">
+                <span className="font-bold shrink-0" style={{ color: COLORS.gold }}>{i + 1}º</span>
+                <span>{c}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+
       {fasesEliminatorias.length > 0 && (
         <div className="mt-4">
           <SectionLabel eyebrow="Segunda fase" title="Eliminatórias" />
