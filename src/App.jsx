@@ -1566,7 +1566,11 @@ const PARCEIROS_APP = [
   { nome: "Casa de Mãinha", img: "casa-de-mainha.png", bg: "#FFFFFF", w: "52%", multiply: true, ig: "restaurantecasademainha", url: "https://www.instagram.com/restaurantecasademainha?dlrf=MXJlZ29keDdnMnRvYg==", texto: "#5A2D12" },
   { nome: "Papa Fritas", img: "papa-fritas.svg", bg: "#F26A1B", w: "62%", ig: "papafritas", url: "https://www.instagram.com/papafritas?cplk=MW9ubzlpNWx6MWRhMQ==", texto: "#FFFFFF" },
 ];
-const LINK_CANAL_TRANSMISSAO = "https://www.youtube.com/live/EqAj1_bFM4I?si=aOrEkHNviFIeQ92p";
+// Transmissão de hoje (atualizar a cada dia) e as dos dias anteriores.
+const LINK_CANAL_TRANSMISSAO = "https://www.youtube.com/live/tZAKdXkphK8?is=VtU0oGkY4PWY9qaM";
+const TRANSMISSOES_ANTERIORES = [
+  { dia: "Sexta (6/11)", url: "https://www.youtube.com/live/EqAj1_bFM4I?si=aOrEkHNviFIeQ92p" },
+];
 
 // Quadradinhos dos parceiros (clicáveis, abrem o Instagram) — usado na Home e na Classificação.
 function BlocoParceiros() {
@@ -1650,12 +1654,13 @@ function FaixaPrestadorMoveX() {
 // Faixa pequena da transmissão (GV Produções) com link do canal.
 function FaixaTransmissaoGV() {
   return (
+    <div className="mb-6">
     <a
       href={LINK_CANAL_TRANSMISSAO}
       target="_blank"
       rel="noreferrer"
       onClick={() => registrarEvento("clique", "canal_transmissao").catch((e) => console.error("Falha ao registrar clique", e))}
-      className="mb-6 flex items-center gap-3 rounded-xl pr-3 overflow-hidden"
+      className="flex items-center gap-3 rounded-xl pr-3 overflow-hidden"
       style={{ backgroundColor: "#05060F", border: `1px solid ${COLORS.border}` }}
     >
       <img
@@ -1672,11 +1677,28 @@ function FaixaTransmissaoGV() {
           Transmissão
         </span>
         <span className="block text-xs truncate" style={{ color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}>
-          GV Produções · ver o canal no YouTube
+          GV Produções · assistir no YouTube
         </span>
       </span>
       <ArrowRight size={14} color={COLORS.gold} className="shrink-0" />
     </a>
+    {TRANSMISSOES_ANTERIORES.map((t) => (
+      <a
+        key={t.dia}
+        href={t.url}
+        target="_blank"
+        rel="noreferrer"
+        onClick={() => registrarEvento("clique", "transmissao_anterior").catch((e) => console.error("Falha ao registrar clique", e))}
+        className="mt-2 flex items-center justify-between gap-2 rounded-xl px-3 py-2"
+        style={{ border: `1px solid ${COLORS.border}`, backgroundColor: "#05060F" }}
+      >
+        <span className="text-xs" style={{ color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}>
+          ▶ Reveja a transmissão de {t.dia}
+        </span>
+        <ArrowRight size={14} color={COLORS.gold} className="shrink-0" />
+      </a>
+    ))}
+    </div>
   );
 }
 
