@@ -6420,7 +6420,7 @@ function calcularSuspensos(matches) {
 // Suspensões por jogo, seguindo o regulamento (Art. 27 a 30):
 // - 1 vermelho = 1 jogo de suspensão; 3 amarelos = 1 jogo (a série zera);
 // - 2 amarelos + vermelho no mesmo jogo: o 2º amarelo não conta (Art. 28 d);
-// - amarelos de séries incompletas não passam pra semifinal (Art. 28 b);
+// - amarelos de séries incompletas não passam pras quartas de final (Art. 28 b);
 // - a suspensão é cumprida no PRÓXIMO jogo do time, na ordem cronológica.
 // Tudo é recalculado a partir dos eventos dos jogos, então qualquer
 // correção de cartão/placar atualiza as suspensões (e as súmulas) sozinha.
@@ -6441,7 +6441,7 @@ function calcularSuspensoes(matches, teams) {
   const chave = (j, t) => `${normalizarTexto(j)}|${t || ""}`;
 
   ord.forEach((m) => {
-    if ((m.fase || "") === "Semifinal" && !resetSemi) {
+    if (["Oitavas", "Quartas", "Semifinal", "3º Lugar", "Final"].includes(m.fase || "") && !resetSemi) {
       Object.values(st).forEach((p) => {
         p.amarelos = 0;
       });
