@@ -5283,7 +5283,14 @@ function TabelaClassificacao({ titulo, linhas, destaqueTop, teams, matches }) {
                         {idx + 1}
                       </span>
                       {ESCUDOS_TIMES[t.nome] && <img src={ESCUDOS_TIMES[t.nome]} alt="" className="w-7 h-7 object-contain shrink-0" />}
-                      <span className="truncate">{t.nome}</span>
+                      <span className="min-w-0">
+                        <span className="block truncate">{t.nome}</span>
+                        {t.gpos && (
+                          <span className="block text-[10px] font-medium" style={{ color: t.gpos <= 2 ? "#4ADE80" : COLORS.slate }}>
+                            {t.gpos}º · {t.gnome}
+                          </span>
+                        )}
+                      </span>
                     </span>
                   </td>
                   {valores.map((v, i) => (
@@ -11875,6 +11882,8 @@ function calcularClassificacaoGeral(matches, teams) {
     const tab = pontosPartida(jogos, teams).filter((t) => jogos.some((m) => m.timeA === t.id || m.timeB === t.id));
     tab.forEach((t, i) => {
       vistos.add(t.id);
+      t.gpos = i + 1;
+      t.gnome = fase;
       (i === 0 ? primeiros : i === 1 ? segundos : demais).push(t);
     });
   });
