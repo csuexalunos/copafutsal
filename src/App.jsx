@@ -6511,8 +6511,9 @@ function calcularSuspensoes(matches, teams) {
   const pendentes = Object.values(st)
     .filter((p) => p.devidos > 0)
     .map((p) => ({ jogador: p.jogador, timeNome: p.timeNome, motivo: p.motivos[0] || "suspensão automática" }));
+  // Pendurado = 2 amarelos na série (o próximo amarelo já gera suspensão).
   const pendurados = Object.values(st)
-    .filter((p) => p.amarelos > 0)
+    .filter((p) => p.amarelos >= 2)
     .map((p) => ({ jogador: p.jogador, timeNome: p.timeNome, amarelos: p.amarelos }));
   return { porJogo, pendentes, pendurados, violacoes, amarelosAntes };
 }
