@@ -11839,23 +11839,53 @@ function pontosPartida(jogos, teams) {
       b.pts += 1;
     }
   });
+  return Object.values(tabela).sort(compararCampanha);
+}
+
+// Art. 21: pontos, vitórias, saldo de gols, gols marcados e, por fim, o ranking
+// da última edição (no lugar do sorteio).
+function compararCampanha(x, y) {
   const posicaoRanking = (nome) => {
     const i = RANKING_ULTIMA_EDICAO.indexOf(nome);
     return i === -1 ? Infinity : i;
   };
-  return Object.values(tabela).sort(
-    (x, y) =>
-      y.pts - x.pts ||
-      y.gp - y.gc - (x.gp - x.gc) ||
-      y.gp - x.gp ||
-      posicaoRanking(x.nome) - posicaoRanking(y.nome)
+  return (
+    y.pts - x.pts ||
+    y.v - x.v ||
+    y.gp - y.gc - (x.gp - x.gc) ||
+    y.gp - x.gp ||
+    posicaoRanking(x.nome) - posicaoRanking(y.nome)
   );
 }
 
 // Classificação geral — todos os times, contando só os jogos da fase de
 // grupos (não mistura com mata-mata).
+// Ranking geral pré-eliminatória: os 4 primeiros colocados dos grupos ocupam
+// do 1º ao 4º (ordenados entre si pela campanha), os 4 segundos colocados do
+// 5º ao 8º, e os demais vêm depois.
 function calcularClassificacaoGeral(matches, teams) {
-  return pontosPartida(matches.filter((m) => (m.fase || "").startsWith("Grupo")), teams);
+  const jogosGrupo = matches.filter((m) => (m.fase || "").startsWith("Grupo"));
+  const fases = [...new Set(jogosGrupo.map((m) => m.fase))];
+  const primeiros = [];
+  const segundos = [];
+  const demais = [];
+  const vistos = new Set();
+  fases.forEach((fase) => {
+    const jogos = jogosGrupo.filter((m) => m.fase === fase);
+    const tab = pontosPartida(jogos, teams).filter((t) => jogos.some((m) => m.timeA === t.id || m.timeB === t.id));
+    tab.forEach((t, i) => {
+      vistos.add(t.id);
+      (i === 0 ? primeiros : i === 1 ? segundos : demais).push(t);
+    });
+  });
+  // Times que ainda não entraram em nenhum jogo de grupo vão para o fim.
+  const semJogo = pontosPartida(jogosGrupo, teams).filter((t) => !vistos.has(t.id));
+  return [
+    ...primeiros.sort(compararCampanha),
+    ...segundos.sort(compararCampanha),
+    ...demais.sort(compararCampanha),
+    ...semJogo,
+  ];
 }
 
 function jogoDecidido(m) {
@@ -11897,7 +11927,9 @@ function gerarMataMataAutomatico(matches, teams, horarios) {
   const temFase = (prefixo) => novos.some((m) => (m.fase || "").startsWith(prefixo));
 
   const jogosGrupo = novos.filter((m) => (m.fase || "").startsWith("Grupo"));
-  const gruposCompletos = jogosGrupo.length > 0 && jogosGrupo.every((m) => jogoDecidido(m));
+  // Na fase de grupos empate é resultado válido: basta ter placar lançado.
+  const placarLancado = (m) => m.golsA != null && m.golsB != null && m.golsA !== "" && m.golsB !== "";
+  const gruposCompletos = jogosGrupo.length > 0 && jogosGrupo.every(placarLancado);
 
   if (gruposCompletos && !temFase("Quartas")) {
     // Cruzamento pela classificação geral (só da fase de grupos), os 8 melhores:
