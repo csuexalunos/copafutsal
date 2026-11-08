@@ -5545,8 +5545,8 @@ function ClassificacaoTabela({ matches, teams }) {
                     const decidido = jogoDecidido(m);
                     const vencedorId = decidido ? vencedorJogo(m) : null;
                     return (
+                      <div key={m.id}>
                       <div
-                        key={m.id}
                         className="rounded-xl px-4 py-2.5 flex items-center justify-between gap-2 text-sm"
                         style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
                       >
@@ -5560,6 +5560,8 @@ function ClassificacaoTabela({ matches, teams }) {
                         <span style={{ color: vencedorId === m.timeB ? "#16A34A" : COLORS.ink, fontWeight: vencedorId === m.timeB ? 700 : 500 }}>
                           {teamName(m.timeB)}
                         </span>
+                      </div>
+                      {decididoNosPenaltis(m) && <div className="px-4 pb-1"><ListaPenaltis match={m} teams={teams} compacto /></div>}
                       </div>
                     );
                   })}
@@ -6922,6 +6924,81 @@ function RegistradorEventos({ match, teams, suspensos, onRegistrar }) {
   );
 }
 
+// Lista das cobranças de pênalti (quem chutou, quem converteu e quem errou)
+function ListaPenaltis({ match, teams, compacto }) {
+  const ks = match.penaltis || [];
+  if (!ks.length) return null;
+  const nome = (id) => teams.find((t) => t.id === id)?.nome || "?";
+  return (
+    <div className={compacto ? "text-[10px] text-left mt-1" : "text-xs text-left mt-2"} style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+      {[match.timeA, match.timeB].map((tid) => (
+        <div key={tid} className="mb-0.5">
+          <strong style={{ color: COLORS.ink }}>{nome(tid)}:</strong>{" "}
+          {ks.filter((k) => k.timeId === tid).map((k, i) => (
+            <span key={i} className="mr-2" style={{ color: k.convertido ? "#16A34A" : "#EF4444" }}>
+              {k.convertido ? "✅" : "❌"} {k.jogador}
+            </span>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PainelPenaltis({ match, teams, onConfirm, onCancel }) {
+  const nome = (id) => teams.find((t) => t.id === id)?.nome || "?";
+  const [kicks, setKicks] = useState(match.penaltis || []);
+  const [timeId, setTimeId] = useState(match.timeA);
+  const [jog, setJog] = useState("");
+  const time = teams.find((t) => t.id === timeId);
+  const elenco = (time ? (Array.isArray(time.jogadores) && time.jogadores.length > 0 ? time.jogadores : ELENCOS_2025[time.nome] || []) : [])
+    .map((j) => j.apelido || j.nome).filter(Boolean);
+  const placar = (id) => kicks.filter((k) => k.timeId === id && k.convertido).length;
+  const a = placar(match.timeA), b = placar(match.timeB);
+  const add = (convertido) => {
+    if (!jog.trim()) return;
+    setKicks([...kicks, { timeId, jogador: jog.trim(), convertido }]);
+    setJog("");
+    setTimeId(timeId === match.timeA ? match.timeB : match.timeA);
+  };
+  const est = { backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" };
+  return (
+    <div className="basis-full rounded-xl p-3 mt-2" style={{ border: `1.5px solid ${COLORS.accent}`, fontFamily: "'Inter', sans-serif" }} onClick={(e) => e.stopPropagation()}>
+      <div className="text-xs font-bold mb-2" style={{ color: COLORS.ink }}>🥅 Empate! Disputa de pênaltis</div>
+      <div className="text-center text-lg font-bold mb-2" style={{ color: COLORS.ink, fontFamily: "'JetBrains Mono', monospace" }}>
+        {nome(match.timeA)} {a} x {b} {nome(match.timeB)}
+      </div>
+      <div className="flex gap-2 mb-2">
+        {[match.timeA, match.timeB].map((id) => (
+          <button key={id} type="button" onClick={() => setTimeId(id)} className="flex-1 rounded-lg py-1.5 text-xs font-semibold"
+            style={timeId === id ? { backgroundColor: COLORS.accent, color: "#fff" } : { border: `1px solid ${COLORS.border}`, color: COLORS.slate }}>
+            {nome(id)}
+          </button>
+        ))}
+      </div>
+      <input list={`elenco-pen-${match.id}`} value={jog} onChange={(e) => setJog(e.target.value)} placeholder="Quem chutou? (escolha ou digite)"
+        className="w-full px-2 py-2 rounded-lg text-sm mb-2" style={est} />
+      <datalist id={`elenco-pen-${match.id}`}>{elenco.map((n) => <option key={n} value={n} />)}</datalist>
+      <div className="flex gap-2 mb-2">
+        <button type="button" disabled={!jog.trim()} onClick={() => add(true)} className="flex-1 rounded-lg py-2 text-xs font-semibold disabled:opacity-40" style={{ backgroundColor: "#16A34A", color: "#fff" }}>✅ Converteu</button>
+        <button type="button" disabled={!jog.trim()} onClick={() => add(false)} className="flex-1 rounded-lg py-2 text-xs font-semibold disabled:opacity-40" style={{ backgroundColor: "#EF4444", color: "#fff" }}>❌ Errou</button>
+      </div>
+      <ListaPenaltis match={{ ...match, penaltis: kicks }} teams={teams} />
+      {kicks.length > 0 && (
+        <button type="button" onClick={() => { const k = kicks[kicks.length - 1]; setKicks(kicks.slice(0, -1)); setTimeId(k.timeId); setJog(k.jogador); }}
+          className="text-xs underline mt-1" style={{ color: COLORS.slate }}>↶ Desfazer última cobrança</button>
+      )}
+      <div className="flex gap-2 justify-center mt-3">
+        <button type="button" disabled={a === b} onClick={() => onConfirm({ penaltis: kicks, penA: a, penB: b })}
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-40" style={{ backgroundColor: COLORS.accent, color: "#fff" }}>
+          Confirmar e encerrar
+        </button>
+        <button type="button" onClick={onCancel} className="px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ border: `1px solid ${COLORS.border}`, color: COLORS.slate }}>Cancelar</button>
+      </div>
+    </div>
+  );
+}
+
 function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, podeDescer, souSuperAdmin, cartao, suspensosJogo }) {
   const [expanded, setExpanded] = useState(false);
   const [eventForm, setEventForm] = useState({ tipo: "gol", jogador: "", timeId: "" });
@@ -6968,7 +7045,7 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
     }).catch((e) => console.error("Falha ao enviar avisos", e));
   const [pedirPen, setPedirPen] = useState(null);
   const encerrarJogo = (pen) => {
-    const campos = pen && typeof pen === "object" && !pen.nativeEvent && pen.a !== undefined ? { penA: Number(pen.a), penB: Number(pen.b) } : {};
+    const campos = pen && typeof pen === "object" && pen.penA !== undefined ? pen : {};
     patch({
       pausado: false,
       status: "encerrado",
@@ -6985,7 +7062,7 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
   };
   const clicarEncerrar = () => {
     const eliminatoria = !(match.fase || "").startsWith("Grupo");
-    if (eliminatoria && Number(match.golsA || 0) === Number(match.golsB || 0)) setPedirPen({ a: match.penA ?? "", b: match.penB ?? "" });
+    if (eliminatoria && Number(match.golsA || 0) === Number(match.golsB || 0)) setPedirPen(true);
     else encerrarJogo();
   };
 
@@ -7154,6 +7231,7 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
                 {inputGol("golsB")}
               </div>
               {penaltisUI}
+              <ListaPenaltis match={match} teams={teams} />
             </div>
             {ladoCartao(match.timeB)}
           </div>
@@ -7350,32 +7428,7 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
                 Encerrar jogo
               </button>
             )}
-            {pedirPen && (
-              <div className="basis-full rounded-xl p-3 mt-2" style={{ border: `1.5px solid ${COLORS.accent}`, fontFamily: "'Inter', sans-serif" }}>
-                <div className="text-xs font-bold mb-2" style={{ color: COLORS.ink }}>🥅 Empate! Disputa de pênaltis</div>
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <span className="text-xs" style={{ color: COLORS.slate }}>{teamName(match.timeA)}</span>
-                  <input type="number" min="0" value={pedirPen.a} onChange={(e) => setPedirPen({ ...pedirPen, a: e.target.value })}
-                    className="w-12 px-1 py-1 rounded text-center text-sm" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}`, color: COLORS.ink }} />
-                  <span style={{ color: COLORS.slate }}>x</span>
-                  <input type="number" min="0" value={pedirPen.b} onChange={(e) => setPedirPen({ ...pedirPen, b: e.target.value })}
-                    className="w-12 px-1 py-1 rounded text-center text-sm" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}`, color: COLORS.ink }} />
-                  <span className="text-xs" style={{ color: COLORS.slate }}>{teamName(match.timeB)}</span>
-                </div>
-                <div className="flex gap-2 justify-center">
-                  <button type="button"
-                    disabled={pedirPen.a === "" || pedirPen.b === "" || Number(pedirPen.a) === Number(pedirPen.b)}
-                    onClick={() => encerrarJogo(pedirPen)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-40"
-                    style={{ backgroundColor: COLORS.accent, color: "#FFFFFF" }}>
-                    Confirmar e encerrar
-                  </button>
-                  <button type="button" onClick={() => setPedirPen(null)} className="px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ border: `1px solid ${COLORS.border}`, color: COLORS.slate }}>
-                    Cancelar
-                  </button>
-                </div>
-              </div>
-            )}
+            {pedirPen && <PainelPenaltis match={match} teams={teams} onConfirm={encerrarJogo} onCancel={() => setPedirPen(null)} />}
             {(match.status !== "agendado" || (match.eventos || []).length > 0 || match.golsA != null || match.golsB != null) && (
               <button
                 type="button"
