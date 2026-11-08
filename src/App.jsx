@@ -6976,9 +6976,22 @@ function PainelPenaltis({ match, teams, onConfirm, onCancel }) {
           </button>
         ))}
       </div>
-      <input list={`elenco-pen-${match.id}`} value={jog} onChange={(e) => setJog(e.target.value)} placeholder="Quem chutou? (escolha ou digite)"
+      <div className="grid grid-cols-3 gap-1.5 mb-2 max-h-56 overflow-y-auto">
+        {elenco.map((n) => {
+          const jaChutou = kicks.some((k) => k.timeId === timeId && k.jogador === n);
+          const sel = jog === n;
+          return (
+            <button key={n} type="button" onClick={() => setJog(sel ? "" : n)}
+              className="rounded-lg px-1 py-2 text-xs font-semibold leading-tight"
+              style={sel ? { backgroundColor: COLORS.accent, color: "#fff" } : { ...est, opacity: jaChutou ? 0.45 : 1 }}>
+              {n}{jaChutou ? " ✓" : ""}
+            </button>
+          );
+        })}
+      </div>
+      <input value={elenco.includes(jog) ? "" : jog} onChange={(e) => setJog(e.target.value)} placeholder="Outro nome (digite)"
         className="w-full px-2 py-2 rounded-lg text-sm mb-2" style={est} />
-      <datalist id={`elenco-pen-${match.id}`}>{elenco.map((n) => <option key={n} value={n} />)}</datalist>
+      {jog && <div className="text-xs mb-1 text-center" style={{ color: COLORS.ink }}>Batedor: <strong>{jog}</strong></div>}
       <div className="flex gap-2 mb-2">
         <button type="button" disabled={!jog.trim()} onClick={() => add(true)} className="flex-1 rounded-lg py-2 text-xs font-semibold disabled:opacity-40" style={{ backgroundColor: "#16A34A", color: "#fff" }}>✅ Converteu</button>
         <button type="button" disabled={!jog.trim()} onClick={() => add(false)} className="flex-1 rounded-lg py-2 text-xs font-semibold disabled:opacity-40" style={{ backgroundColor: "#EF4444", color: "#fff" }}>❌ Errou</button>
