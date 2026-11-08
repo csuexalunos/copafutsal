@@ -11816,10 +11816,17 @@ function datetimeLocalParaIso(valor) {
 function pontosPartida(jogos, teams) {
   const tabela = {};
   teams.forEach((t) => {
-    tabela[t.id] = { id: t.id, nome: t.nome, j: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0, pts: 0 };
+    tabela[t.id] = { id: t.id, nome: t.nome, j: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0, pts: 0, disc: 0 };
   });
   jogos.forEach((m) => {
     if (m.golsA == null || m.golsB == null || m.golsA === "" || m.golsB === "") return;
+    // Disciplina (Art. 21, V): amarelo = 1 ponto, vermelho = 3 pontos (menos é melhor).
+    (m.eventos || []).forEach((ev) => {
+      const peso = ev.tipo === "cartao_amarelo" ? 1 : ev.tipo === "cartao_vermelho" ? 3 : 0;
+      if (!peso) return;
+      const tt = [m.timeA, m.timeB].map((id) => tabela[id]).find((x) => x && x.nome === ev.timeNome);
+      if (tt) tt.disc += peso;
+    });
     const a = tabela[m.timeA];
     const b = tabela[m.timeB];
     if (!a || !b) return;
@@ -11861,6 +11868,7 @@ function compararCampanha(x, y) {
     y.v - x.v ||
     y.gp - y.gc - (x.gp - x.gc) ||
     y.gp - x.gp ||
+    (x.disc || 0) - (y.disc || 0) ||
     posicaoRanking(x.nome) - posicaoRanking(y.nome)
   );
 }
