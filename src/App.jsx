@@ -14247,6 +14247,30 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
     }
   };
 
+  // Refaz os confrontos das quartas pela classificação geral atual (4 primeiros
+  // dos grupos, depois 4 segundos): 1º x 8º, 4º x 5º, 2º x 7º, 3º x 6º.
+  // Mantém os horários e só mexe em quartas que ainda não começaram.
+  const refazerQuartasOrg = async () => {
+    const geral = calcularClassificacaoGeral(matches, teams).slice(0, 8);
+    const quartasAtuais = ordemCronologica(matches).filter((m) => m.fase === "Quartas");
+    if (geral.length < 8 || quartasAtuais.length !== 4) {
+      alert("Não consegui refazer: precisa ter 8 classificados e as 4 quartas já criadas.");
+      return;
+    }
+    if (quartasAtuais.some((m) => m.status !== "agendado" || (m.golsA != null && m.golsA !== "") || (m.golsB != null && m.golsB !== "") || (m.eventos || []).length > 0)) {
+      alert("Alguma quarta já começou ou tem placar/eventos. Não vou mexer nela.");
+      return;
+    }
+    const pares = [[0, 7], [3, 4], [1, 6], [2, 5]].map(([i, j]) => [geral[i], geral[j]]);
+    const resumo = pares.map(([x, y], i) => `${i + 1}) ${x.nome} x ${y.nome}`).join("\n");
+    if (!confirm(`Refazer os confrontos das quartas assim?\n\n${resumo}`)) return;
+    const mapa = {};
+    quartasAtuais.forEach((m, i) => { mapa[m.id] = pares[i]; });
+    await saveMatches((atuais) =>
+      (atuais || []).map((m) => (mapa[m.id] ? { ...m, timeA: mapa[m.id][0].id, timeB: mapa[m.id][1].id } : m))
+    );
+  };
+
   const [listaAdmins, setListaAdmins] = useState([]);
   const [carregandoPainel, setCarregandoPainel] = useState(true);
   const [buscaInscritos, setBuscaInscritos] = useState("");
@@ -15431,6 +15455,14 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
             >
               {verificandoMataMata && <Loader2 size={14} className="animate-spin" />}
               Verificar/gerar eliminatórias agora
+            </button>
+            <button
+              type="button"
+              onClick={refazerQuartasOrg}
+              className="px-4 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2"
+              style={{ border: `1.5px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
+            >
+              Refazer confrontos das quartas
             </button>
           </div>
         </div>
