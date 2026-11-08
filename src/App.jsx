@@ -6831,7 +6831,7 @@ function RegistradorEventos({ match, teams, suspensos, onRegistrar }) {
               className="w-full rounded-xl py-3 text-sm font-semibold mt-2"
               style={{ backgroundColor: COLORS.navy || "#1B2A5C", color: COLORS.gold, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
             >
-              🧤 Defesa difícil (melhor goleiro)
+              🧤 Defesa difícil
             </button>
           )}
         </>
