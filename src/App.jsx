@@ -5461,7 +5461,7 @@ function ClassificacaoTabela({ matches, teams }) {
   const temGrupos = gruposNomes.length > 0;
   const [modo, setModo] = useState("grupos"); // "grupos" | "geral"
 
-  const teamName = (id) => teams.find((t) => t.id === id)?.nome || "?";
+  const teamName = (id) => (id ? teams.find((t) => t.id === id)?.nome || "?" : "A definir");
 
   return (
     <div>
@@ -7017,7 +7017,7 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
   const [eventForm, setEventForm] = useState({ tipo: "gol", jogador: "", timeId: "" });
   const [timeModal, setTimeModal] = useState(null);
 
-  const teamName = (id) => teams.find((t) => t.id === id)?.nome || "?";
+  const teamName = (id) => (id ? teams.find((t) => t.id === id)?.nome || "?" : "A definir");
 
   const patch = (fields) => onUpdate({ ...match, ...fields });
 
@@ -12100,24 +12100,54 @@ function gerarMataMataAutomatico(matches, teams, horarios) {
     }
   }
 
-  const quartas = novos.filter((m) => (m.fase || "") === "Quartas");
-  if (quartas.length === 4 && quartas.every(jogoDecidido) && !temFase("Semifinal")) {
+  // Avanço imediato: assim que um jogo é decidido, o vencedor já ocupa a vaga
+  // dele na próxima fase (a vaga do adversário fica em aberto até ele sair).
+  const naoComecou = (m) => (m.status || "agendado") === "agendado" && (m.golsA == null || m.golsA === "") && (m.golsB == null || m.golsB === "");
+  const preencher = (jogo, a, b) => {
+    if (!naoComecou(jogo)) return jogo;
+    const ta = a || null, tb = b || null;
+    if ((jogo.timeA || null) === ta && (jogo.timeB || null) === tb) return jogo;
+    return { ...jogo, timeA: ta, timeB: tb };
+  };
+  const ordem = (fase) => novos.filter((m) => (m.fase || "") === fase);
+
+  const quartas = ordem("Quartas");
+  if (quartas.length === 4) {
     const v = quartas.map(vencedorJogo);
-    const semis = [
-      novoJogoVazio(`jogo_sf0_${Date.now()}`, "Semifinal", v[0], v[1]),
-      novoJogoVazio(`jogo_sf1_${Date.now()}`, "Semifinal", v[2], v[3]),
-    ];
-    novos = agendarHorarios([...novos, ...semis], h);
+    let semis = ordem("Semifinal");
+    if (semis.length === 0 && quartas.some(jogoDecidido)) {
+      const criar = [
+        novoJogoVazio(`jogo_sf0_${Date.now()}`, "Semifinal", v[0], v[1]),
+        novoJogoVazio(`jogo_sf1_${Date.now()}`, "Semifinal", v[2], v[3]),
+      ];
+      novos = agendarHorarios([...novos, ...criar], h);
+    } else if (semis.length === 2) {
+      const pares = [[v[0], v[1]], [v[2], v[3]]];
+      novos = novos.map((m) => {
+        const k = semis.findIndex((x) => x.id === m.id);
+        return k >= 0 ? preencher(m, pares[k][0], pares[k][1]) : m;
+      });
+    }
   }
 
-  const semis = novos.filter((m) => (m.fase || "") === "Semifinal");
-  if (semis.length === 2 && semis.every(jogoDecidido) && !temFase("Final")) {
+  const semis = ordem("Semifinal");
+  if (semis.length === 2) {
     const vencedores = semis.map(vencedorJogo);
     const perdedores = semis.map(perdedorJogo);
-    const final = novoJogoVazio(`jogo_final_${Date.now()}`, "Final", vencedores[0], vencedores[1]);
-    const terceiro = novoJogoVazio(`jogo_3lugar_${Date.now()}`, "3º Lugar", perdedores[0], perdedores[1]);
-    // 3º lugar primeiro, final por último.
-    novos = agendarHorarios([...novos, terceiro, final], h);
+    const final = ordem("Final")[0];
+    const terceiro = ordem("3º Lugar")[0];
+    if (!final && semis.some(jogoDecidido)) {
+      const nTerceiro = novoJogoVazio(`jogo_3lugar_${Date.now()}`, "3º Lugar", perdedores[0], perdedores[1]);
+      const nFinal = novoJogoVazio(`jogo_final_${Date.now()}`, "Final", vencedores[0], vencedores[1]);
+      // 3º lugar primeiro, final por último.
+      novos = agendarHorarios([...novos, nTerceiro, nFinal], h);
+    } else if (final) {
+      novos = novos.map((m) => {
+        if (final && m.id === final.id) return preencher(m, vencedores[0], vencedores[1]);
+        if (terceiro && m.id === terceiro.id) return preencher(m, perdedores[0], perdedores[1]);
+        return m;
+      });
+    }
   }
 
   return novos;
