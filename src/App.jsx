@@ -1802,6 +1802,11 @@ function Home({ teams, matches, setTab, config, totalPessoas }) {
   const timeCampeao = jogoFinal && jogoDecidido(jogoFinal) ? (teams || []).find((t) => t.id === vencedorJogo(jogoFinal)) : null;
   const timeVice = jogoFinal && jogoDecidido(jogoFinal) ? (teams || []).find((t) => t.id === perdedorJogo(jogoFinal)) : null;
   const escudoCampeao = timeCampeao ? ESCUDOS_TIMES[timeCampeao.nome] || timeCampeao.escudoUrl : null;
+  const titulosAnteriores = timeCampeao
+    ? (((config && config.hallDaFama) || HALL_DA_FAMA).campeoes || []).filter((c) => c.turma === timeCampeao.nome && !/VIII|8ª/.test(c.edicao || "")).length
+    : 0;
+  const titulos = titulosAnteriores + 1;
+  const rotuloTitulos = ["", "Campeã", "Bicampeã", "Tricampeã", "Tetracampeã"][titulos] || `${titulos}× campeã`;
   const replays = [...TRANSMISSOES_ANTERIORES, { dia: "Domingo (8/11)", url: linkLive }];
   const fonte = "'Inter', sans-serif";
   const tile = { backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` };
@@ -1837,7 +1842,7 @@ function Home({ teams, matches, setTab, config, totalPessoas }) {
           style={{ background: "linear-gradient(160deg, #F5C242 0%, #B8860B 45%, #1B2A5C 100%)", border: "1px solid #F5C24288" }}
         >
           <div className="text-[11px] font-bold uppercase mb-3" style={{ color: "#1B2A5C", letterSpacing: "0.24em", fontFamily: fonte }}>
-            🏆 Campeão · {EDITION}ª Copa de Ex-Alunos
+            🏆 {titulos > 1 ? rotuloTitulos : "Campeã"} · {EDITION}ª Copa de Ex-Alunos
           </div>
           {escudoCampeao ? (
             <img src={escudoCampeao} alt={`Escudo ${timeCampeao.nome}`} className="w-28 h-28 object-contain mx-auto mb-3 drop-shadow-xl" />
@@ -1850,7 +1855,7 @@ function Home({ teams, matches, setTab, config, totalPessoas }) {
             Turma {timeCampeao.nome}
           </div>
           <div className="text-sm mt-1" style={{ color: "#FFF7DB", fontFamily: fonte }}>
-            Campeã da VIII Copa CSU de Ex-Alunos
+            {titulos > 1 ? `${rotuloTitulos} — ${titulos}º título da história!` : "Campeã da VIII Copa CSU de Ex-Alunos"}
           </div>
           {jogoFinal && (
             <div className="inline-block mt-3 rounded-full px-4 py-1.5 text-xs font-semibold" style={{ backgroundColor: "rgba(11,18,32,.55)", color: "#FFFFFF", fontFamily: fonte }}>
