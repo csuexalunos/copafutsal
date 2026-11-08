@@ -1567,6 +1567,7 @@ const PARCEIROS_APP = [
   { nome: "Papa Fritas", img: "papa-fritas.svg", bg: "#F26A1B", w: "62%", ig: "papafritas", url: "https://www.instagram.com/papafritas?cplk=MW9ubzlpNWx6MWRhMQ==", texto: "#FFFFFF" },
 ];
 // Transmissão de hoje (atualizar a cada dia) e as dos dias anteriores.
+const LINK_FOTOS_FOTOP = "https://guimaraesdaniel.fotop.com/fotos/eventos/index/evento/357825";
 const LINK_CANAL_TRANSMISSAO = "https://www.youtube.com/live/tZAKdXkphK8?is=VtU0oGkY4PWY9qaM";
 const TRANSMISSOES_ANTERIORES = [
   { dia: "Sexta (6/11)", url: "https://www.youtube.com/live/EqAj1_bFM4I?si=aOrEkHNviFIeQ92p" },
@@ -1906,6 +1907,26 @@ function Home({ teams, matches, setTab, config, totalPessoas }) {
           </button>
         ))}
       </div>
+
+      <a
+        href={LINK_FOTOS_FOTOP}
+        target="_blank"
+        rel="noreferrer"
+        onClick={() => registrarEvento("clique", "fotos_fotop").catch((e) => console.error("Falha ao registrar clique", e))}
+        className="flex items-center gap-3.5 rounded-2xl p-3.5 mb-3"
+        style={{ backgroundColor: "#E9652C" }}
+      >
+        <img src={`${import.meta.env.BASE_URL}parceiros/fotop.png`} alt="Fotop" className="w-12 h-12 rounded-full shrink-0" />
+        <span className="flex-1 min-w-0">
+          <span className="block text-[15px] font-bold" style={{ color: "#FFFFFF", fontFamily: "'Sora', sans-serif" }}>
+            Fotos oficiais da Copa
+          </span>
+          <span className="block text-xs" style={{ color: "rgba(255,255,255,0.85)", fontFamily: fonte }}>
+            Veja e baixe as suas no Fotop
+          </span>
+        </span>
+        <ArrowRight size={18} color="#FFFFFF" className="shrink-0" />
+      </a>
 
       <LinkRegulamento
         config={config}
