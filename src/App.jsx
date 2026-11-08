@@ -1788,196 +1788,153 @@ function Home({ teams, matches, setTab, config, totalPessoas }) {
     }
   };
   const menuItems = [
-    { id: "inscricao", label: "Inscrição", desc: `Inscreva seu time para a ${EDITION}ª edição`, icon: Users },
-    { id: "sorteio", label: "Sorteio", desc: "Potes e grupos da edição", icon: Dices },
-    { id: "chaveamento", label: "Jogos ao Vivo", desc: "Todos os confrontos, horários e placares em tempo real", icon: Swords },
-    { id: "classificacao", label: "Classificação", desc: "Tabela, resultados e saldo de gols", icon: ListOrdered },
-    { id: "comunidade", label: "Fotos e Vídeos", desc: "Compartilhado por quem se inscreveu", icon: Camera },
-    { id: "galeria", label: "Galeria", desc: "Hall da fama e histórico das edições", icon: Award },
-    { id: "organizacao", label: "Organização", desc: "Lançar jogos, placares e fotos", icon: ShieldCheck },
+    { id: "chaveamento", label: "Jogos ao vivo", icon: Swords, destaque: true },
+    { id: "classificacao", label: "Classificação", icon: ListOrdered, destaque: true },
+    { id: "comunidade", label: "Fotos e vídeos", icon: Camera },
+    { id: "sorteio", label: "Sorteio", icon: Dices },
+    { id: "galeria", label: "Galeria", icon: Award },
+    { id: "inscricao", label: "Inscrição", icon: Users },
   ];
-
-  const stats = [
-    { label: "Pessoas inscritas no app", value: totalPessoas },
-    { label: "Times inscritos", value: teams.length },
-    { label: "Jogos registrados", value: matches.length },
-    { label: "Edições disputadas", value: EDITION - 1 },
-  ];
+  const linkLive = (config && config.linkTransmissao) || LINK_CANAL_TRANSMISSAO;
+  const fonte = "'Inter', sans-serif";
+  const tile = { backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` };
 
   return (
     <div>
-      <div className="flex items-center gap-4 mb-3">
-        <img
-          src={CSU_BADGE_IMG}
-          alt="Santa Úrsula Jogos Ex-Alunos"
-          className="h-14 sm:h-16 w-auto object-contain shrink-0"
-        />
-        <div>
-          <h1
-            className="text-xl sm:text-2xl font-bold"
-            style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink, letterSpacing: "-0.01em" }}
-          >
-            Copa de Ex-Alunos de Futsal
+      {/* Topo enxuto */}
+      <div className="flex items-center gap-3.5 mb-5">
+        <img src={CSU_BADGE_IMG} alt="Santa Úrsula Jogos Ex-Alunos" className="h-14 w-auto object-contain shrink-0" />
+        <div className="flex-1 min-w-0">
+          <h1 className="text-lg font-bold leading-tight" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink, letterSpacing: "-0.01em" }}>
+            Copa de Ex-Alunos
           </h1>
-          <p className="text-sm" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-            Colégio Santa Úrsula · {EDITION}ª edição
+          <p className="text-[13px]" style={{ color: COLORS.slate, fontFamily: fonte }}>
+            {EDITION}ª edição · Colégio Santa Úrsula
           </p>
         </div>
+        <button
+          type="button"
+          onClick={compartilharApp}
+          aria-label="Compartilhar"
+          className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+          style={{ backgroundColor: COLORS.chipSoft, color: COLORS.ink }}
+        >
+          {compartilhado ? <span className="text-[10px] font-bold">OK</span> : <Share2 size={16} />}
+        </button>
       </div>
 
-      <p
-        className="text-sm leading-relaxed mb-4 max-w-xl"
-        style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}
-      >
-        {EDITION}ª edição de reencontro entre quem passou pelo Santa Úrsula. Inscreva o seu
-        time, acompanhe o chaveamento e siga a classificação em tempo real.
-      </p>
-
-      <button
-        type="button"
-        onClick={compartilharApp}
-        className="inline-flex items-center gap-1.5 text-xs font-semibold mb-6 px-3 py-1.5 rounded-full"
-        style={{ backgroundColor: COLORS.chipSoft, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}
-      >
-        <Share2 size={13} /> {compartilhado ? "Link copiado!" : "Compartilhar"}
-      </button>
-
+      {/* Transmissão: um cartão só, um botão principal */}
       <div
-        className="flex flex-wrap gap-x-6 gap-y-1 mb-6 rounded-xl px-4 py-3"
-        style={{ backgroundColor: COLORS.accentSoft }}
+        className="rounded-3xl p-5 mb-3"
+        style={{ background: "linear-gradient(135deg, #1B2A5C 0%, #0B1220 70%)", border: `1px solid ${COLORS.border}` }}
       >
-        <div className="text-sm" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
-          <strong>Inscrições:</strong> {prazoInscricaoTexto}
+        <div className="flex items-center gap-2 mb-1">
+          <span className="relative flex w-2.5 h-2.5">
+            <span className="absolute inline-flex w-full h-full rounded-full opacity-75 animate-ping" style={{ backgroundColor: "#EF4444" }} />
+            <span className="relative inline-flex w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "#EF4444" }} />
+          </span>
+          <span className="text-[11px] font-bold uppercase" style={{ color: "#FCA5A5", letterSpacing: "0.18em", fontFamily: fonte }}>
+            Ao vivo
+          </span>
         </div>
-        <div className="text-sm" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
-          <strong>Competição:</strong> {dataEventoTexto}
+        <div className="text-lg font-bold mb-0.5" style={{ color: "#FFFFFF", fontFamily: "'Sora', sans-serif" }}>
+          Assista aos jogos
         </div>
-        <div className="text-sm" style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}>
-          <strong>Valor:</strong> {VALOR_INSCRICAO_ATLETA}
+        <div className="text-xs mb-4" style={{ color: COLORS.slate, fontFamily: fonte }}>
+          Transmissão oficial · GV Produções
         </div>
-      </div>
-
-      <LinkRegulamento
-        config={config}
-        className="inline-flex items-center gap-1.5 text-xs mb-6"
-        style={{ color: COLORS.accent, fontFamily: "'Inter', sans-serif" }}
-      >
-        <Download size={13} /> Baixar regulamento oficial (PDF)
-      </LinkRegulamento>
-
-      <div className="flex flex-wrap gap-x-6 gap-y-1 mb-6">
-        {stats.map((s) => (
-          <div key={s.label} className="flex items-baseline gap-1.5">
-            <span
-              className="text-base font-bold"
-              style={{ fontFamily: "'JetBrains Mono', monospace", color: COLORS.ink }}
-            >
-              {s.value}
-            </span>
-            <span className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-              {s.label}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      {config && config.linkTransmissao && (
         <a
-          href={config.linkTransmissao}
+          href={linkLive}
           target="_blank"
           rel="noreferrer"
           onClick={() => registrarEvento("clique", "transmissao_ao_vivo").catch((e) => console.error("Falha ao registrar clique", e))}
-          className="flex items-center gap-3 mb-3 rounded-xl px-4 py-3.5"
-          style={{ backgroundColor: COLORS.navy }}
+          className="flex items-center justify-center gap-2 rounded-2xl py-3.5 text-[15px] font-bold"
+          style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: fonte }}
         >
-          <span
-            className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
-            style={{ backgroundColor: "rgba(255,255,255,0.1)" }}
-          >
-            <Radio size={18} color={COLORS.gold} />
-          </span>
-          <span className="flex-1 min-w-0">
-            <div className="text-sm font-semibold" style={{ color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}>
-              Assista aos jogos ao vivo
-            </div>
-            <div className="text-xs truncate" style={{ color: COLORS.ice, fontFamily: "'Inter', sans-serif" }}>
-              {config.linkTransmissao}
-            </div>
-          </span>
-          <ArrowRight size={16} color={COLORS.gold} className="shrink-0" />
+          <Radio size={18} /> Assistir agora
         </a>
-      )}
+        {TRANSMISSOES_ANTERIORES.length > 0 && (
+          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 justify-center">
+            {TRANSMISSOES_ANTERIORES.map((t) => (
+              <a
+                key={t.dia}
+                href={t.url}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => registrarEvento("clique", "transmissao_anterior").catch((e) => console.error("Falha ao registrar clique", e))}
+                className="text-xs underline"
+                style={{ color: COLORS.slate, fontFamily: fonte }}
+              >
+                Rever {t.dia}
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
 
+      {/* Local */}
       <a
         href={LOCAL_MAPS_LINK}
         target="_blank"
         rel="noreferrer"
         onClick={() => registrarEvento("clique", "local_mapa").catch((e) => console.error("Falha ao registrar clique", e))}
-        className="flex items-center gap-3 mb-3 rounded-xl px-4 py-3.5"
-        style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
+        className="flex items-center gap-3 rounded-2xl px-4 py-3 mb-6"
+        style={tile}
       >
-        <span
-          className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
-          style={{ backgroundColor: COLORS.accentSoft }}
-        >
-          <MapPin size={18} color={COLORS.accent} />
+        <MapPin size={18} color={COLORS.accent} className="shrink-0" />
+        <span className="flex-1 min-w-0 text-sm font-medium truncate" style={{ color: COLORS.ink, fontFamily: fonte }}>
+          {LOCAL_NOME}
         </span>
-        <span className="flex-1 min-w-0">
-          <div className="text-sm font-semibold" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
-            {LOCAL_NOME}
-          </div>
-          <div className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-            Toque para abrir no mapa
-          </div>
-        </span>
-        <ArrowRight size={16} color={COLORS.accent} className="shrink-0" />
+        <span className="text-xs shrink-0" style={{ color: COLORS.accent, fontFamily: fonte }}>Ver no mapa</span>
       </a>
-
-      <FaixaTransmissaoGV />
 
       <ProgramacaoCopa config={config} />
 
-      <FaixaInstagramCopa />
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-        {menuItems.map(({ id, label, desc, icon: Icon }) => {
-          return (
-            <button
-              key={id}
-              onClick={() => setTab(id)}
-              className="group flex items-center gap-4 text-left rounded-2xl p-4 sm:p-5 transition-all hover:-translate-y-0.5"
-              style={{
-                backgroundColor: COLORS.card,
-                border: `1px solid ${COLORS.border}`,
-              }}
-            >
-              <div
-                className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
-                style={{ backgroundColor: COLORS.accentSoft }}
-              >
-                <Icon size={20} color={COLORS.accent} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold text-[15px]" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>
-                  {label}
-                </div>
-                <div className="text-xs mt-0.5 truncate" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-                  {desc}
-                </div>
-              </div>
-              <ArrowRight
-                size={16}
-                color={COLORS.slate}
-                className="shrink-0 transition-transform group-hover:translate-x-0.5"
-              />
-            </button>
-          );
-        })}
+      {/* Atalhos: só ícone e nome */}
+      <div className="grid grid-cols-2 gap-3 mb-3">
+        {menuItems.map(({ id, label, icon: Icon, destaque }) => (
+          <button
+            key={id}
+            onClick={() => setTab(id)}
+            className="flex flex-col items-start gap-3 text-left rounded-2xl p-4 transition-transform active:scale-[0.98]"
+            style={destaque ? { backgroundColor: COLORS.accentSoft, border: `1px solid ${COLORS.accent}55` } : tile}
+          >
+            <Icon size={22} color={destaque ? COLORS.accent : COLORS.slate} />
+            <span className="font-semibold text-[15px]" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>
+              {label}
+            </span>
+          </button>
+        ))}
       </div>
 
-      <div className="mt-10">
+      <LinkRegulamento
+        config={config}
+        className="flex items-center justify-between rounded-2xl px-4 py-3 mb-8 text-sm"
+        style={{ ...tile, color: COLORS.ink, fontFamily: fonte }}
+      >
+        <span className="flex items-center gap-2"><Download size={16} color={COLORS.slate} /> Regulamento oficial</span>
+        <ArrowRight size={14} color={COLORS.slate} />
+      </LinkRegulamento>
+
+      <FaixaInstagramCopa />
+
+      <div className="mt-8">
         <BlocoParceiros />
         <FaixaPrestadorMoveX />
+      </div>
+
+      <div className="mt-8 text-center">
+        <button
+          type="button"
+          onClick={() => setTab("organizacao")}
+          className="text-xs underline"
+          style={{ color: COLORS.slate, fontFamily: fonte }}
+        >
+          Área da organização
+        </button>
+        <div className="text-[11px] mt-2" style={{ color: COLORS.slate, fontFamily: fonte }}>
+          {totalPessoas} pessoas no app · {teams.length} times · {matches.length} jogos
+        </div>
       </div>
     </div>
   );
