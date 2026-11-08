@@ -7086,6 +7086,25 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
     );
   };
 
+  const penaltisUI = !(match.fase || "").startsWith("Grupo") && temNum(match.golsA) && temNum(match.golsB) && Number(match.golsA) === Number(match.golsB) ? (
+          <div className="basis-full flex items-center justify-center gap-2 text-xs mt-2" onClick={(e) => e.stopPropagation()} style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            <span className="font-semibold">🥅 Empate — pênaltis:</span>
+            {["penA", "penB"].map((k, i) => (
+              <span key={k} className="flex items-center gap-1">
+                {i === 1 && "x"}
+                <input
+                  type="number"
+                  min="0"
+                  value={match[k] ?? ""}
+                  onChange={(e) => patch({ [k]: e.target.value === "" ? null : Number(e.target.value) })}
+                  className="w-11 px-1 py-1 rounded text-center text-sm"
+                  style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'JetBrains Mono', monospace" }}
+                />
+              </span>
+            ))}
+          </div>
+        ) : null;
+
   return (
     <div
       className={cartao ? "rounded-2xl overflow-hidden mt-4" : "rounded-lg overflow-hidden"}
@@ -7124,6 +7143,7 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
                 <span style={{ color: COLORS.slate }}>:</span>
                 {inputGol("golsB")}
               </div>
+              {penaltisUI}
             </div>
             {ladoCartao(match.timeB)}
           </div>
@@ -7199,24 +7219,7 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
             <X size={15} color={COLORS.accent} />
           </button>
         )}
-        {!(match.fase || "").startsWith("Grupo") && temNum(match.golsA) && temNum(match.golsB) && Number(match.golsA) === Number(match.golsB) && (
-          <div className="basis-full flex items-center gap-2 text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-            <span className="font-semibold">🥅 Empate — pênaltis:</span>
-            {["penA", "penB"].map((k, i) => (
-              <span key={k} className="flex items-center gap-1">
-                {i === 1 && "x"}
-                <input
-                  type="number"
-                  min="0"
-                  value={match[k] ?? ""}
-                  onChange={(e) => patch({ [k]: e.target.value === "" ? null : Number(e.target.value) })}
-                  className="w-11 px-1 py-1 rounded text-center text-sm"
-                  style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'JetBrains Mono', monospace" }}
-                />
-              </span>
-            ))}
-          </div>
-        )}
+        {penaltisUI}
       </div>
 
       {expanded && (
