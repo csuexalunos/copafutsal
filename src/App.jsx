@@ -5555,6 +5555,7 @@ function ClassificacaoTabela({ matches, teams }) {
                         </span>
                         <span style={{ color: COLORS.slate, fontFamily: "'JetBrains Mono', monospace" }}>
                           {m.golsA ?? "–"} x {m.golsB ?? "–"}
+                          {decididoNosPenaltis(m) && <span className="block text-center text-[10px]">pên. {m.penA} x {m.penB}</span>}
                         </span>
                         <span style={{ color: vencedorId === m.timeB ? "#16A34A" : COLORS.ink, fontWeight: vencedorId === m.timeB ? 700 : 500 }}>
                           {teamName(m.timeB)}
@@ -7132,7 +7133,7 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
           </div>
         </div>
       )}
-      <div className={cartao ? "hidden" : "flex items-center gap-2 text-sm px-3 py-2"}>
+      <div className={cartao ? "hidden" : "flex flex-wrap items-center gap-2 text-sm px-3 py-2"}>
         {onMover && (
           <div className="flex flex-col shrink-0 -my-1">
             <button
@@ -7197,6 +7198,24 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
           <button onClick={onRemove} aria-label="Remover jogo">
             <X size={15} color={COLORS.accent} />
           </button>
+        )}
+        {!(match.fase || "").startsWith("Grupo") && temNum(match.golsA) && temNum(match.golsB) && Number(match.golsA) === Number(match.golsB) && (
+          <div className="basis-full flex items-center gap-2 text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            <span className="font-semibold">🥅 Empate — pênaltis:</span>
+            {["penA", "penB"].map((k, i) => (
+              <span key={k} className="flex items-center gap-1">
+                {i === 1 && "x"}
+                <input
+                  type="number"
+                  min="0"
+                  value={match[k] ?? ""}
+                  onChange={(e) => patch({ [k]: e.target.value === "" ? null : Number(e.target.value) })}
+                  className="w-11 px-1 py-1 rounded text-center text-sm"
+                  style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'JetBrains Mono', monospace" }}
+                />
+              </span>
+            ))}
+          </div>
         )}
       </div>
 
@@ -11905,18 +11924,26 @@ function calcularClassificacaoGeral(matches, teams) {
   ];
 }
 
+const temNum = (v) => v != null && v !== "";
+// Empate no mata-mata decide nos pênaltis (penA x penB).
+function decididoNosPenaltis(m) {
+  return !(m.fase || "").startsWith("Grupo") && temNum(m.golsA) && temNum(m.golsB) && Number(m.golsA) === Number(m.golsB)
+    && temNum(m.penA) && temNum(m.penB) && Number(m.penA) !== Number(m.penB);
+}
+
 function jogoDecidido(m) {
-  return m.golsA != null && m.golsB != null && m.golsA !== "" && m.golsB !== "" && Number(m.golsA) !== Number(m.golsB);
+  return (temNum(m.golsA) && temNum(m.golsB) && Number(m.golsA) !== Number(m.golsB)) || decididoNosPenaltis(m);
 }
 
 function vencedorJogo(m) {
   if (!jogoDecidido(m)) return null;
+  if (decididoNosPenaltis(m)) return Number(m.penA) > Number(m.penB) ? m.timeA : m.timeB;
   return Number(m.golsA) > Number(m.golsB) ? m.timeA : m.timeB;
 }
 
 function perdedorJogo(m) {
   if (!jogoDecidido(m)) return null;
-  return Number(m.golsA) > Number(m.golsB) ? m.timeB : m.timeA;
+  return vencedorJogo(m) === m.timeA ? m.timeB : m.timeA;
 }
 
 function novoJogoVazio(id, fase, timeA, timeB) {
