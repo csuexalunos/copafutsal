@@ -1798,6 +1798,11 @@ function Home({ teams, matches, setTab, config, totalPessoas }) {
     { id: "inscricao", label: "Inscrição", icon: Users },
   ];
   const linkLive = (config && config.linkTransmissao) || LINK_CANAL_TRANSMISSAO;
+  const jogoFinal = (matches || []).find((m) => m.fase === "Final");
+  const timeCampeao = jogoFinal && jogoDecidido(jogoFinal) ? (teams || []).find((t) => t.id === vencedorJogo(jogoFinal)) : null;
+  const timeVice = jogoFinal && jogoDecidido(jogoFinal) ? (teams || []).find((t) => t.id === perdedorJogo(jogoFinal)) : null;
+  const escudoCampeao = timeCampeao ? ESCUDOS_TIMES[timeCampeao.nome] || timeCampeao.escudoUrl : null;
+  const replays = [...TRANSMISSOES_ANTERIORES, { dia: "Domingo (8/11)", url: linkLive }];
   const fonte = "'Inter', sans-serif";
   const tile = { backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` };
 
@@ -1825,7 +1830,65 @@ function Home({ teams, matches, setTab, config, totalPessoas }) {
         </button>
       </div>
 
-      {/* Transmissão: um cartão só, um botão principal */}
+      {/* Campeão */}
+      {timeCampeao && (
+        <div
+          className="rounded-3xl p-6 mb-3 text-center relative overflow-hidden"
+          style={{ background: "linear-gradient(160deg, #F5C242 0%, #B8860B 45%, #1B2A5C 100%)", border: "1px solid #F5C24288" }}
+        >
+          <div className="text-[11px] font-bold uppercase mb-3" style={{ color: "#1B2A5C", letterSpacing: "0.24em", fontFamily: fonte }}>
+            🏆 Campeão · {EDITION}ª Copa de Ex-Alunos
+          </div>
+          {escudoCampeao ? (
+            <img src={escudoCampeao} alt={`Escudo ${timeCampeao.nome}`} className="w-28 h-28 object-contain mx-auto mb-3 drop-shadow-xl" />
+          ) : (
+            <div className="w-28 h-28 rounded-full mx-auto mb-3 flex items-center justify-center text-2xl font-bold" style={{ backgroundColor: "#1B2A5C", color: "#F5C242" }}>
+              {timeCampeao.nome.slice(0, 6)}
+            </div>
+          )}
+          <div className="text-3xl font-bold leading-tight" style={{ color: "#FFFFFF", fontFamily: "'Sora', sans-serif", textShadow: "0 2px 12px rgba(0,0,0,.35)" }}>
+            Turma {timeCampeao.nome}
+          </div>
+          <div className="text-sm mt-1" style={{ color: "#FFF7DB", fontFamily: fonte }}>
+            Campeã da VIII Copa CSU de Ex-Alunos
+          </div>
+          {jogoFinal && (
+            <div className="inline-block mt-3 rounded-full px-4 py-1.5 text-xs font-semibold" style={{ backgroundColor: "rgba(11,18,32,.55)", color: "#FFFFFF", fontFamily: fonte }}>
+              Final: {jogoFinal.golsA} x {jogoFinal.golsB}{decididoNosPenaltis(jogoFinal) ? ` (pên. ${jogoFinal.penA} x ${jogoFinal.penB})` : ""}
+              {timeVice ? ` · vice: ${timeVice.nome}` : ""}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Transmissão */}
+      {timeCampeao ? (
+        <div className="rounded-2xl p-4 mb-3" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+          <div className="text-sm font-bold mb-0.5" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>
+            Reveja como foi a Copa
+          </div>
+          <div className="text-xs mb-3" style={{ color: COLORS.slate, fontFamily: fonte }}>
+            Transmissão completa · GV Produções
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {replays.map((t) => (
+              <a
+                key={t.dia}
+                href={t.url}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => registrarEvento("clique", "transmissao_anterior").catch((e) => console.error("Falha ao registrar clique", e))}
+                className="rounded-xl py-2.5 px-1 text-center text-xs font-semibold"
+                style={{ backgroundColor: COLORS.accentSoft, border: `1px solid ${COLORS.accent}55`, color: COLORS.ink, fontFamily: fonte }}
+              >
+                <Radio size={14} color={COLORS.accent} className="mx-auto mb-1" />
+                {t.dia.replace(/ \(.*/, "")}
+                <span className="block text-[10px] font-normal" style={{ color: COLORS.slate }}>{(t.dia.match(/\((.*)\)/) || [])[1]}</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      ) : (
       <div
         className="rounded-3xl p-5 mb-3"
         style={{ background: "linear-gradient(135deg, #1B2A5C 0%, #0B1220 70%)", border: `1px solid ${COLORS.border}` }}
@@ -1873,6 +1936,7 @@ function Home({ teams, matches, setTab, config, totalPessoas }) {
           </div>
         )}
       </div>
+      )}
 
       {/* Local */}
       <a
