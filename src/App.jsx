@@ -6966,17 +6966,27 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
       times: [teamName(match.timeA), teamName(match.timeB)],
       tag: `jogo-${match.id}`,
     }).catch((e) => console.error("Falha ao enviar avisos", e));
-  const encerrarJogo = () => {
+  const [pedirPen, setPedirPen] = useState(null);
+  const encerrarJogo = (pen) => {
+    const campos = pen && typeof pen === "object" && !pen.nativeEvent && pen.a !== undefined ? { penA: Number(pen.a), penB: Number(pen.b) } : {};
     patch({
       pausado: false,
       status: "encerrado",
       tempoAcumuladoMs: computeElapsedMs(match),
       tempoIniciadoEm: null,
+      ...campos,
+      ...(campos.penA != null ? { golsA: match.golsA ?? 0, golsB: match.golsB ?? 0 } : {}),
     });
+    setPedirPen(null);
     enviarAviso(
       "🏁 Fim de jogo!",
-      `${teamName(match.timeA)} ${match.golsA ?? 0} x ${match.golsB ?? 0} ${teamName(match.timeB)}`
+      `${teamName(match.timeA)} ${match.golsA ?? 0} x ${match.golsB ?? 0} ${teamName(match.timeB)}${campos.penA != null ? ` (pên. ${campos.penA} x ${campos.penB})` : ""}`
     );
+  };
+  const clicarEncerrar = () => {
+    const eliminatoria = !(match.fase || "").startsWith("Grupo");
+    if (eliminatoria && Number(match.golsA || 0) === Number(match.golsB || 0)) setPedirPen({ a: match.penA ?? "", b: match.penB ?? "" });
+    else encerrarJogo();
   };
 
   const registrarEventos = async (itens) => {
@@ -7333,12 +7343,38 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
             {(match.status === "ao_vivo" || match.status === "intervalo") && (
               <button
                 type="button"
-                onClick={encerrarJogo}
+                onClick={clicarEncerrar}
                 className="px-3 py-1.5 rounded-lg text-xs font-semibold"
                 style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
               >
                 Encerrar jogo
               </button>
+            )}
+            {pedirPen && (
+              <div className="basis-full rounded-xl p-3 mt-2" style={{ border: `1.5px solid ${COLORS.accent}`, fontFamily: "'Inter', sans-serif" }}>
+                <div className="text-xs font-bold mb-2" style={{ color: COLORS.ink }}>🥅 Empate! Disputa de pênaltis</div>
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <span className="text-xs" style={{ color: COLORS.slate }}>{teamName(match.timeA)}</span>
+                  <input type="number" min="0" value={pedirPen.a} onChange={(e) => setPedirPen({ ...pedirPen, a: e.target.value })}
+                    className="w-12 px-1 py-1 rounded text-center text-sm" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}`, color: COLORS.ink }} />
+                  <span style={{ color: COLORS.slate }}>x</span>
+                  <input type="number" min="0" value={pedirPen.b} onChange={(e) => setPedirPen({ ...pedirPen, b: e.target.value })}
+                    className="w-12 px-1 py-1 rounded text-center text-sm" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}`, color: COLORS.ink }} />
+                  <span className="text-xs" style={{ color: COLORS.slate }}>{teamName(match.timeB)}</span>
+                </div>
+                <div className="flex gap-2 justify-center">
+                  <button type="button"
+                    disabled={pedirPen.a === "" || pedirPen.b === "" || Number(pedirPen.a) === Number(pedirPen.b)}
+                    onClick={() => encerrarJogo(pedirPen)}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-40"
+                    style={{ backgroundColor: COLORS.accent, color: "#FFFFFF" }}>
+                    Confirmar e encerrar
+                  </button>
+                  <button type="button" onClick={() => setPedirPen(null)} className="px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ border: `1px solid ${COLORS.border}`, color: COLORS.slate }}>
+                    Cancelar
+                  </button>
+                </div>
+              </div>
             )}
             {(match.status !== "agendado" || (match.eventos || []).length > 0 || match.golsA != null || match.golsB != null) && (
               <button
