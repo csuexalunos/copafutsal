@@ -3927,7 +3927,7 @@ function MatchCardExpansivel({ match, teams, sessao, saveMatches, matches, confi
   }
 
   const rotuloEvento = (tipo) =>
-    ({ gol: "⚽ Gol", assistencia: "🅰️ Assistência", cartao_amarelo: "🟨 Amarelo", cartao_vermelho: "🟥 Vermelho" }[tipo] || tipo);
+    ({ gol: "⚽ Gol", assistencia: "🅰️ Assistência", cartao_amarelo: "🟨 Amarelo", cartao_vermelho: "🟥 Vermelho", defesa_dificil: "🧤 Defesa difícil" }[tipo] || tipo);
 
   const suspensosJogo = calcularSuspensoes(matches || [], teams).porJogo[match.id] || [];
   const status = match.status || "agendado";
@@ -5305,7 +5305,7 @@ function EstatisticasJogadores({ matches, teams, tipo }) {
     matches.forEach((m) => {
       (m.eventos || []).forEach((ev) => {
         const k = `${normalizarTexto(ev.jogador || "")}|${ev.timeNome || ""}`;
-        if (!mapa[k]) mapa[k] = { jogador: ev.jogador, timeNome: ev.timeNome, gol: 0, assistencia: 0, cartao_amarelo: 0, cartao_vermelho: 0 };
+        if (!mapa[k]) mapa[k] = { jogador: ev.jogador, timeNome: ev.timeNome, gol: 0, assistencia: 0, cartao_amarelo: 0, cartao_vermelho: 0, defesa_dificil: 0 };
         if (mapa[k][ev.tipo] != null) mapa[k][ev.tipo] += 1;
       });
     });
@@ -5315,11 +5315,11 @@ function EstatisticasJogadores({ matches, teams, tipo }) {
         .filter((p) => p.cartao_amarelo + p.cartao_vermelho > 0)
         .sort((a, b) => b.cartao_vermelho - a.cartao_vermelho || b.cartao_amarelo - a.cartao_amarelo || a.jogador.localeCompare(b.jogador));
     }
-    const campo = tipo === "gols" ? "gol" : "assistencia";
+    const campo = tipo === "gols" ? "gol" : tipo === "defesas" ? "defesa_dificil" : "assistencia";
     return todos.filter((p) => p[campo] > 0).sort((a, b) => b[campo] - a[campo] || a.jogador.localeCompare(b.jogador));
   }, [matches, tipo]);
 
-  const campo = tipo === "gols" ? "gol" : "assistencia";
+  const campo = tipo === "gols" ? "gol" : tipo === "defesas" ? "defesa_dificil" : "assistencia";
   const suspenso = (p) =>
     sus.pendentes.some((x) => x.timeNome === p.timeNome && nomesBatem(x.jogador, p.jogador)) ||
     matches.some(
@@ -5329,6 +5329,7 @@ function EstatisticasJogadores({ matches, teams, tipo }) {
     gols: "Ainda não há gols registrados.",
     assistencias: "Ainda não há assistências registradas.",
     cartoes: "Ainda não há cartões registrados.",
+    defesas: "Ainda não há defesas difíceis registradas (valem nos jogos eliminatórios).",
   }[tipo];
   if (linhas.length === 0) return <EmptyState>{vazio}</EmptyState>;
   let posAnt = 0;
@@ -5389,6 +5390,7 @@ function Classificacao({ matches, teams }) {
     { id: "gols", label: "⚽ Artilharia" },
     { id: "assistencias", label: "🅰️ Assistências" },
     { id: "cartoes", label: "🟨🟥 Cartões" },
+    { id: "defesas", label: "🧤 Goleiros" },
   ];
   return (
     <div>
@@ -6776,10 +6778,14 @@ function RegistradorEventos({ match, teams, suspensos, onRegistrar }) {
     </div>
   );
 
+  const ehGoleiro = (j) => /goleir/i.test(j.posicao || "");
+  const temGoleiros = elenco.some(ehGoleiro);
+  const [todosJog, setTodosJog] = useState(false);
   const grade = (onPick, excluirK, comSuspensao) => (
     <div className="grid grid-cols-3 gap-2">
       {elenco
         .filter((j) => j._k !== excluirK)
+        .filter((j) => tipo !== "defesa_dificil" || todosJog || !temGoleiros || ehGoleiro(j))
         .map((j) => {
           const susp = comSuspensao && estaSuspenso(j);
           return (
@@ -6818,12 +6824,22 @@ function RegistradorEventos({ match, teams, suspensos, onRegistrar }) {
               </button>
             ))}
           </div>
+          {!(match.fase || "").startsWith("Grupo") && (
+            <button
+              type="button"
+              onClick={() => setTipo("defesa_dificil")}
+              className="w-full rounded-xl py-3 text-sm font-semibold mt-2"
+              style={{ backgroundColor: COLORS.navy || "#1B2A5C", color: COLORS.gold, border: `1px solid ${COLORS.border}`, fontFamily: "'Inter', sans-serif" }}
+            >
+              🧤 Defesa difícil (melhor goleiro)
+            </button>
+          )}
         </>
       )}
 
       {tipo && !timeId && (
         <>
-          {passo(`${tipo === "gol" ? "Gol" : tipo === "cartao_amarelo" ? "Cartão amarelo" : "Cartão vermelho"} — de qual time?`)}
+          {passo(`${tipo === "gol" ? "Gol" : tipo === "cartao_amarelo" ? "Cartão amarelo" : tipo === "defesa_dificil" ? "Defesa difícil" : "Cartão vermelho"} — de qual time?`)}
           <div className="grid grid-cols-2 gap-2">
             {[match.timeA, match.timeB].map((id) => (
               <button key={id} type="button" onClick={() => setTimeId(id)} className="rounded-xl py-3 flex flex-col items-center gap-1" style={btn(false)}>
@@ -6840,13 +6856,18 @@ function RegistradorEventos({ match, teams, suspensos, onRegistrar }) {
 
       {tipo && timeId && !golDe && (
         <>
-          {passo(`${tipo === "gol" ? "Quem fez o gol" : "Quem levou o cartão"} — ${nomeDe(timeId)}`)}
+          {passo(`${tipo === "gol" ? "Quem fez o gol" : tipo === "defesa_dificil" ? "Qual goleiro fez a defesa" : "Quem levou o cartão"} — ${nomeDe(timeId)}`)}
           {elenco.length === 0 && (
             <p className="text-xs mb-2" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
               Esse time ainda não tem elenco cadastrado. Digite o nome abaixo.
             </p>
           )}
-          {grade((n, id, k) => escolherJogador(n, id, k), null, true)}
+          {grade((n, id, k) => escolherJogador(n, id, k), null, tipo !== "defesa_dificil")}
+          {tipo === "defesa_dificil" && temGoleiros && (
+            <button type="button" onClick={() => setTodosJog((v) => !v)} className="text-xs mt-2 underline" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+              {todosJog ? "Mostrar só goleiros" : "Mostrar todos os jogadores"}
+            </button>
+          )}
           <div className="flex gap-2 mt-3">
             <input
               type="text"
