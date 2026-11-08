@@ -1568,9 +1568,10 @@ const PARCEIROS_APP = [
 ];
 // Transmissão de hoje (atualizar a cada dia) e as dos dias anteriores.
 const LINK_FOTOS_FOTOP = "https://guimaraesdaniel.fotop.com/fotos/eventos/index/evento/357825";
-const LINK_CANAL_TRANSMISSAO = "https://www.youtube.com/live/tZAKdXkphK8?is=VtU0oGkY4PWY9qaM";
+const LINK_CANAL_TRANSMISSAO = "https://youtube.com/live/CFm35veEM78?feature=share";
 const TRANSMISSOES_ANTERIORES = [
   { dia: "Sexta (6/11)", url: "https://www.youtube.com/live/EqAj1_bFM4I?si=aOrEkHNviFIeQ92p" },
+  { dia: "Sábado (7/11)", url: "https://www.youtube.com/live/tZAKdXkphK8?is=VtU0oGkY4PWY9qaM" },
 ];
 
 // Quadradinhos dos parceiros (clicáveis, abrem o Instagram) — usado na Home e na Classificação.
