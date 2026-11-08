@@ -1768,10 +1768,100 @@ function ProgramacaoCopa({ config }) {
   );
 }
 
+// Estatísticas e trajetória de um time na Copa (abre ao tocar no banner do campeão)
+function TrajetoriaTime({ time, teams, matches, titulos, rotuloTitulos, onClose }) {
+  const nome = (id) => teams.find((t) => t.id === id)?.nome || "A definir";
+  const escudo = ESCUDOS_TIMES[time.nome] || time.escudoUrl;
+  const fonte = "'Inter', sans-serif";
+  const jogos = matches.filter((m) => (m.timeA === time.id || m.timeB === time.id) && temNum(m.golsA) && temNum(m.golsB));
+  let v = 0, e = 0, d = 0, gp = 0, gc = 0;
+  const linhas = jogos.map((m) => {
+    const casa = m.timeA === time.id;
+    const pro = Number(casa ? m.golsA : m.golsB), contra = Number(casa ? m.golsB : m.golsA);
+    gp += pro; gc += contra;
+    let res = pro > contra ? "V" : pro < contra ? "D" : "E";
+    let pen = "";
+    if (res === "E" && decididoNosPenaltis(m)) {
+      const p1 = Number(casa ? m.penA : m.penB), p2 = Number(casa ? m.penB : m.penA);
+      res = p1 > p2 ? "V" : "D";
+      pen = ` (pên. ${p1} x ${p2})`;
+    }
+    if (pro === contra && !pen) e++; else if (res === "V") v++; else d++;
+    return { m, adv: nome(casa ? m.timeB : m.timeA), pro, contra, res, pen, empate: pro === contra && !pen };
+  });
+  const cor = (r, emp) => (emp ? "#D99A00" : r === "V" ? "#16A34A" : "#EF4444");
+  const mapa = {};
+  matches.forEach((m) => (m.eventos || []).forEach((ev) => {
+    if (ev.timeNome !== time.nome) return;
+    const k = normalizarTexto(ev.jogador || "");
+    if (!mapa[k]) mapa[k] = { jogador: ev.jogador, gol: 0, assistencia: 0, cartao_amarelo: 0, cartao_vermelho: 0, defesa_dificil: 0 };
+    if (mapa[k][ev.tipo] != null) mapa[k][ev.tipo] += 1;
+  }));
+  const jog = Object.values(mapa);
+  const top = (campo) => jog.filter((p) => p[campo] > 0).sort((a, b) => b[campo] - a[campo]);
+  const bloco = (titulo, lista, campo) =>
+    lista.length > 0 && (
+      <div className="rounded-2xl p-3 mb-3" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+        <div className="text-xs font-bold uppercase mb-2" style={{ color: COLORS.gold, letterSpacing: "0.1em", fontFamily: fonte }}>{titulo}</div>
+        {lista.map((p) => (
+          <div key={p.jogador} className="flex justify-between text-sm py-0.5" style={{ color: COLORS.ink, fontFamily: fonte }}>
+            <span>{p.jogador}</span>
+            <strong>{campo === "cartoes" ? `${p.cartao_amarelo ? `🟨${p.cartao_amarelo} ` : ""}${p.cartao_vermelho ? `🟥${p.cartao_vermelho}` : ""}` : p[campo]}</strong>
+          </div>
+        ))}
+      </div>
+    );
+  const caixa = (rot, val) => (
+    <div className="rounded-xl py-2 text-center" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+      <div className="text-lg font-bold" style={{ color: COLORS.ink, fontFamily: "'JetBrains Mono', monospace" }}>{val}</div>
+      <div className="text-[10px] uppercase" style={{ color: COLORS.slate, fontFamily: fonte }}>{rot}</div>
+    </div>
+  );
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto" style={{ backgroundColor: COLORS.bg || "#0B1220" }}>
+      <div className="max-w-xl mx-auto p-4 pb-10">
+        <button type="button" onClick={onClose} className="text-sm mb-3 underline" style={{ color: COLORS.slate, fontFamily: fonte }}>← Voltar</button>
+        <div className="text-center mb-5">
+          {escudo && <img src={escudo} alt="" className="w-24 h-24 object-contain mx-auto mb-2" />}
+          <div className="text-2xl font-bold" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>Turma {time.nome}</div>
+          {titulos > 0 && <div className="text-sm" style={{ color: COLORS.gold, fontFamily: fonte }}>🏆 {rotuloTitulos} · VIII Copa CSU de Ex-Alunos</div>}
+        </div>
+        <div className="grid grid-cols-4 gap-2 mb-2">
+          {caixa("Jogos", jogos.length)}{caixa("Vitórias", v)}{caixa("Empates", e)}{caixa("Derrotas", d)}
+        </div>
+        <div className="grid grid-cols-3 gap-2 mb-5">
+          {caixa("Gols pró", gp)}{caixa("Gols contra", gc)}{caixa("Saldo", (gp - gc > 0 ? "+" : "") + (gp - gc))}
+        </div>
+        <div className="text-xs font-bold uppercase mb-2" style={{ color: COLORS.gold, letterSpacing: "0.1em", fontFamily: fonte }}>Trajetória</div>
+        <div className="mb-5">
+          {linhas.map(({ m, adv, pro, contra, res, pen, empate }) => (
+            <div key={m.id} className="flex items-center gap-3 rounded-xl px-3 py-2.5 mb-2" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}`, fontFamily: fonte }}>
+              <span className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0" style={{ backgroundColor: cor(res, empate), color: "#fff" }}>{empate ? "E" : res}</span>
+              <div className="flex-1 min-w-0">
+                <div className="text-[11px]" style={{ color: COLORS.slate }}>{m.fase}</div>
+                <div className="text-sm font-semibold truncate" style={{ color: COLORS.ink }}>vs Turma {adv}</div>
+              </div>
+              <div className="text-sm font-bold text-right" style={{ color: COLORS.ink, fontFamily: "'JetBrains Mono', monospace" }}>
+                {pro} x {contra}<span className="block text-[10px] font-normal" style={{ color: COLORS.slate }}>{pen}</span>
+              </div>
+            </div>
+          ))}
+          {linhas.length === 0 && <div className="text-sm" style={{ color: COLORS.slate, fontFamily: fonte }}>Ainda sem jogos registrados.</div>}
+        </div>
+        {bloco("⚽ Artilheiros", top("gol"), "gol")}
+        {bloco("🎯 Assistências", top("assistencia"), "assistencia")}
+        {bloco("🧤 Defesas difíceis", top("defesa_dificil"), "defesa_dificil")}
+        {bloco("🟨🟥 Cartões", jog.filter((p) => p.cartao_amarelo + p.cartao_vermelho > 0).sort((a, b) => b.cartao_vermelho - a.cartao_vermelho || b.cartao_amarelo - a.cartao_amarelo), "cartoes")}
+      </div>
+    </div>
+  );
+}
+
 function Home({ teams, matches, setTab, config, totalPessoas }) {
   const dataEventoTexto = (config && config.dataEvento) || DATA_EVENTO;
   const prazoInscricaoTexto = (config && config.prazoInscricao) || PRAZO_INSCRICAO;
   const [compartilhado, setCompartilhado] = useState(false);
+  const [verTrajetoria, setVerTrajetoria] = useState(false);
 
   const compartilharApp = async () => {
     const url = window.location.href;
@@ -1836,9 +1926,24 @@ function Home({ teams, matches, setTab, config, totalPessoas }) {
       </div>
 
       {/* Campeão */}
-      {timeCampeao && (
+      {timeCampeao && timeCampeao.nome === "2022.1" && (
+        <button
+          type="button"
+          onClick={() => setVerTrajetoria(true)}
+          className="block w-full mb-3 rounded-3xl overflow-hidden relative active:scale-[0.99] transition-transform"
+          aria-label="Ver estatísticas e trajetória do campeão"
+        >
+          <img src={`${import.meta.env.BASE_URL}campeao-2022-1.webp`} alt="Tricampeão — Turma 2022.1" className="w-full h-auto block" />
+          <span className="absolute bottom-2 right-3 text-[11px] font-semibold rounded-full px-3 py-1" style={{ backgroundColor: "rgba(11,18,32,.75)", color: "#F5C242", fontFamily: fonte }}>
+            Ver trajetória →
+          </span>
+        </button>
+      )}
+      {timeCampeao && timeCampeao.nome !== "2022.1" && (
         <div
-          className="rounded-3xl p-6 mb-3 text-center relative overflow-hidden"
+          onClick={() => setVerTrajetoria(true)}
+          role="button"
+          className="rounded-3xl p-6 mb-3 text-center relative overflow-hidden cursor-pointer"
           style={{ background: "linear-gradient(160deg, #F5C242 0%, #B8860B 45%, #1B2A5C 100%)", border: "1px solid #F5C24288" }}
         >
           <div className="text-[11px] font-bold uppercase mb-3" style={{ color: "#1B2A5C", letterSpacing: "0.24em", fontFamily: fonte }}>
@@ -1864,6 +1969,10 @@ function Home({ teams, matches, setTab, config, totalPessoas }) {
             </div>
           )}
         </div>
+      )}
+
+      {verTrajetoria && timeCampeao && (
+        <TrajetoriaTime time={timeCampeao} teams={teams} matches={matches} titulos={titulos} rotuloTitulos={rotuloTitulos} onClose={() => setVerTrajetoria(false)} />
       )}
 
       {/* Transmissão */}
