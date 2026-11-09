@@ -135,6 +135,13 @@ export async function atualizarPerfil(userId, campos) {
   if (error) throw error;
 }
 
+// Exclui o cadastro (perfil) de um inscrito. Confirma que a linha saiu mesmo.
+export async function excluirPerfil(userId) {
+  const { data, error } = await supabase.from("profiles").delete().eq("id", userId).select("id");
+  if (error) throw error;
+  if (!data || data.length === 0) throw new Error("O banco não excluiu o cadastro (rode o SQL supabase-excluir-inscritos.sql no Supabase).");
+}
+
 // Igual atualizarPerfil, mas confirma que alguma linha foi mesmo alterada
 // (uma política do banco pode "aceitar" o update sem alterar nada).
 export async function atualizarPerfilConfirmado(userId, campos) {

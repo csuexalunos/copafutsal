@@ -46,7 +46,7 @@ import {
 import { jsPDF } from "jspdf";
 import {
   readKey, writeKey, cadastrarConta, entrarConta, sairConta, sessaoAtual, aoMudarSessao,
-  criarPerfil, cadastroDuplicado, enviarBoasVindas, buscarPerfil, listarPerfis, atualizarPerfil, atualizarPerfilConfirmado, souAdmin, listarAdmins,
+  criarPerfil, cadastroDuplicado, enviarBoasVindas, buscarPerfil, listarPerfis, atualizarPerfil, excluirPerfil, atualizarPerfilConfirmado, souAdmin, listarAdmins,
   promoverParaAdmin, removerAdmin, contarAparelhosPush, subirArquivo, urlAssinada, contarPessoasInscritas, buscarCpfsDaTurma,
   registrarAcesso, contarAcessos, registrarEvento as registrarEventoBruto, buscarMetricasDetalhadas, esqueciSenha, definirNovaSenha, supabase,
   buscarCpfsDoTime, salvarCpfJogador, salvarCpfsEmLote, excluirCpfsDoJogador, buscarAtletas, salvarAtletas, readStamp, subirEscudo, cpfsEmOutrosTimes, sincronizarBancoAtletas,
@@ -14943,6 +14943,17 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
     }
   };
 
+  const excluirInscrito = async (p) => {
+    if (!confirm(`Excluir o cadastro de "${p.nome || p.email}"? Essa pessoa some da lista e precisará se cadastrar de novo se quiser voltar.`)) return;
+    try {
+      await excluirPerfil(p.id);
+      setPerfis((atual) => atual.filter((x) => x.id !== p.id));
+    } catch (err) {
+      console.error("Falha ao excluir inscrito:", err);
+      alert("Não consegui excluir: " + err.message);
+    }
+  };
+
   const revogarAcesso = async (p) => {
     if (!confirm(`Revogar o acesso de representante de "${p.nome || p.email}"? Ela precisa ser aprovada de novo pra voltar a editar o time.`)) return;
     try {
@@ -15467,6 +15478,14 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
                       style={{ backgroundColor: COLORS.accent, color: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
                     >
                       Tornar representante
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => excluirInscrito(p)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0"
+                      style={{ border: "1px solid #EF4444", color: "#EF4444", fontFamily: "'Inter', sans-serif" }}
+                    >
+                      🗑 Excluir
                     </button>
                   </div>
                 </li>
