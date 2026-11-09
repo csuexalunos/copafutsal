@@ -15483,9 +15483,11 @@ function Organizacao({ teams, matches, saveMatches, saveTeams, adminRequests, sa
                       type="button"
                       onClick={() => excluirInscrito(p)}
                       className="px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0"
+                      aria-label="Excluir cadastro"
+                      title="Excluir"
                       style={{ border: "1px solid #EF4444", color: "#EF4444", fontFamily: "'Inter', sans-serif" }}
                     >
-                      🗑 Excluir
+                      <X size={14} />
                     </button>
                   </div>
                 </li>
