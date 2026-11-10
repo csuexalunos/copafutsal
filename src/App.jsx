@@ -7106,19 +7106,37 @@ function RegistradorEventos({ match, teams, suspensos, onRegistrar }) {
 function ListaPenaltis({ match, teams, compacto }) {
   const ks = match.penaltis || [];
   if (!ks.length) return null;
-  const nome = (id) => teams.find((t) => t.id === id)?.nome || "?";
+  const A = ks.filter((k) => k.timeId === match.timeA);
+  const B = ks.filter((k) => k.timeId === match.timeB);
+  const rodadas = Math.max(A.length, B.length);
+  const tam = compacto ? "text-[11px]" : "text-[13px]";
+  const bolinha = (k) => (
+    <span
+      className="inline-flex items-center justify-center rounded-full shrink-0 font-bold"
+      style={{ width: 18, height: 18, fontSize: 10, backgroundColor: k.convertido ? "#16A34A" : "#EF4444", color: "#fff" }}
+    >
+      {k.convertido ? "✓" : "✕"}
+    </span>
+  );
+  const celula = (k, direita) =>
+    k ? (
+      <div className={`flex items-center gap-1.5 min-w-0 ${direita ? "justify-start" : "justify-end"}`}>
+        {!direita && <span className="truncate" style={{ color: k.convertido ? COLORS.ink : COLORS.slate, textDecoration: k.convertido ? "none" : "line-through" }}>{k.jogador}</span>}
+        {bolinha(k)}
+        {direita && <span className="truncate" style={{ color: k.convertido ? COLORS.ink : COLORS.slate, textDecoration: k.convertido ? "none" : "line-through" }}>{k.jogador}</span>}
+      </div>
+    ) : <div />;
   return (
-    <div className={compacto ? "text-[10px] text-left mt-1" : "text-xs text-left mt-2"} style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-      {[match.timeA, match.timeB].map((tid) => (
-        <div key={tid} className="mb-0.5">
-          <strong style={{ color: COLORS.ink }}>{nome(tid)}:</strong>{" "}
-          {ks.filter((k) => k.timeId === tid).map((k, i) => (
-            <span key={i} className="mr-2" style={{ color: k.convertido ? "#16A34A" : "#EF4444" }}>
-              {k.convertido ? "✅" : "❌"} {k.jogador}
-            </span>
-          ))}
-        </div>
-      ))}
+    <div className={`w-full ${tam} mt-2`} style={{ fontFamily: "'Inter', sans-serif" }} onClick={(e) => e.stopPropagation()}>
+      <div className="rounded-xl py-2 px-3" style={{ backgroundColor: "rgba(255,255,255,0.04)", border: `1px solid ${COLORS.border}` }}>
+        {Array.from({ length: rodadas }).map((_, n) => (
+          <div key={n} className="grid items-center gap-2 py-1" style={{ gridTemplateColumns: "1fr auto 1fr" }}>
+            {celula(A[n], false)}
+            <span className="text-[10px] font-semibold rounded-full px-1.5" style={{ color: COLORS.slate, backgroundColor: COLORS.border }}>{n + 1}</span>
+            {celula(B[n], true)}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -7364,24 +7382,51 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
     );
   };
 
-  const penaltisUI = !(match.fase || "").startsWith("Grupo") && temNum(match.golsA) && temNum(match.golsB) && Number(match.golsA) === Number(match.golsB) ? (
-          <div className="basis-full flex items-center justify-center gap-2 text-xs mt-2" onClick={(e) => e.stopPropagation()} style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-            <span className="font-semibold">🥅 Empate — pênaltis:</span>
-            {["penA", "penB"].map((k, i) => (
-              <span key={k} className="flex items-center gap-1">
-                {i === 1 && "x"}
-                <input
-                  type="number"
-                  min="0"
-                  value={match[k] ?? ""}
-                  onChange={(e) => patch({ [k]: e.target.value === "" ? null : Number(e.target.value) })}
-                  className="w-11 px-1 py-1 rounded text-center text-sm"
-                  style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'JetBrains Mono', monospace" }}
-                />
+  const empatadoElim = !(match.fase || "").startsWith("Grupo") && temNum(match.golsA) && temNum(match.golsB) && Number(match.golsA) === Number(match.golsB);
+  const temCobrancas = (match.penaltis || []).length > 0;
+  const penaltisUI = empatadoElim ? (
+    temCobrancas && temNum(match.penA) && temNum(match.penB) ? (
+      <div className="w-full flex flex-col items-center mt-3" onClick={(e) => e.stopPropagation()}>
+        <div className="text-[10px] font-bold uppercase mb-1.5" style={{ color: COLORS.slate, letterSpacing: "0.18em", fontFamily: "'Inter', sans-serif" }}>Pênaltis</div>
+        <div className="flex items-center gap-2" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+          {[["penA", "penB"], ["penB", "penA"]].map(([k, o], i) => (
+            <span key={k} className="flex items-center gap-2">
+              {i === 1 && <span style={{ color: COLORS.slate }}>:</span>}
+              <span
+                className="rounded-lg px-3 py-1 text-lg font-bold"
+                style={{
+                  backgroundColor: Number(match[k]) > Number(match[o]) ? COLORS.accent : "transparent",
+                  color: Number(match[k]) > Number(match[o]) ? "#FFFFFF" : COLORS.slate,
+                  border: `1px solid ${Number(match[k]) > Number(match[o]) ? COLORS.accent : COLORS.border}`,
+                }}
+              >
+                {match[k]}
               </span>
-            ))}
-          </div>
-        ) : null;
+            </span>
+          ))}
+        </div>
+      </div>
+    ) : (
+      <div className="w-full flex flex-col items-center mt-3" onClick={(e) => e.stopPropagation()} style={{ fontFamily: "'Inter', sans-serif" }}>
+        <div className="text-[10px] font-bold uppercase mb-1.5" style={{ color: COLORS.slate, letterSpacing: "0.18em" }}>Pênaltis</div>
+        <div className="flex items-center gap-2">
+          {["penA", "penB"].map((k, i) => (
+            <span key={k} className="flex items-center gap-2">
+              {i === 1 && <span style={{ color: COLORS.slate }}>:</span>}
+              <input
+                type="number"
+                min="0"
+                value={match[k] ?? ""}
+                onChange={(e) => patch({ [k]: e.target.value === "" ? null : Number(e.target.value) })}
+                className="w-12 py-1.5 rounded-lg text-center text-base font-bold"
+                style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: "'JetBrains Mono', monospace" }}
+              />
+            </span>
+          ))}
+        </div>
+      </div>
+    )
+  ) : null;
 
   return (
     <div
@@ -7422,10 +7467,10 @@ function MatchAdminRow({ match, teams, onUpdate, onRemove, onMover, podeSubir, p
                 {inputGol("golsB")}
               </div>
               {penaltisUI}
-              <ListaPenaltis match={match} teams={teams} />
             </div>
             {ladoCartao(match.timeB)}
           </div>
+          <ListaPenaltis match={match} teams={teams} />
           <div className="text-[11px] mt-3" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
             {LOCAL_NOME}
             {match.horario ? ` · ${formatarHorarioJogo(match.horario)}` : ""} · toque para eventos
