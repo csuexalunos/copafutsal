@@ -5754,88 +5754,173 @@ function ClassificacaoTabela({ matches, teams }) {
 // ---------------------------------------------------------------------------
 // TAB: Galeria
 // ---------------------------------------------------------------------------
-function RecordRow({ label, entries, highlight }) {
+function anoDe(edicao) {
+  const m = String(edicao || "").match(/\d{4}/);
+  return m ? Number(m[0]) : 0;
+}
+
+function EscudoTurma({ turma, size = 20 }) {
+  const e = ESCUDOS_TIMES[turma];
+  return e ? (
+    <img src={e} alt="" style={{ width: size, height: size }} className="object-contain shrink-0" />
+  ) : (
+    <span className="rounded-full shrink-0 inline-block" style={{ width: size, height: size, backgroundColor: COLORS.border }} />
+  );
+}
+
+function RecordRow({ label, icone, entries }) {
+  const lista = [...entries].sort((a, b) => (b.ano || 0) - (a.ano || 0));
   return (
-    <div className="mb-5 last:mb-0">
-      <div
-        className="text-xs font-semibold uppercase tracking-wide mb-2"
-        style={{ color: COLORS.gold, fontFamily: "'Inter', sans-serif" }}
-      >
-        {label}
+    <div>
+      <div className="text-xs font-bold uppercase mb-2" style={{ color: COLORS.gold, letterSpacing: "0.12em", fontFamily: "'Inter', sans-serif" }}>
+        {icone} {label}
       </div>
-      <div className="space-y-1.5">
-        {entries.map((e, i) => {
-          const turmaKey = highlight ? String(e.nome).replace(" ★", "") : null;
-          const escudo = turmaKey ? ESCUDOS_TIMES[turmaKey] : null;
-          return (
-            <div key={i} className="flex items-baseline justify-between text-sm gap-3">
-              <span className="flex items-center gap-1.5" style={{ color: COLORS.ink, fontFamily: "'Inter', sans-serif" }}>
-                {escudo && <img src={escudo} alt="" className="w-4 h-4 object-contain shrink-0" />}
-                {highlight ? `Seleção ${e.nome}` : e.nome}
-                {e.turma && <span style={{ color: COLORS.slate }}> · {e.turma}</span>}
-              </span>
-              <span
-                style={{ fontFamily: "'JetBrains Mono', monospace", color: COLORS.slate }}
-                className="text-xs shrink-0 text-right"
-              >
-                {e.ano}
-              </span>
-            </div>
+      <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${COLORS.border}` }}>
+        {lista.map((e, i) => (
+          <div
+            key={i}
+            className="flex items-center gap-2.5 px-3 py-2 text-sm"
+            style={{ backgroundColor: i % 2 ? COLORS.zebra : "transparent", fontFamily: "'Inter', sans-serif" }}
+          >
+            <span className="text-xs w-9 shrink-0" style={{ color: COLORS.slate, fontFamily: "'JetBrains Mono', monospace" }}>{e.ano}</span>
+            <EscudoTurma turma={e.turma} size={20} />
+            <span className="flex-1 min-w-0 truncate font-medium" style={{ color: COLORS.ink }}>{e.nome}</span>
+            <span className="text-xs shrink-0" style={{ color: COLORS.slate }}>{e.turma}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function HallDaFama({ config, matches, teams }) {
+  const base = (config && config.hallDaFama) || HALL_DA_FAMA;
+  const dados = { ...base, campeoes: [...(base.campeoes || [])], artilheiro: [...(base.artilheiro || [])] };
+
+  // Edição atual (VIII, 2026): entra sozinha a partir da Final e das estatísticas
+  // do app, até a organização arquivar a edição no Hall da Fama.
+  const ANO_ATUAL = 2026;
+  const jaArquivada = dados.campeoes.some((c) => anoDe(c.edicao) === ANO_ATUAL || /VIII|8ª/.test(c.edicao || ""));
+  let edicaoAtualAoVivo = false;
+  if (!jaArquivada) {
+    const final = (matches || []).find((m) => m.fase === "Final");
+    if (final && jogoDecidido(final)) {
+      const campeao = (teams || []).find((t) => t.id === vencedorJogo(final));
+      if (campeao) {
+        dados.campeoes.push({ edicao: String(ANO_ATUAL), turma: campeao.nome });
+        edicaoAtualAoVivo = true;
+        // Artilheiro pelos números do app
+        const gols = {};
+        (matches || []).forEach((m) =>
+          (m.eventos || []).forEach((ev) => {
+            if (ev.tipo !== "gol" || !ev.jogador) return;
+            const k = `${normalizarTexto(ev.jogador)}|${ev.timeNome}`;
+            gols[k] = gols[k] || { nome: ev.jogador, turma: ev.timeNome, n: 0 };
+            gols[k].n += 1;
+          })
+        );
+        const lista = Object.values(gols).sort((a, b) => b.n - a.n);
+        if (lista.length && lista[0].n > 0) {
+          lista.filter((p) => p.n === lista[0].n).forEach((p) =>
+            dados.artilheiro.push({ ano: ANO_ATUAL, nome: `${p.nome} (${p.n} ${p.n === 1 ? "gol" : "gols"})`, turma: p.turma })
           );
-        })}
-      </div>
-    </div>
-  );
-}
+        }
+      }
+    }
+  }
 
-function HallDaFama({ config }) {
-  const dados = (config && config.hallDaFama) || HALL_DA_FAMA;
-  const contagem = {};
-  dados.campeoes.forEach((c) => {
-    contagem[c.turma] = (contagem[c.turma] || 0) + 1;
+  const camps = dados.campeoes.map((c) => ({ ano: anoDe(c.edicao), turma: c.turma })).sort((a, b) => b.ano - a.ano);
+  const porTurma = {};
+  camps.forEach((c) => {
+    porTurma[c.turma] = porTurma[c.turma] || { turma: c.turma, anos: [] };
+    porTurma[c.turma].anos.push(c.ano);
   });
-  const campeoesComMarca = dados.campeoes.map((c) => ({
-    nome: c.turma + (contagem[c.turma] > 1 ? " ★" : ""),
-    ano: c.edicao,
-  }));
+  const ranking = Object.values(porTurma).sort((a, b) => b.anos.length - a.anos.length || Math.max(...b.anos) - Math.max(...a.anos));
+  const nomeTitulos = (n) => (n >= 3 ? "Tricampeã" : n === 2 ? "Bicampeã" : "Campeã");
+  const ultimo = camps[0];
 
   return (
-    <div
-      className="rounded-2xl p-5 sm:p-6 mb-8"
-      style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}
-    >
-      <div className="flex items-center gap-2 mb-5">
-        <div
-          className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
-          style={{ backgroundColor: COLORS.goldSoft }}
-        >
-          <Trophy size={16} color={COLORS.gold} />
+    <div>
+      {/* Cabeçalho */}
+      <div className="flex items-center gap-3 mb-5">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: COLORS.goldSoft }}>
+          <Trophy size={18} color={COLORS.gold} />
         </div>
-        <h3 className="font-bold text-lg" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>
-          Hall da Fama — 7 edições
-        </h3>
+        <div>
+          <h3 className="font-bold text-lg leading-tight" style={{ fontFamily: "'Sora', sans-serif", color: COLORS.ink }}>Hall da Fama</h3>
+          <p className="text-xs" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            {camps.length} edições · {ranking.length} turmas campeãs
+          </p>
+        </div>
       </div>
 
-      <RecordRow label="Campeões por edição" entries={campeoesComMarca} highlight />
-      <p className="text-xs mt-1.5 mb-2" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
-        ★ = bicampeão
-      </p>
+      {/* Campeão mais recente */}
+      {ultimo && (
+        <div
+          className="rounded-2xl p-5 mb-5 text-center"
+          style={{ background: "linear-gradient(160deg, rgba(242,183,5,0.22) 0%, rgba(242,183,5,0.04) 70%)", border: `1px solid ${COLORS.gold}55` }}
+        >
+          <div className="text-[11px] font-bold uppercase mb-2" style={{ color: COLORS.gold, letterSpacing: "0.2em", fontFamily: "'Inter', sans-serif" }}>
+            Último campeão · {ultimo.ano}
+          </div>
+          <div className="flex justify-center mb-2"><EscudoTurma turma={ultimo.turma} size={72} /></div>
+          <div className="text-2xl font-bold" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>Turma {ultimo.turma}</div>
+          <div className="text-xs mt-1" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+            {nomeTitulos(porTurma[ultimo.turma].anos.length)} · {porTurma[ultimo.turma].anos.length}º título
+          </div>
+        </div>
+      )}
 
-      <div className="grid sm:grid-cols-2 gap-x-10 gap-y-5 mt-2 pt-5" style={{ borderTop: `1px solid ${COLORS.border}` }}>
-        <RecordRow label="Melhor jogador" entries={dados.melhorJogador} />
-        <RecordRow label="Artilheiro" entries={dados.artilheiro} />
-        <RecordRow label="Melhor goleiro" entries={dados.melhorGoleiro} />
-        <RecordRow label="Gol mais bonito" entries={dados.golMaisBonito} />
+      {/* Maiores campeões */}
+      <div className="text-xs font-bold uppercase mb-2" style={{ color: COLORS.gold, letterSpacing: "0.12em", fontFamily: "'Inter', sans-serif" }}>
+        🏆 Maiores campeões
       </div>
+      <div className="grid grid-cols-2 gap-2 mb-6">
+        {ranking.map((r) => (
+          <div key={r.turma} className="rounded-xl p-3 flex items-center gap-2.5" style={{ backgroundColor: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+            <EscudoTurma turma={r.turma} size={36} />
+            <div className="min-w-0">
+              <div className="text-sm font-bold" style={{ color: COLORS.ink, fontFamily: "'Sora', sans-serif" }}>
+                {r.turma} <span style={{ color: COLORS.gold }}>×{r.anos.length}</span>
+              </div>
+              <div className="text-[11px] truncate" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+                {[...r.anos].sort((a, b) => b - a).join(" · ")}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Linha do tempo */}
+      <div className="mb-6">
+        <RecordRow
+          label="Campeões por edição"
+          icone="🗓"
+          entries={camps.map((c) => ({ ano: c.ano, nome: `Turma ${c.turma}`, turma: porTurma[c.turma].anos.length > 1 ? `×${porTurma[c.turma].anos.length}` : "" }))}
+        />
+      </div>
+
+      {/* Prêmios individuais */}
+      <div className="grid sm:grid-cols-2 gap-x-6 gap-y-6">
+        <RecordRow label="Melhor jogador" icone="⭐" entries={dados.melhorJogador} />
+        <RecordRow label="Artilheiro" icone="⚽" entries={dados.artilheiro} />
+        <RecordRow label="Melhor goleiro" icone="🧤" entries={dados.melhorGoleiro} />
+        <RecordRow label="Gol mais bonito" icone="🎯" entries={dados.golMaisBonito} />
+      </div>
+      {edicaoAtualAoVivo && (
+        <p className="text-[11px] mt-4 text-center" style={{ color: COLORS.slate, fontFamily: "'Inter', sans-serif" }}>
+          Campeão e artilheiro de 2026 vêm direto dos resultados do app. Os prêmios votados entram quando a organização arquivar a edição.
+        </p>
+      )}
     </div>
   );
 }
 
-function Galeria({ config }) {
+function Galeria({ config, matches, teams }) {
   return (
     <div>
       <SectionLabel eyebrow="Memória" title="Galeria das edições" />
-      <HallDaFama config={config} />
+      <HallDaFama config={config} matches={matches} teams={teams} />
     </div>
   );
 }
@@ -17076,7 +17161,7 @@ export default function App() {
             {tab === "classificacao" && <Classificacao matches={matches} teams={teamsInscritos} />}
             {tab === "sorteios" && <SorteiosCopa premios={premios} savePremios={savePremios} sessao={sessao} perfis={perfis} setPerfis={setPerfis} totalPessoas={totalPessoas} />}
             {tab === "comunidade" && <Comunidade posts={posts} savePosts={savePosts} sessao={sessao} />}
-            {tab === "galeria" && <Galeria config={config} />}
+            {tab === "galeria" && <Galeria config={config} matches={matches} teams={teams} />}
             {tab === "organizacao" && (
               <Organizacao
                 teams={teams}
