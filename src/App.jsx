@@ -5764,14 +5764,14 @@ function EscudoTurma({ turma, size = 20 }) {
   return e ? (
     <img src={e} alt="" style={{ width: size, height: size }} className="object-contain shrink-0" />
   ) : (
-    <span className="rounded-full shrink-0 inline-block" style={{ width: size, height: size, backgroundColor: COLORS.border }} />
+    <span className="shrink-0 inline-block" style={{ width: size, height: size }} />
   );
 }
 
 function RecordRow({ label, icone, entries }) {
   const lista = [...entries].sort((a, b) => (b.ano || 0) - (a.ano || 0));
   return (
-    <div>
+    <div className="min-w-0">
       <div className="text-xs font-bold uppercase mb-2" style={{ color: COLORS.gold, letterSpacing: "0.12em", fontFamily: "'Inter', sans-serif" }}>
         {icone} {label}
       </div>
@@ -5784,8 +5784,8 @@ function RecordRow({ label, icone, entries }) {
           >
             <span className="text-xs w-9 shrink-0" style={{ color: COLORS.slate, fontFamily: "'JetBrains Mono', monospace" }}>{e.ano}</span>
             <EscudoTurma turma={e.turma} size={20} />
-            <span className="flex-1 min-w-0 truncate font-medium" style={{ color: COLORS.ink }}>{e.nome}</span>
-            <span className="text-xs shrink-0" style={{ color: e.extra ? COLORS.gold : COLORS.slate, fontWeight: e.extra ? 700 : 400, fontFamily: e.extra ? "'JetBrains Mono', monospace" : undefined }}>{e.extra || e.turma}</span>
+            <span className="flex-1 min-w-0 font-medium leading-snug" style={{ color: COLORS.ink, overflowWrap: "anywhere" }}>{e.nome}</span>
+            <span className="text-xs shrink-0 text-right" style={{ maxWidth: "36%", overflowWrap: "anywhere", color: e.extra ? COLORS.gold : COLORS.slate, fontWeight: e.extra ? 700 : 400, fontFamily: e.extra ? "'JetBrains Mono', monospace" : undefined }}>{e.extra || e.turma}</span>
           </div>
         ))}
       </div>
@@ -5840,7 +5840,7 @@ function HallDaFama({ config, matches, teams }) {
   const ultimo = camps[0];
 
   return (
-    <div>
+    <div className="min-w-0 overflow-x-hidden">
       {/* Cabeçalho */}
       <div className="flex items-center gap-3 mb-5">
         <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: COLORS.goldSoft }}>
@@ -5907,7 +5907,7 @@ function HallDaFama({ config, matches, teams }) {
       </div>
 
       {/* Prêmios individuais */}
-      <div className="grid sm:grid-cols-2 gap-x-6 gap-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6 min-w-0">
         <RecordRow label="Melhor jogador" icone="⭐" entries={dados.melhorJogador} />
         <RecordRow label="Artilheiro" icone="⚽" entries={dados.artilheiro} />
         <RecordRow label="Melhor goleiro" icone="🧤" entries={dados.melhorGoleiro} />
